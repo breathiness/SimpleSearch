@@ -66,6 +66,9 @@
                   case "github":
                       window.location.href = "https://github.com";
                       break
+                  case "unsplash":
+                      window.location.href = "https://unsplash.com/";
+                      break
                   case "bilibili":
                       window.location.href = "https://www.bilibili.com";
                       break
@@ -98,6 +101,9 @@
               switch(site) {
                   case "github":
                       window.location.href = `https://github.com/search?q=${searchQuery}`;
+                      break
+                  case "unsplash":
+                      window.location.href = `https://unsplash.com/search?q=${searchQuery}`;
                       break
                   case "bilibili":
                       window.location.href = `https://search.bilibili.com/all?keyword=${searchQuery}`;
@@ -144,6 +150,7 @@
     </div>
     <div id="buttons-container">
         <button class="button" onclick="searchSite('github')">GitHub</button>
+        <button class="button" onclick="searchSite('unsplash')">unsplash</button>
         <button class="button" onclick="searchSite('bilibili')">哔哩哔哩</button>
         <button class="button" onclick="searchSite('sspai')">少数派</button>
         <button class="button" onclick="searchSite('moegirl')">萌娘百科</button>
