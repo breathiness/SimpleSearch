@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<html>
+<head>
+    <title>简单搜索</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+        #search-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 50vh;
+        }
+        #search-form {
+            display: flex;
+            align-items: center;
+        }
+        #search-form input[type="text"] {
+            font-size: 18px;
+            padding: 12px 20px;
+            margin: 8px 0;
+            box-sizing: border-box;
+            border: 2px solid #ccc;
+            border-radius: 4px;
+			background-color:#FFFFFF;
+        }
+        #search-form input[type="submit"] {
+          display:none
+        }
+        #buttons-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content:center;
+        }
+        .button {
+          background-color:#fafafa;
+          border:none;
+          color:#757575;
+          padding:0px 16px;
+          text-align:center;
+          text-decoration:none;
+          display:inline-block;
+          font-size:14px;
+          line-height:36px;
+          margin:4px 2px;
+          cursor:pointer
+        }
+        .clear-button {
+          padding:6px 16px !important
+        }
+        .button:hover {
+          box-shadow:0 1px 3px rgba(0,0,0,.12),0 1px 2px rgba(0,0,0,.24)
+        }
+    </style>
+    <script>
+        function searchSite(site) {
+          var searchQuery = document.getElementById("search-input").value
+          if (searchQuery === "") {
+              switch(site) {
+                  case "github":
+                      window.location.href = "https://github.com";
+                      break
+                  case "bilibili":
+                      window.location.href = "https://www.bilibili.com";
+                      break
+                  case "sspai":
+                      window.location.href = "https://sspai.com";
+                      break
+                  case "moegirl":
+                      window.location.href = "https://zh.moegirl.org.cn";
+                      break
+                  case "zhihu":
+                      window.location.href = "https://www.zhihu.com";
+                      break
+                  case "tieba":
+                      window.location.href = "https://tieba.baidu.com";
+                      break
+                  case "taobao":
+                      window.location.href = "https://www.taobao.com";
+                      break
+                  case "jd":
+                      window.location.href = "https://www.jd.com";
+                      break
+                  case "steam":
+                      window.location.href = "https://store.steampowered.com";
+                      break
+                  case "archwiki":
+                      window.location.href = "https://wiki.archlinux.org";
+                      break
+              }
+          } else {
+              switch(site) {
+                  case "github":
+                      window.location.href = `https://github.com/search?q=${searchQuery}`;
+                      break
+                  case "bilibili":
+                      window.location.href = `https://search.bilibili.com/all?keyword=${searchQuery}`;
+                      break
+                  case "sspai":
+                      window.location.href = `https://sspai.com/search/post/${searchQuery}`;
+                      break
+                  case "moegirl":
+                      window.location.href = `https://zh.moegirl.org.cn/index.php?search=${searchQuery}`;
+                      break
+                  case "zhihu":
+                      window.location.href = `https://www.zhihu.com/search?type=content&q=${searchQuery}`;
+                      break
+                  case "tieba":
+                      window.location.href = `https://tieba.baidu.com/f/search/res?qw=${searchQuery}`;
+                      break
+                  case "taobao":
+                      window.location.href = `https://s.taobao.com/search?q=${searchQuery}`;
+                      break
+                  case "jd":
+                      window.location.href = `https://search.jd.com/Search?keyword=${searchQuery}`;
+                      break
+                  case "steam":
+                      window.location.href = `https://store.steampowered.com/search/?term=${searchQuery}`;
+                      break
+                  case "archwiki":
+                    window.location.href = `https://wiki.archlinux.org/index.php?search=${searchQuery}`;
+                    break
+              }
+          }
+        }
+        function clearSearch() {
+            document.getElementById("search-input").value = "";
+        }
+    </script>
+</head>
+<body>
+    <div id="search-container">
+        <form id="search-form" action="https://www.bing.com/search" method="get">
+            <!-- <button class="button clear-button" onclick="clearSearch()">清除</button> -->
+            <input type="text" id="search-input" name="q" placeholder="搜索...">
+            <input type="submit" value="搜索">
+        </form>
+    </div>
+    <div id="buttons-container">
+        <button class="button" onclick="searchSite('github')">GitHub</button>
+        <button class="button" onclick="searchSite('bilibili')">哔哩哔哩</button>
+        <button class="button" onclick="searchSite('sspai')">少数派</button>
+        <button class="button" onclick="searchSite('moegirl')">萌娘百科</button>
+        <button class="button" onclick="searchSite('zhihu')">知乎</button>
+        <button class="button" onclick="searchSite('tieba')">百度贴吧</button>
+        <button class="button" onclick="searchSite('taobao')">淘宝</button>
+        <button class="button" onclick="searchSite('jd')">京东</button>
+        <button class="button" onclick="searchSite('steam')">Steam</button>
+        <button class="button" onclick="searchSite('archwiki')">ArchWiki</button>
+    </div>
+</body>
+</html>
