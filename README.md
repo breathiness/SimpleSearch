@@ -20,7 +20,7 @@
 ## 灵感来源
 
 灵感来自于AnywhereAnything网站，以及via作者写的viayoo。这两个聚合搜索网站有个我非常喜欢的功能。输入关键词，然后点网站，即在那个网站里搜索。而不输入关键词直接点击网站就是直接打开。  
-但是非常可惜的是viayoo现在改成了via浏览器的介绍页面，现在以及没办法使用了。而AnywhereAnything只能在桌面端使用，并且加载速度慢。  
+但是非常可惜的是viayoo现在改成了via浏览器的介绍页面，现在没办法使用了。而AnywhereAnything只能在桌面端使用，并且加载速度慢。  
 我其实一直都很想要一个能满足上面提到的功能，并且速度足够快的聚合搜索网站。估计是我这个需求太过小众且简单，在网络上一直没有找到有其他类似的网站。刚好最近想测试一下bing的能力如何。于是将我的需求描述了一下，然后就有了现在这个项目。
 ![5548CDA8-BAB4-4a06-88F1-10AD42AB7BF7](https://github.com/breathiness/SimpleSearch/assets/11361630/9bff05bf-e07c-4e09-a9b3-c29d72c86c49)
 
@@ -52,6 +52,10 @@
 ## 自定义网站
 
 这里面的几个网站都是我个人常用的，如果想要增加或减少网站。需要在三个地方参考对应的格式填入对应的网址。
+
+![Snipaste_2023-06-07_23-40-43](https://github.com/breathiness/SimpleSearch/assets/11361630/7110624c-600a-4495-96b8-7bcb78b3d56e)
+![Snipaste_2023-06-07_23-41-05](https://github.com/breathiness/SimpleSearch/assets/11361630/be35ae4c-c5ec-44d3-a4da-375670012736)
+![Snipaste_2023-06-07_23-41-18](https://github.com/breathiness/SimpleSearch/assets/11361630/64b69e11-985a-4ebb-9ea1-756615fc9837)
 
 ## 遗憾
 
