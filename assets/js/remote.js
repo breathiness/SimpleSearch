@@ -18,10 +18,8 @@
   let requestSeq = 0
   const cache = new Map()
   const inFlight = new Map()
-  // localStorage 不可用时的会话内开关；null = 以存储为准
   let sessionEnabled = null
 
-  // 查询词规范化：去首尾空白，连续空白折叠
   function normalize(raw) {
     if (typeof raw !== 'string') return ''
     return raw.trim().replace(/\s+/g, ' ')
@@ -40,7 +38,6 @@
     return Math.max(0, Math.min(20, Math.floor(number)))
   }
 
-  // 过滤非字符串/空串/超长，去重（大小写不敏感），截断
   function normalizeWords(words, limit) {
     const result = []
     const seen = new Set()
@@ -109,7 +106,6 @@
       cache.delete(cacheKey)
       return null
     }
-    // 命中后移到队尾，让淘汰更接近 LRU
     cache.delete(cacheKey)
     cache.set(cacheKey, entry)
     return entry.words.slice()
@@ -133,8 +129,6 @@
       '&cb=' + encodeURIComponent(callbackName)
   }
 
-  // 解析 JSONP 文本：严格 JSON 失败时给裸键补引号再试（百度回包是 JS 对象字面量）。
-  // 只用 JSON.parse + 字符串处理，不执行代码。
   function parseJsonpBody(text) {
     let body = text.trim()
     if (body === '') return null
@@ -155,7 +149,6 @@
     }
   }
 
-  // 兼容回调包裹、纯 JSON、对象/数组直接传入；字段缺失返回 []
   function parseBaiduSuggestion(input) {
     let payload = input
     if (typeof payload === 'string') payload = parseJsonpBody(payload)
@@ -193,7 +186,6 @@
 
   // ---------------------------------------------------------------- JSONP
 
-  // 注入 script 完成 JSONP；异常/超时/abort 一律 resolve([])
   function requestJsonp(query, options) {
     return new Promise((resolve) => {
       const doc = root.document
@@ -234,7 +226,6 @@
           script.onload = null
           script = null
         }
-        // 用完删除全局回调，避免泄漏
         try {
           delete root[callbackName]
         } catch (e) {
@@ -272,7 +263,6 @@
         }
       }
 
-      // 700ms 超时：删 script 中止下载并静默降级
       timer = root.setTimeout(() => finish([]), timeout)
 
       try {
@@ -321,7 +311,6 @@
       .then((words) => {
         const normalized = normalizeWords(words, MAX_REQUEST_WORDS)
         if (normalized.length > 0) writeCache(cacheKey, normalized)
-        // 期间又发了更新的查询：本次结果对调用方作废（缓存仍可复用）
         if (seq !== requestSeq) return []
         return normalized
       })

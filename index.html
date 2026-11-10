@@ -144,13 +144,25 @@
       </button>
     </div>
     <div class="panel-body">
-      <button id="theme-toggle" class="switch-row" type="button" aria-pressed="false">夜间模式</button>
-      <button id="suggest-source-toggle" class="switch-row" type="button" aria-pressed="true">联网联想</button>
+      <div class="settings-row">
+        <span class="settings-label">主题模式</span>
+        <div id="theme-mode" class="segmented" role="group" aria-label="主题模式">
+          <button class="segmented-item" type="button" data-mode="auto" aria-pressed="true">跟随系统</button>
+          <button class="segmented-item" type="button" data-mode="light" aria-pressed="false">浅色</button>
+          <button class="segmented-item" type="button" data-mode="dark" aria-pressed="false">深色</button>
+        </div>
+      </div>
       <div class="settings-row">
         <span class="settings-label">主题色</span>
         <div id="color-swatches" class="swatches" role="group" aria-label="主题色"></div>
       </div>
+      <button id="suggest-source-toggle" class="switch-row" type="button" aria-pressed="true">联网联想</button>
+      <div class="settings-row settings-row-inline">
+        <span class="settings-label">搜索历史 <span id="history-count" class="settings-value">0 条</span></span>
+        <button id="history-clear" class="text-button" type="button" disabled>清空</button>
+      </div>
       <a class="panel-link" href="https://github.com/breathiness/SimpleSearch">GitHub 仓库 · 关于</a>
+      <p class="panel-version">简单搜索 v2.5.0</p>
     </div>
   </aside>
 

@@ -185,9 +185,20 @@ function readTemplate(relative) {
   return fs.readFileSync(file, 'utf8')
 }
 
+function readAppVersion() {
+  const pkgPath = path.join(ROOT, 'package.json')
+  try {
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'))
+    return String(pkg.version || '0.0.0')
+  } catch {
+    return '0.0.0'
+  }
+}
+
 async function main() {
   const pageTemplate = readTemplate(PAGE.template)
   const redirectTemplate = readTemplate('templates/redirect.html')
+  const appVersion = readAppVersion()
 
   const SS = await loadRegistry()
   validateSites(SS.sites)
@@ -205,6 +216,7 @@ async function main() {
         ...PAGE.values,
         '{{ICON_SPRITE}}': renderIconSprite(SS.sites, SITE_ICONS),
         '{{GROUP_NAV}}': renderGroupNav(groups),
+        '{{APP_VERSION}}': escapeHtml(appVersion),
         '{{SITE_BUTTONS}}': renderSiteButtons(SS.sites, SITE_ICONS),
       },
       PAGE.output

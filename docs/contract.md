@@ -296,7 +296,7 @@ npm run serve      # 本地静态服务器 http://127.0.0.1:8080
 6. 关闭联网联想（`ss.remote='off'`）时**零第三方网络请求**，全部核心功能离线可用。
 7. 开启联网联想时：请求只发往 provider 域（百度），700ms 超时/失败静默降级为本地联想，永不阻塞键盘。
 8. `file://` 直接打开可用（无 CORS 报错、无 module 加载失败；联网联想在 file:// 下也能工作）。
-9. 单文件页面 + 全部资源体积目标：< 100 KB（gzip 前；v2.3 文档站骨架后实际约 95 KB，gzip 后约 33 KB）。内联图标 sprite 约 3.8 KB（gzip 0.85 KB）且零额外请求。
+9. 单文件页面 + 全部资源体积目标：< 128 KB（gzip 前；v2.5 实际约 120 KB，gzip 后约 38 KB）。内联图标 sprite 约 5.6 KB（gzip 0.97 KB）且零额外请求。**以 gzip 体积为真实成本口径**（GitHub Pages 默认 gzip）。
 
 ## 10. 沟通规则
 
@@ -381,7 +381,7 @@ SS.siteGroups = [
 - `scripts/build.mjs` 把用到的图标渲染成一个隐藏的 `<svg class="icon-sprite">` + `<symbol id="i-<siteId>">`，插在 `<body>` 开头；每个按钮里放 `<svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-<siteId>"></use></svg>`。
 - 没有配图标的站点（用户自加的站点）**不留空**：渲染 `<span class="button-icon button-icon-text" aria-hidden="true">首字符</span>` 做字母/汉字 monogram 兜底。
 - 图标风格：24×24 viewBox、`fill="none"` + `stroke="currentColor"` + 1.8 线宽 + 圆头，**通用几何符号而不是他人商标的精确复制**（避免商标问题）。
-- 体积红线：sprite 全部内联后 HTML 增量 ≤ 4 KB（未压缩），全站仍满足 §9.9 的 100 KB 预算（当前约 95 KB）；首屏不得因此新增任何网络请求。
+- 体积红线：sprite 全部内联后 HTML 增量 ≤ 4 KB（未压缩），全站仍满足 §9.9 的 128 KB 预算（当前约 120 KB）；首屏不得因此新增任何网络请求。
 
 ## 14. v2.3：改成 MDUI 文档站式骨架（用户要求）
 
@@ -423,7 +423,7 @@ SS.siteGroups = [
 
 ### 14.2 图标（继续内联，零请求）
 
-`scripts/icons.mjs` 分两组：`SITE_ICONS`（11 个站点图标）+ `UI_ICONS`（`menu` 汉堡、`settings` 设置、`close` 关闭）。build 把两组都塞进同一个 `<svg class="icon-sprite">`，UI 图标的 `<symbol id="i-menu">` 等。sprite 体积仍须 ≤ 6 KB（未压缩），全站 ≤ 100 KB。
+`scripts/icons.mjs` 分两组：`SITE_ICONS`（11 个站点图标）+ `UI_ICONS`（`menu` 汉堡、`settings` 设置、`close` 关闭）。build 把两组都塞进同一个 `<svg class="icon-sprite">`，UI 图标的 `<symbol id="i-menu">` 等。sprite 体积仍须 ≤ 6 KB（未压缩），全站 ≤ 128 KB。
 
 ### 14.3 验收门增补
 
@@ -479,4 +479,53 @@ SS.siteGroups = [
 
 - 每个 `.nav-item` 内含 `<svg class="nav-icon"><use href="#i-cat-<group>"></use></svg>` + `<span class="nav-label">…</span>`；`all` 用网格图标。
 - `UI_ICONS` 新增 `cat-all`（九宫格）、`cat-tech`（终端）、`cat-community`（对话气泡）、`cat-media`（播放电视）、`cat-shopping`（手提袋）、`cat-content`（相机）。
-- sprite 体积红线：≤ 8 KB（未压缩）；全站预算 ≤ 110 KB。
+- sprite 体积红线：≤ 8 KB（未压缩）；全站预算 ≤ 128 KB。
+
+## 16. v2.5：深链、主题三态、历史管理、站点自检、版本号（批次 A 去掉 `?q=` 默认搜索引擎）
+
+用户明确**不做**「把自己设成浏览器默认搜索引擎（`?q=%s` 自动提交）」，其余照做。
+
+### 16.1 深链（只预填/预选，不自动跳转）
+
+- `?cat=<groupId>`：进入时选中该分类（等价点击该 `.nav-item`，`aria-current` 同步）；点分类时用 `history.replaceState` 把 URL 同步为 `?cat=<id>`（`all` 时删除参数），便于收藏/分享。非法 cat 忽略。
+- `?q=<term>`：把查询词填入 `#search-input` 并聚焦（光标在末尾），**不自动提交**、不跳转。
+- `?site=<siteId>`：选中该站点所属分类，并把焦点移到对应站点按钮（**不跳转**）。非法 id 忽略。
+- 三个参数可组合，执行顺序：cat → site → q（q 最后，保证聚焦在输入框）。处理后**不要**用 replaceState 删掉这些参数（与 `?theme=` 不同，深链是可分享状态）。
+
+### 16.2 主题三态（跟随系统 / 浅色 / 深色）
+
+- **移除**设置面板里的「夜间模式」开关行 `#theme-toggle`（连带其 aria-pressed 语义），改为分段控件：
+```html
+<div class="settings-row">
+  <span class="settings-label">主题模式</span>
+  <div id="theme-mode" class="segmented" role="group" aria-label="主题模式">
+    <button class="segmented-item" type="button" data-mode="auto" aria-pressed="true">跟随系统</button>
+    <button class="segmented-item" type="button" data-mode="light" aria-pressed="false">浅色</button>
+    <button class="segmented-item" type="button" data-mode="dark" aria-pressed="false">深色</button>
+  </div>
+</div>
+```
+- 语义：`data-mode="auto"` 时不写 `ss.theme`（跟随系统 + 实时响应系统变化）；`light`/`dark` 写 `ss.theme`。`theme.js` 新增 `getMode()` / `setMode(mode)`，`applyMode()` 同步 `aria-pressed`；`init()` 绑定分段按钮。旧的 `toggle()` 保留给内部/测试用。
+- `?theme=light|dark` 深链仍然优先（进入时等价于 setMode 该值并持久化）——注意这是老链接语义，保留。
+
+### 16.3 搜索历史管理
+
+- 设置面板新增一行：
+```html
+<div class="settings-row settings-row-inline">
+  <span class="settings-label">搜索历史 <span id="history-count" class="settings-value">0 条</span></span>
+  <button id="history-clear" class="text-button" type="button" disabled>清空</button>
+</div>
+```
+- `#history-count` 显示 `SS.history.list().length` 条；`#history-clear` 在 0 条时 `disabled`。点击 → `SS.history.clear()` → 刷新计数 → 关闭联想列表。
+- **单条删除**：联想列表里 `data-type="history"` 的项，鼠标路径上提供一个 `.suggest-delete` 小按钮（`aria-label="删除这条历史"`，`tabindex="-1"`，点击 `stopPropagation` 后删除该条并重渲染）；键盘路径：高亮 history 项时按 `Delete` 键删除。
+- 历史写入仍只由 `app.js` 负责；app.js 在每次 `record()` 后 `document.dispatchEvent(new CustomEvent('ss:history-changed'))`，input.js 监听它刷新计数（含清空/单删后自己刷新）。
+
+### 16.4 版本号显示
+
+- 设置面板底部新增 `<p class="panel-version">简单搜索 v{{APP_VERSION}}</p>`（`{{APP_VERSION}}` 由 build 从 package.json 读取注入；小号次要色）。
+
+### 16.5 站点健康自检（可选网络，不进 CI）
+
+- 新增 `scripts/check-sites.mjs` + `npm run check:sites`：逐个站点请求 `home` 与 `search`（把 `{q}` 换成 `test`），8s 超时、`redirect: 'follow'`，输出表格：站点 id、home 状态、search 状态、最终 URL、判定（OK / 重定向到首页 / 非 2xx / 网络失败）。
+- 默认退出码 0（只报告）；`--strict` 时有 FAIL 退出 1。**不加入 `npm run check` 和 CI**（避免网络抖动误伤）。

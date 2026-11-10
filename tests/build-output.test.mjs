@@ -1,9 +1,11 @@
-// v2.4 产物静态校验：MDUI 文档站骨架 + 主题色 + 内联 SVG sprite（契约 §13、§14、§15）。
+// v2.5 产物静态校验：MDUI 文档站骨架 + 主题三态 + 历史行/版本号 + 内联 SVG sprite（契约 §13、§14、§15、§16）。
 //
 // 直接对生成的 index.html / tokens.css 做静态解析（不跑浏览器）：
 //   - 骨架：.appbar（含 .appbar-logo → #i-logo）/ .shell / #main-content / 卡片 / 左侧 #site-nav
 //   - 分类：nav-item 数量 = 分组数 + 1，aria-current 选中语义；每个 nav-item 有 .nav-icon（#i-cat-<group>）+ .nav-label
-//   - 设置面板：#settings-panel[role=dialog][hidden]、两个 .switch-row（固定文案）、主题色行 .settings-row + #color-swatches（空容器）
+//   - 设置面板：#settings-panel[role=dialog][hidden]、#theme-mode 三段式（auto/light/dark）、唯一 .switch-row（联网联想）、
+//     主题色行 .settings-row + 空 #color-swatches、历史行（#history-count「0 条」+ #history-clear[disabled]）、
+//     .panel-version「简单搜索 v<semver>」；不得存在 #theme-toggle
 //   - 无 #site-footer；<html data-color="indigo">
 //   - tokens.css：19 组 :root[data-color='…']（每组 4 个 --c-*）+ 语义变量 --primary-bg 等
 //   - sprite：11 站点 + 3 UI(menu/settings/close) + 1 logo + 6 分类 = 21 个 symbol，体积 ≤ 8KB
@@ -76,15 +78,15 @@ const TOKENS = 'assets/css/tokens.css'
 const present = hasRepo(INDEX)
 const html = present ? readRepo(INDEX) : ''
 const built = present && BUILD_MARKER.test(html)
-// v2.4 签名：<html data-color=…> 或 .appbar-logo / #i-logo / nav-icon。
-// 没有 = lead 还没重建 v2.4 产物，按任务约定先 skip，等「产物已重建」通知后跑真值。
-const isV24 = built && /data-color|appbar-logo|nav-icon|i-logo/.test(html)
+// v2.5 签名：#theme-mode 分段控件 / #history-count / .panel-version。
+// 没有 = lead 还没重建 v2.5 产物，按任务约定先 skip，等「产物已重建」通知后跑真值。
+const isV25 = built && /theme-mode|history-count|panel-version/.test(html)
 const skipReason = !present
   ? '等待 lead 重建产物：index.html 不存在'
   : !built
     ? '等待 lead 重建产物：index.html 不是 build.mjs 生成物'
-    : !isV24
-      ? '等待 lead「产物已重建」：当前 index.html 还是 v2.3 产物（无 data-color/logo/nav-icon）'
+    : !isV25
+      ? '等待 lead「产物已重建」：当前 index.html 还是 v2.4 产物（无 #theme-mode/#history-count/.panel-version）'
       : null
 
 function testOutput(name, fn) {
@@ -264,6 +266,56 @@ function extractSwitchRows(source) {
     rows.push({ id: getAttr(openTag, 'id'), pressed: getAttr(openTag, 'aria-pressed'), text, openTag })
   }
   return rows
+}
+
+/** 查找内部 HTML 含 token 的 .settings-row（v2.5 有多行，且 <div class="settings-row"> 重复出现，
+ *  必须按 match.index 计算各自的内部区域，不能再用 indexOf(tag) 取第一次出现）。 */
+function findSettingsRowContaining(source, token) {
+  const text = String(source)
+  const tagRe = /<([a-zA-Z][\w:-]*)\b[^>]*>/g
+  for (const match of text.matchAll(tagRe)) {
+    const tag = match[0]
+    if (!hasClass(tag, 'settings-row')) continue
+    const tagName = match[1]
+    const start = match.index + tag.length
+    const end = text.indexOf(`</${tagName}>`, start)
+    if (end === -1) continue
+    const inner = text.slice(start, end)
+    if (inner.includes(token)) return { openTag: tag, inner }
+  }
+  return null
+}
+
+/** v2.5 §16.2：主题三态分段控件 #theme-mode > 3 个 .segmented-item[data-mode]。 */
+function extractSegmented(source) {
+  const container = findTagById(source, 'theme-mode')
+  if (!container) return null
+  const tagName = (container.match(/^<([a-zA-Z][\w:-]*)/) || [])[1]
+  const inner = innerOfTag(source, container, tagName) || ''
+  const items = []
+  for (const match of inner.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/gi)) {
+    const tag = match[0]
+    const openTag = tag.slice(0, tag.indexOf('>') + 1)
+    if (!hasClass(openTag, 'segmented-item')) continue
+    items.push({
+      mode: getAttr(openTag, 'data-mode'),
+      pressed: getAttr(openTag, 'aria-pressed'),
+      type: getAttr(openTag, 'type'),
+      text: textOf(tag.slice(tag.indexOf('>') + 1, tag.lastIndexOf('</button>'))),
+      openTag,
+    })
+  }
+  return {
+    container,
+    role: getAttr(container, 'role'),
+    label: getAttr(container, 'aria-label'),
+    hasSegmentedClass: hasClass(container, 'segmented'),
+    items,
+  }
+}
+
+function hasDisabledAttr(openTag) {
+  return /\sdisabled(?:\s|=|>|\/)/i.test(openTag)
 }
 
 // ---------------------------------------------------------------- tokens.css 解析
@@ -522,9 +574,9 @@ testOutput('nav-item 的 aria-current：初始只有「全部」为 true，同�
   assert.equal(current[0].group, 'all', '初始选中的必须是「全部」分类')
 })
 
-// ---------------------------------------------------------------- 设置面板（v2.3 + v2.4 主题色行）
+// ---------------------------------------------------------------- 设置面板（v2.5：主题三态 / 历史行 / 版本号）
 
-testOutput('#settings-panel 是隐藏的 dialog，含标题/关闭按钮/两个开关/面板链接', () => {
+testOutput('#settings-panel 是隐藏的 dialog，含标题/关闭按钮/面板链接；唯一 .switch-row 是联网联想', () => {
   const clean = stripHtmlComments(html)
   const panel = findTagById(clean, 'settings-panel')
   assert.ok(panel, '缺少 #settings-panel')
@@ -535,38 +587,61 @@ testOutput('#settings-panel 是隐藏的 dialog，含标题/关闭按钮/两个�
   assert.ok(findTagById(clean, 'settings-title'), '缺少 #settings-title')
   assert.ok(findTagById(clean, 'settings-close'), '缺少 #settings-close')
   assert.ok(findTagWithClass(clean, 'panel-link'), '缺少 .panel-link（关于链接）')
-  assert.equal(extractSwitchRows(clean).length, 2, '#settings-panel 内应恰好有 2 个 .switch-row')
-})
 
-testOutput('两个 .switch-row：id 正确、文案固定、初始 aria-pressed 正确（theme=false / remote=true）', () => {
-  const clean = stripHtmlComments(html)
   const rows = extractSwitchRows(clean)
-  const byId = new Map(rows.map((row) => [row.id, row]))
-
-  const themeRow = byId.get('theme-toggle')
-  assert.ok(themeRow, '缺少 #theme-toggle.switch-row')
-  assert.equal(themeRow.text, '夜间模式', `#theme-toggle 文案应固定为「夜间模式」，实际 ${JSON.stringify(themeRow.text)}`)
-  assert.equal(themeRow.pressed, 'false', `#theme-toggle 初始 aria-pressed 应为 "false"，实际 ${JSON.stringify(themeRow.pressed)}`)
-
-  const remoteRow = byId.get('suggest-source-toggle')
-  assert.ok(remoteRow, '缺少 #suggest-source-toggle.switch-row')
-  assert.equal(remoteRow.text, '联网联想', `#suggest-source-toggle 文案应固定为「联网联想」，实际 ${JSON.stringify(remoteRow.text)}`)
-  assert.equal(remoteRow.pressed, 'true', `#suggest-source-toggle 初始 aria-pressed 应为 "true"，实际 ${JSON.stringify(remoteRow.pressed)}`)
+  assert.equal(rows.length, 1, `v2.5 起 .switch-row 只剩 #suggest-source-toggle 一个，实际 ${rows.length} 个`)
+  const remoteRow = rows[0]
+  assert.equal(remoteRow.id, 'suggest-source-toggle')
+  assert.equal(remoteRow.text, '联网联想', `#suggest-source-toggle 文案应固定为「联网联想」`)
+  assert.equal(remoteRow.pressed, 'true', `#suggest-source-toggle 初始 aria-pressed 应为 "true"`)
 })
 
-testOutput('v2.4 主题色行：.settings-row > .settings-label「主题色」+ 空容器 #color-swatches.swatches', () => {
+testOutput('#theme-mode 分段控件：3 个 .segmented-item（auto/light/dark，初始只有 auto aria-pressed=true）', () => {
   const clean = stripHtmlComments(html)
-  const settingsRow = findTagWithClass(clean, 'settings-row')
-  assert.ok(settingsRow, '设置面板里缺少 .settings-row（主题色行）')
+  const segmented = extractSegmented(clean)
+  assert.ok(segmented, '缺少 #theme-mode 分段控件')
+  assert.ok(segmented.hasSegmentedClass, '#theme-mode 应带 .segmented 类')
+  assert.equal((segmented.role || '').toLowerCase(), 'group', '#theme-mode 的 role 应为 group')
+  assert.equal(segmented.label, '主题模式', '#theme-mode 的 aria-label 应为「主题模式」')
 
-  const label = findTagWithClass(clean, 'settings-label')
-  assert.ok(label, '缺少 .settings-label')
-  const labelTagName = (label.match(/^<([a-zA-Z][\w:-]*)/) || [])[1]
-  assert.equal(
-    textOf(innerOfTag(clean, label, labelTagName)),
-    '主题色',
-    '.settings-label 文案应为「主题色」',
+  assert.equal(segmented.items.length, 3, `#theme-mode 内应有 3 个 .segmented-item，实际 ${segmented.items.length}`)
+  assert.deepEqual(
+    [...segmented.items.map((item) => item.mode)],
+    ['auto', 'light', 'dark'],
+    '分段项 data-mode 顺序应为 auto / light / dark',
   )
+  assert.deepEqual(
+    [...segmented.items.map((item) => item.text)],
+    ['跟随系统', '浅色', '深色'],
+    '分段项文案应为「跟随系统 / 浅色 / 深色」',
+  )
+
+  for (const item of segmented.items) {
+    assert.ok(
+      item.pressed === 'true' || item.pressed === 'false',
+      `分段项 ${item.mode} 的 aria-pressed 缺失或非法：${JSON.stringify(item.pressed)}`,
+    )
+  }
+  const pressed = segmented.items.filter((item) => item.pressed === 'true')
+  assert.equal(pressed.length, 1, `初始应只有一个分段项 aria-pressed="true"，实际 ${pressed.length} 个`)
+  assert.equal(pressed[0].mode, 'auto', '初始选中的应为「跟随系统」(data-mode="auto")')
+})
+
+testOutput('#theme-toggle 已移除：不得存在 id="theme-toggle"', () => {
+  const clean = stripHtmlComments(html)
+  assert.ok(!/id\s*=\s*["']theme-toggle["']/i.test(clean), 'v2.5 已移除 #theme-toggle，页面里不应再出现')
+})
+
+testOutput('主题色行：主题色 .settings-row 内 .settings-label「主题色」+ 空容器 #color-swatches.swatches', () => {
+  const clean = stripHtmlComments(html)
+  const row = findSettingsRowContaining(clean, 'color-swatches')
+  assert.ok(row, '设置面板里缺少含 #color-swatches 的 .settings-row（主题色行）')
+
+  const labelMatch = row.inner.match(
+    /<span\b[^>]*\bclass\s*=\s*["'][^"']*\bsettings-label\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/i,
+  )
+  assert.ok(labelMatch, '主题色行缺少 .settings-label')
+  assert.equal(textOf(labelMatch[1]), '主题色', '主题色行 .settings-label 文案应为「主题色」')
 
   const swatches = findTagById(clean, 'color-swatches')
   assert.ok(swatches, '缺少 #color-swatches')
@@ -574,7 +649,48 @@ testOutput('v2.4 主题色行：.settings-row > .settings-label「主题色」+ 
   const swatchTagName = (swatches.match(/^<([a-zA-Z][\w:-]*)/) || [])[1]
   const inner = innerOfTag(clean, swatches, swatchTagName)
   assert.ok(inner !== null, '无法读取 #color-swatches 内容')
-  assert.equal(inner.trim(), '', `#color-swatches 在产物里必须是空容器（色块由 theme.js 运行时生成），实际内容：${JSON.stringify(inner.trim())}`)
+  assert.equal(
+    inner.trim(),
+    '',
+    `#color-swatches 在产物里必须是空容器（色块由 theme.js 运行时生成），实际内容：${JSON.stringify(inner.trim())}`,
+  )
+})
+
+testOutput('v2.5 历史行：.settings-row-inline 内「搜索历史」+ #history-count「0 条」+ #history-clear[disabled]', () => {
+  const clean = stripHtmlComments(html)
+  const row = findSettingsRowContaining(clean, 'history-count')
+  assert.ok(row, '设置面板里缺少含 #history-count 的 .settings-row（历史行）')
+  assert.ok(hasClass(row.openTag, 'settings-row-inline'), '历史行应带 .settings-row-inline 类')
+
+  const labelMatch = row.inner.match(
+    /<span\b[^>]*\bclass\s*=\s*["'][^"']*\bsettings-label\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/i,
+  )
+  assert.ok(labelMatch, '历史行缺少 .settings-label')
+  assert.match(textOf(labelMatch[1]) || '', /搜索历史/, '历史行 .settings-label 应含「搜索历史」')
+
+  const count = findTagById(clean, 'history-count')
+  assert.ok(count, '缺少 #history-count')
+  assert.ok(hasClass(count, 'settings-value'), '#history-count 应带 .settings-value')
+  const countTagName = (count.match(/^<([a-zA-Z][\w:-]*)/) || [])[1]
+  assert.equal(textOf(innerOfTag(clean, count, countTagName)), '0 条', '#history-count 初始应为「0 条」')
+
+  const clearButton = findTagById(clean, 'history-clear')
+  assert.ok(clearButton, '缺少 #history-clear')
+  assert.ok(hasClass(clearButton, 'text-button'), '#history-clear 应带 .text-button')
+  assert.ok(hasDisabledAttr(clearButton), '#history-clear 在 0 条时初始应带 disabled')
+})
+
+testOutput('v2.5 版本号：.panel-version 文案为「简单搜索 v<semver>」', () => {
+  const clean = stripHtmlComments(html)
+  const version = findTagWithClass(clean, 'panel-version')
+  assert.ok(version, '缺少 .panel-version（设置面板版本号）')
+  const tagName = (version.match(/^<([a-zA-Z][\w:-]*)/) || [])[1]
+  const text = textOf(innerOfTag(clean, version, tagName))
+  assert.match(
+    text || '',
+    /^简单搜索 v\d+\.\d+\.\d+$/,
+    `版本号文案应为「简单搜索 vX.Y.Z」，实际 ${JSON.stringify(text)}`,
+  )
 })
 
 testOutput('#scrim.scrim 初始 hidden', () => {

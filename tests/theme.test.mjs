@@ -1,8 +1,8 @@
-// 主题（assets/js/theme.js）契约测试 —— v2.1 单页主题版。
-// 契约依据：docs/contract.md §5.4、§11、§12.1、§9.4。
+// 主题（assets/js/theme.js）契约测试 —— v2.5 单页主题 + 主题三态 + 19 色主题版。
+// 契约依据：docs/contract.md §5.4、§11、§12.1、§15.1、§16.2、§9.4。
 //
 // 用 node:vm 造最小假 DOM / localStorage / matchMedia / location / history：
-// 覆盖注入 ?theme=、存储、系统偏好、浅色回退的完整优先级，以及 replaceState 去参数。
+// 覆盖注入 ?theme=、存储、系统偏好、浅色回退的完整优先级，主题三态分段控件，以及 replaceState 去参数。
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
@@ -17,24 +17,26 @@ function kebab(name) {
   return 'data-' + String(name).replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)
 }
 
-function makeToggleButton() {
-  const handlers = {}
-  return {
-    textContent: '',
-    attrs: {},
-    setAttribute(name, value) {
-      this.attrs[name] = String(value)
-    },
-    getAttribute(name) {
-      return this.attrs[name] ?? null
-    },
-    addEventListener(type, handler) {
-      handlers[type] = handler
-    },
-    fire(type) {
-      if (typeof handlers[type] === 'function') handlers[type]()
-    },
-  }
+// v2.5 §16.2：主题三态分段控件（#theme-mode > 3 个 .segmented-item[data-mode]）
+const MODE_LABELS = { auto: '跟随系统', light: '浅色', dark: '深色' }
+const MODE_ORDER = ['auto', 'light', 'dark']
+
+function makeSegmented() {
+  const items = MODE_ORDER.map((mode) => {
+    const button = makeElement('button')
+    button.setAttribute('type', 'button')
+    button.setAttribute('data-mode', mode)
+    button.setAttribute('aria-pressed', mode === 'auto' ? 'true' : 'false')
+    button.textContent = MODE_LABELS[mode]
+    return button
+  })
+  const container = makeElement('div')
+  container.setAttribute('id', 'theme-mode')
+  container.setAttribute('class', 'segmented')
+  container.setAttribute('role', 'group')
+  container.setAttribute('aria-label', '主题模式')
+  for (const item of items) container.appendChild(item)
+  return { container, items }
 }
 
 function makeThemeColorMeta() {
@@ -137,8 +139,13 @@ function makeElement(tagName) {
       return null
     },
     querySelectorAll(selector) {
-      if (String(selector) === '.swatch') return children.filter((child) => classListContains(child, 'swatch'))
+      const text = String(selector)
+      if (text.startsWith('.')) return children.filter((child) => classListContains(child, text.slice(1)))
       return []
+    },
+    fire(type) {
+      const handler = listeners[type]
+      if (typeof handler === 'function') handler.call(element)
     },
     focus() {
       element.focused = true
@@ -250,7 +257,7 @@ function createThemeEnv(options = {}) {
     ),
   }
 
-  const toggleButton = makeToggleButton()
+  const segmented = makeSegmented()
   const themeColorMeta = makeThemeColorMeta()
   const swatchesContainer = makeElement('div')
 
@@ -260,15 +267,22 @@ function createThemeEnv(options = {}) {
     createElement: (tagName) => makeElement(tagName),
     createDocumentFragment: () => makeElement('fragment'),
     getElementById(id) {
-      if (id === 'theme-toggle') return toggleButton
+      if (id === 'theme-mode') return segmented.container
       if (id === 'color-swatches') return swatchesContainer
       return null
     },
     querySelector(selector) {
-      return /theme-color/.test(String(selector)) ? themeColorMeta : null
+      const text = String(selector)
+      if (/theme-color/.test(text)) return themeColorMeta
+      if (/theme-mode/.test(text)) return segmented.container
+      return null
     },
     querySelectorAll(selector) {
-      if (String(selector) === '.swatch') return swatchesContainer.querySelectorAll('.swatch')
+      const text = String(selector)
+      if (text.includes('theme-mode') || text.includes('[data-mode]') || text.includes('segmented-item')) {
+        return segmented.items
+      }
+      if (text === '.swatch') return swatchesContainer.querySelectorAll('.swatch')
       return []
     },
   }
@@ -311,7 +325,7 @@ function createThemeEnv(options = {}) {
     theme,
     store,
     documentElement,
-    toggleButton,
+    segmented,
     themeColorMeta,
     swatchesContainer,
     history,
@@ -402,41 +416,87 @@ testTheme('readUrlTheme()：非法值 / 无参数 → null', () => {
   }
 })
 
-// ---------------------------------------------------------------- apply / toggle
+// ---------------------------------------------------------------- apply / 主题三态（v2.5 §16.2）
 
-testTheme('apply()：写 <html data-theme> 并同步 aria-pressed / theme-color（v2.3 起文案固定不改）', () => {
+testTheme('apply()：写 <html data-theme> 并同步 theme-color', () => {
   const env = createThemeEnv()
-  env.toggleButton.textContent = '夜间模式'
   env.theme.apply('dark')
   assert.equal(env.readThemeAttr(), 'dark')
-  assert.equal(env.toggleButton.getAttribute('aria-pressed'), 'true')
   assert.ok(env.themeColorMeta.content, 'apply 后 theme-color 不应为空')
   assert.match(env.themeColorMeta.content, /^#[0-9a-f]{6}$/i)
 
   env.theme.apply('light')
   assert.equal(env.readThemeAttr(), 'light')
-  assert.equal(env.toggleButton.getAttribute('aria-pressed'), 'false')
 
   env.theme.apply('blue')
   assert.equal(env.readThemeAttr(), 'light', '非法值应被忽略')
-  assert.equal(env.toggleButton.textContent, '夜间模式', 'v2.3 §14.1：theme.js 不得改 #theme-toggle 文案')
 })
 
-testTheme('固定文案：v2.3 起 #theme-toggle 的 textContent 永不被改写（只更新 aria-pressed）', () => {
+testTheme('分段控件文案固定：跟随系统 / 浅色 / 深色 不被 theme.js 改写', () => {
   const env = createThemeEnv({ docTheme: 'light' })
-  env.toggleButton.textContent = '夜间模式'
-
+  const before = env.segmented.items.map((item) => item.textContent)
   env.theme.apply('dark')
-  assert.equal(env.toggleButton.textContent, '夜间模式', '切到深色时也不应改成「白天模式」')
-  assert.equal(env.toggleButton.getAttribute('aria-pressed'), 'true')
-
   env.theme.toggle()
-  assert.equal(env.toggleButton.textContent, '夜间模式', 'toggle 也不应改文案')
-  assert.equal(env.readThemeAttr(), 'light')
-  assert.equal(env.toggleButton.getAttribute('aria-pressed'), 'false')
-
   env.theme.init()
-  assert.equal(env.toggleButton.textContent, '夜间模式', 'init 也不应改文案')
+  assert.deepEqual([...env.segmented.items.map((item) => item.textContent)], before)
+})
+
+testTheme('分段控件初始：只有 auto 的 aria-pressed=true', () => {
+  const env = createThemeEnv()
+  const pressed = env.segmented.items.filter((item) => item.getAttribute('aria-pressed') === 'true')
+  assert.equal(pressed.length, 1)
+  assert.equal(pressed[0].getAttribute('data-mode'), 'auto')
+})
+
+testTheme('init() 后 aria-pressed 与模式一致：auto 模式下只有 auto 选中', () => {
+  const env = createThemeEnv({ defaultTheme: 'auto', systemTheme: 'light' })
+  env.theme.init()
+  const pressed = env.segmented.items.filter((item) => item.getAttribute('aria-pressed') === 'true')
+  assert.equal(pressed.length, 1, '同一时刻只能有一个 .segmented-item aria-pressed=true')
+  assert.equal(pressed[0].getAttribute('data-mode'), 'auto')
+})
+
+testTheme('点击「深色」：写 ss.theme=dark、应用深色、只有 dark 选中', () => {
+  const env = createThemeEnv({ defaultTheme: 'auto', systemTheme: 'light' })
+  env.theme.init()
+  const dark = env.segmented.items.find((item) => item.getAttribute('data-mode') === 'dark')
+  assert.ok(dark, '缺少 data-mode="dark" 的分段项')
+  dark.fire('click')
+
+  assert.equal(env.readThemeAttr(), 'dark')
+  assert.equal(env.store.get('ss.theme'), 'dark')
+  const pressed = env.segmented.items.filter((item) => item.getAttribute('aria-pressed') === 'true')
+  assert.equal(pressed.length, 1)
+  assert.equal(pressed[0].getAttribute('data-mode'), 'dark')
+})
+
+testTheme('点击「跟随系统」：删除 ss.theme 键并按系统偏好解析', () => {
+  const env = createThemeEnv({ storedTheme: 'dark', systemTheme: 'light', defaultTheme: 'auto' })
+  env.theme.init()
+  assert.equal(env.readThemeAttr(), 'dark')
+
+  const auto = env.segmented.items.find((item) => item.getAttribute('data-mode') === 'auto')
+  auto.fire('click')
+  assert.equal(env.store.has('ss.theme'), false, 'auto 模式应删除 ss.theme 键')
+  assert.equal(env.readThemeAttr(), 'light', 'auto 模式应按系统偏好解析（系统 light）')
+  assert.equal(auto.getAttribute('aria-pressed'), 'true')
+})
+
+testTheme('显式模式刷新保持：storedTheme=dark + 系统 light → init 后仍是 dark 且 dark 选中', () => {
+  const env = createThemeEnv({ storedTheme: 'dark', systemTheme: 'light', defaultTheme: 'auto' })
+  env.theme.init()
+  assert.equal(env.readThemeAttr(), 'dark')
+  const dark = env.segmented.items.find((item) => item.getAttribute('data-mode') === 'dark')
+  assert.equal(dark.getAttribute('aria-pressed'), 'true')
+})
+
+testTheme('?theme=dark 深链：持久化 ss.theme 且分段 dark 选中', () => {
+  const env = createThemeEnv({ urlSearch: '?theme=dark' })
+  env.theme.init()
+  assert.equal(env.readThemeAttr(), 'dark')
+  assert.equal(env.store.get('ss.theme'), 'dark')
+  const dark = env.segmented.items.find((item) => item.getAttribute('data-mode') === 'dark')
+  assert.equal(dark.getAttribute('aria-pressed'), 'true')
 })
 
 testTheme('toggle()：切换、持久化并返回新主题', () => {
@@ -510,17 +570,20 @@ testTheme('init()：history.replaceState 抛错时不崩', () => {
   assert.equal(env.readThemeAttr(), 'light')
 })
 
-testTheme('init()：绑定 #theme-toggle 点击切换并持久化', () => {
+testTheme('init()：绑定 #theme-mode 分段项点击切换并持久化', () => {
   const env = createThemeEnv({ defaultTheme: 'auto', systemTheme: 'light' })
   env.theme.init()
   assert.equal(env.readThemeAttr(), 'light')
 
-  env.toggleButton.fire('click')
+  const dark = env.segmented.items.find((item) => item.getAttribute('data-mode') === 'dark')
+  dark.fire('click')
   assert.equal(env.readThemeAttr(), 'dark')
   assert.equal(env.store.get('ss.theme'), 'dark')
 
-  env.toggleButton.fire('click')
+  const light = env.segmented.items.find((item) => item.getAttribute('data-mode') === 'light')
+  light.fire('click')
   assert.equal(env.readThemeAttr(), 'light')
+  assert.equal(env.store.get('ss.theme'), 'light')
 })
 
 // ---------------------------------------------------------------- v2.4 主题色（加分项，§15.1）

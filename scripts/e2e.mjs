@@ -404,24 +404,51 @@ async function run() {
     await page.goto(PAGE)
     check('A5 存储优先于系统偏好', (await page.theme()) === 'light', await page.theme())
 
-    // A6 切换 + 持久化（设置面板里的开关）
+    // A6 主题三态（跟随系统 / 浅色 / 深色）
     await page.clearStorage()
     await emulateSystemTheme('light')
     await page.goto(PAGE)
-    await page.evaluate("SimpleSearch.app && SimpleSearch.app.openSettings()")
-    await sleep(250)
-    await page.evaluate("document.getElementById('theme-toggle').click()")
-    await sleep(250)
-    check('A6 切换生效', (await page.theme()) === 'dark', await page.theme())
-    check('A6 切换写入存储', (await page.stored('ss.theme')) === 'dark')
-    const switchState = await page.evaluate(`(() => {
-      const b = document.getElementById('theme-toggle')
-      return { pressed: b.getAttribute('aria-pressed'), text: (b.textContent || '').trim() }
+    const defaultMode = await page.evaluate(`(() => {
+      const items = [...document.querySelectorAll('#theme-mode .segmented-item')]
+      return {
+        count: items.length,
+        modes: items.map((i) => i.getAttribute('data-mode')),
+        pressed: items.filter((i) => i.getAttribute('aria-pressed') === 'true').map((i) => i.getAttribute('data-mode')),
+      }
     })()`)
-    check('A6 开关状态与文案', switchState.pressed === 'true' && switchState.text === '夜间模式', JSON.stringify(switchState))
+    check('A6 分段控件 3 项', defaultMode.count === 3 && defaultMode.modes.join(',') === 'auto,light,dark', defaultMode.modes.join(','))
+    check('A6 默认跟随系统', defaultMode.pressed.length === 1 && defaultMode.pressed[0] === 'auto', defaultMode.pressed.join(','))
+    check('A6 跟随系统=浅色', (await page.theme()) === 'light', await page.theme())
+
+    // 系统变深色 → 自动跟随（auto 才跟随）
+    await emulateSystemTheme('dark')
+    await sleep(300)
+    check('A6 系统切换后自动跟随', (await page.theme()) === 'dark', await page.theme())
+
+    // 显式选浅色 → 写存储、不再跟随系统
+    await page.evaluate(`document.querySelector('#theme-mode [data-mode="light"]').click()`)
+    await sleep(250)
+    check('A6 选浅色生效', (await page.theme()) === 'light', await page.theme())
+    check('A6 选浅色写入存储', (await page.stored('ss.theme')) === 'light', String(await page.stored('ss.theme')))
     await page.goto(PAGE)
-    check('A6 刷新后保持', (await page.theme()) === 'dark', await page.theme())
+    check('A6 刷新后保持浅色', (await page.theme()) === 'light', await page.theme())
+
+    // 显式选深色 → 持久化
+    await page.evaluate(`document.querySelector('#theme-mode [data-mode="dark"]').click()`)
+    await sleep(250)
+    check('A6 选深色生效', (await page.theme()) === 'dark', await page.theme())
+    await page.goto(PAGE)
+    check('A6 刷新后保持深色', (await page.theme()) === 'dark', await page.theme())
+
+    // 回到跟随系统 → 删除存储键，跟随当前系统偏好（此时是 dark）
+    await page.evaluate(`document.querySelector('#theme-mode [data-mode="auto"]').click()`)
+    await sleep(250)
+    check('A6 跟随系统删除存储键', (await page.stored('ss.theme')) === null, String(await page.stored('ss.theme')))
+    await emulateSystemTheme('light')
+    await sleep(300)
+    check('A6 跟随系统实时响应', (await page.theme()) === 'light', await page.theme())
     await emulateSystemTheme(null)
+    await page.clearStorage()
 
     // ================= B. 旧链接重定向 =================
     console.log('\n=== B. 老链接 0 秒重定向 ===')
@@ -451,8 +478,8 @@ async function run() {
     const externalAssets = earlyRequests.filter((u) => !u.startsWith(ORIGIN) && !u.startsWith('data:'))
     check('C: 首屏无第三方请求', externalAssets.length === 0, externalAssets[0] || '')
     check(
-      'C: 首屏传输体积 < 120KB',
-      earlyBytes < 120 * 1024,
+      'C: 首屏传输体积 < 140KB',
+      earlyBytes < 140 * 1024,
       `${(earlyBytes / 1024).toFixed(1)} KB / ${earlyRequests.length} 个请求`
     )
 
@@ -551,16 +578,27 @@ async function run() {
         panelHidden: panel.hidden,
         scrimHidden: scrim.hidden,
         rows: switches.map((s) => s.id),
+        modeItems: [...panel.querySelectorAll('#theme-mode .segmented-item')].map((b) => b.getAttribute('data-mode')),
+        version: (panel.querySelector('.panel-version')?.textContent || '').trim(),
+        historyCount: (panel.querySelector('#history-count')?.textContent || '').trim(),
+        historyClearDisabled: panel.querySelector('#history-clear')?.disabled === true,
         expanded: document.getElementById('settings-toggle').getAttribute('aria-expanded'),
         focusInside: panel.contains(active),
       }
     })()`)
     check('C: 点设置打开面板', panelState.panelHidden === false && panelState.expanded === 'true')
     check('C: 遮罩显示', panelState.scrimHidden === false)
+    check('C: 面板内有联网联想开关行', panelState.rows.includes('suggest-source-toggle'), panelState.rows.join(','))
     check(
-      'C: 面板内有两个开关行',
-      panelState.rows.includes('theme-toggle') && panelState.rows.includes('suggest-source-toggle'),
-      panelState.rows.join(',')
+      'C: 面板内有主题模式分段控件',
+      panelState.modeItems.join(',') === 'auto,light,dark',
+      panelState.modeItems.join(',')
+    )
+    check('C: 面板内显示版本号', /^简单搜索 v\d+\.\d+\.\d+$/.test(panelState.version), panelState.version)
+    check(
+      'C: 历史行初始为空且清空禁用',
+      panelState.historyCount === '0 条' && panelState.historyClearDisabled === true,
+      `${panelState.historyCount} / disabled=${panelState.historyClearDisabled}`
     )
     check('C: 打开后焦点进入面板', panelState.focusInside)
 
@@ -621,6 +659,35 @@ async function run() {
     }))()`)
     check('C: Esc 关闭面板并归还焦点', afterEsc.panelHidden === true && afterEsc.scrimHidden === true && afterEsc.focusId === 'settings-toggle')
 
+    // ---- 搜索历史：记录 → 计数/清空 ----
+    await page.evaluate(`(() => {
+      const input = document.getElementById('search-input')
+      input.value = 'e2e-history'
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      document.getElementById('search-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    })()`)
+    await sleep(300)
+    const storedHistory = await page.evaluate(
+      `(() => { try { return JSON.parse(localStorage.getItem('ss.history')) } catch (e) { return null } })()`
+    )
+    check('C: 提交后写入历史', Array.isArray(storedHistory) && storedHistory.includes('e2e-history'), JSON.stringify(storedHistory))
+    await page.evaluate("SimpleSearch.app.openSettings()")
+    await sleep(300)
+    const historyRow = await page.evaluate(`(() => ({
+      count: document.getElementById('history-count').textContent.trim(),
+      disabled: document.getElementById('history-clear').disabled,
+    }))()`)
+    check('C: 历史计数更新且清空可用', historyRow.count === '1 条' && historyRow.disabled === false, JSON.stringify(historyRow))
+    await page.evaluate("document.getElementById('history-clear').click()")
+    await sleep(300)
+    const afterClear = await page.evaluate(`(() => ({
+      count: document.getElementById('history-count').textContent.trim(),
+      disabled: document.getElementById('history-clear').disabled,
+      stored: (() => { try { return localStorage.getItem('ss.history') } catch (e) { return null } })(),
+    }))()`)
+    check('C: 清空历史生效', afterClear.count === '0 条' && afterClear.disabled === true, JSON.stringify(afterClear))
+    await page.evaluate("SimpleSearch.app.closeSettings()")
+    await sleep(150)
     // 主题色刷新保持 + 复位
     await page.goto(PAGE)
     const persistedColor = await page.evaluate(`(() => ({
@@ -948,7 +1015,51 @@ async function run() {
         "[...document.querySelectorAll('#buttons-container [data-site]')].length"
       )) >= BUILTIN_SITE_IDS.length
     )
-    check('H: 主题开关可用', (await page.evaluate("!!document.getElementById('theme-toggle')")))
+    check('H: 主题模式控件可用', (await page.evaluate("document.querySelectorAll('#theme-mode .segmented-item').length === 3")))
+    // ================= I. 深链（只预填/预选，不自动跳转） =================
+    console.log('\n=== I. 深链 ===')
+    await page.clearStorage()
+    await page.goto(`${PAGE}?cat=tech`, 400)
+    const catState = await page.evaluate(`(() => {
+      const current = [...document.querySelectorAll('#group-chips .nav-item')]
+        .filter((i) => i.getAttribute('aria-current') === 'true')
+        .map((i) => i.getAttribute('data-group'))
+      const visible = [...document.querySelectorAll('#buttons-container [data-site]')]
+        .filter((b) => !b.hidden)
+        .map((b) => b.dataset.site)
+      return { current, visible }
+    })()`)
+    check('I: ?cat= 选中分类', catState.current.length === 1 && catState.current[0] === 'tech', catState.current.join(','))
+    check('I: ?cat= 只显示该组站点', catState.visible.length > 0 && catState.visible.length < 11, catState.visible.join(','))
+
+    await page.evaluate(`document.querySelector('#group-chips [data-group="all"]').click()`)
+    await sleep(250)
+    check(
+      'I: 点分类后地址栏同步（all 时去掉参数）',
+      !(await page.evaluate('location.search')).includes('cat='),
+      await page.evaluate('location.search')
+    )
+
+    await page.goto(`${PAGE}?q=rust`, 400)
+    const qState = await page.evaluate(`(() => ({
+      value: document.getElementById('search-input').value,
+      focused: document.activeElement && document.activeElement.id,
+      path: location.pathname,
+    }))()`)
+    check('I: ?q= 预填并聚焦', qState.value === 'rust' && qState.focused === 'search-input', JSON.stringify(qState))
+    check('I: ?q= 不自动跳转', /\/index\.html$/.test(qState.path), qState.path)
+
+    await page.goto(`${PAGE}?site=bilibili`, 400)
+    const siteState = await page.evaluate(`(() => ({
+      current: [...document.querySelectorAll('#group-chips .nav-item')]
+        .filter((i) => i.getAttribute('aria-current') === 'true')
+        .map((i) => i.getAttribute('data-group')),
+      focused: document.activeElement && document.activeElement.dataset
+        ? document.activeElement.dataset.site
+        : null,
+    }))()`)
+    check('I: ?site= 选中所属分类并聚焦按钮', siteState.current[0] === 'media' && siteState.focused === 'bilibili', JSON.stringify(siteState))
+    await page.clearStorage()
   } finally {
     cleanup()
   }

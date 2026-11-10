@@ -9,6 +9,7 @@
   const KEY = 'ss.theme'
   const LIGHT = 'light'
   const DARK = 'dark'
+  const AUTO = 'auto'
 
   // 与 tokens.css 的 --bg 保持一致；仅当无法读取 CSS 变量时兜底
   const THEME_COLORS = { light: '#f5f5f5', dark: '#303030' }
@@ -86,6 +87,18 @@
       if (storage) storage.setItem(KEY, theme)
     } catch (error) {
       // 存储失败不影响本次切换
+    }
+  }
+
+  // 删除主题存储（auto 模式跟随系统，不保留显式选择）
+  function clearTheme() {
+    try {
+      const storage = root.localStorage
+      if (!storage) return
+      if (typeof storage.removeItem === 'function') storage.removeItem(KEY)
+      else storage.setItem(KEY, '')
+    } catch (error) {
+      // 存储不可用就算了
     }
   }
 
@@ -236,15 +249,6 @@
     return THEME_COLORS[theme] || THEME_COLORS[LIGHT]
   }
 
-  // 同步主题开关：文案由模板固定（永远「夜间模式」），只用 aria-pressed 表达状态
-  function syncToggle(doc, theme) {
-    if (typeof doc.getElementById !== 'function') return
-    const button = doc.getElementById('theme-toggle')
-    if (!button) return
-    button.setAttribute('aria-pressed', theme === DARK ? 'true' : 'false')
-    button.setAttribute('title', '切换深浅色主题')
-  }
-
   function syncThemeColor(doc, theme) {
     if (typeof doc.querySelector !== 'function') return
     const meta = doc.querySelector('meta[name="theme-color"]')
@@ -260,7 +264,6 @@
     const el = doc && doc.documentElement
     if (!el) return
     el.setAttribute('data-theme', next)
-    syncToggle(doc, next)
     syncThemeColor(doc, next)
   }
 
@@ -284,18 +287,78 @@
     return systemTheme() || LIGHT
   }
 
-  // 切换并持久化：一旦用户显式切换过，后续不再跟随系统
-  function toggle() {
-    const next = currentTheme() === DARK ? LIGHT : DARK
-    save(next)
-    apply(next)
+  // ---------------------------------------------------------------- 主题三态
+
+  function normalizeMode(mode) {
+    return mode === AUTO || mode === LIGHT || mode === DARK ? mode : null
+  }
+
+  // auto / light / dark：ss.theme 有合法值即显式模式，否则 auto
+  function getMode() {
+    return get() || AUTO
+  }
+
+  // 同步分段控件的 aria-pressed（#theme-mode 不存在时静默）
+  function applyMode() {
+    const doc = getDoc()
+    const mode = getMode()
+    if (!doc || typeof doc.querySelectorAll !== 'function') return mode
+    const items = doc.querySelectorAll('#theme-mode [data-mode]')
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+      if (!item || typeof item.getAttribute !== 'function') continue
+      item.setAttribute('aria-pressed', item.getAttribute('data-mode') === mode ? 'true' : 'false')
+    }
+    return mode
+  }
+
+  // 设置主题模式：auto 删除 ss.theme 并跟随系统；light/dark 写入并应用
+  function setMode(mode) {
+    const next = normalizeMode(mode)
+    if (!next) return getMode()
+    if (next === AUTO) {
+      clearTheme()
+      apply(resolve(null))
+      followSystem()
+    } else {
+      save(next)
+      apply(next)
+    }
+    applyMode()
     return next
   }
 
-  let bound = false
+  let modeBound = false
+
+  // 绑定分段控件（每个 segmented-item 各绑一次，重复 init 不重复绑定）
+  function bindMode() {
+    if (modeBound) return
+    const doc = getDoc()
+    if (!doc || typeof doc.querySelectorAll !== 'function') return
+    const items = doc.querySelectorAll('#theme-mode [data-mode]')
+    if (!items.length) return
+    modeBound = true
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+      if (!item || typeof item.addEventListener !== 'function') continue
+      item.addEventListener('click', function (event) {
+        const target = event && event.target
+        const button = target && typeof target.closest === 'function' ? target.closest('[data-mode]') : item
+        if (button) setMode(button.getAttribute('data-mode'))
+      })
+    }
+  }
+
+  // 切换并持久化：保留给内部/测试用（现在等价于在 light/dark 间切）
+  function toggle() {
+    const next = currentTheme() === DARK ? LIGHT : DARK
+    setMode(next)
+    return next
+  }
+
   let following = false
 
-  // 用户没有显式选择（ss.theme 为空）时实时跟随系统；显式选择过就不再覆盖
+  // 仅 auto 模式下实时跟随系统；显式 light/dark 时 onChange 会忽略
   function followSystem() {
     if (following) return
     try {
@@ -305,6 +368,7 @@
       const onChange = function () {
         if (get()) return
         apply(media.matches ? DARK : LIGHT)
+        applyMode()
       }
       if (typeof media.addEventListener === 'function') media.addEventListener('change', onChange)
       else if (typeof media.addListener === 'function') media.addListener(onChange)
@@ -321,34 +385,21 @@
     const el = doc && doc.documentElement
     if (!el) return
 
-    // 1) ?theme= 优先：持久化后从地址栏移除，之后按存储解析
+    // 1) ?theme= 深链优先（老链接语义：等价 setMode 并持久化），处理完清理地址栏
     const fromUrl = readUrlTheme()
     if (fromUrl) {
-      save(fromUrl)
+      setMode(fromUrl)
       stripUrlTheme()
+    } else {
+      // 2) 否则按当前模式应用：auto 跟随系统，light/dark 用存储值
+      setMode(getMode())
     }
 
-    // 2) 应用：URL 命中时直接用该主题（存储不可用也不丢失）；否则
-    //    存储 > 系统偏好 > 浅色（data-theme-default 为 auto）
-    apply(fromUrl || resolve(el.getAttribute('data-theme-default')))
-
-    // 2.5) 主题色：读取/应用存储色，并渲染设置面板的 19 个色块
+    // 3) 主题色：读取/应用存储色，并渲染设置面板的 19 个色块
     initColor()
 
-    // 3) 从未显式选择过时，实时跟随系统深浅色变化
-    if (!get()) followSystem()
-
-    // 防止重复 init 时重复绑定
-    if (bound) return
-    bound = true
-
-    if (typeof doc.getElementById !== 'function') return
-    const button = doc.getElementById('theme-toggle')
-    if (!button || typeof button.addEventListener !== 'function') return
-    // 键盘 Enter / Space 由原生 button 负责，不需要额外处理
-    button.addEventListener('click', function () {
-      toggle()
-    })
+    // 4) 绑定主题模式分段控件（#theme-mode）；重复 init 不重复绑定
+    bindMode()
   }
 
   SS.theme = {
@@ -364,5 +415,9 @@
     getColor,
     applyColor,
     initColor,
+    getMode,
+    setMode,
+    applyMode,
+    bindMode,
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this)

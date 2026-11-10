@@ -25,6 +25,7 @@ node -v   # 应为 v21 或更高（CI 用 22）
 | `npm run check` | `build && test && validate`，提交前与 CI 都跑这个 |
 | `npm run serve` | 零依赖本地静态服务器，默认 <http://127.0.0.1:8080/>（可用 `PORT` 环境变量改端口） |
 | `npm run e2e` | 可选：用本机 Edge/Chrome 跑真实浏览器端到端检查（没装浏览器会跳过，CI 不跑），截图输出到已 gitignore 的 `artifacts/` |
+| `npm run check:sites` | 可选：逐个请求站点 `home` / `search`，检查是否 2xx、是否被重定向到首页（**需要网络，不进 CI**）；`--strict` 失败退 1 |
 
 ## 目录结构
 
@@ -35,7 +36,7 @@ SimpleSearch/
 │  ├─ img/            # favicon.svg
 │  └─ js/             # 经典脚本（sites / search / suggest / history / theme / remote / input / app）
 ├─ docs/              # 契约、自定义站点指南、更新日志
-├─ scripts/           # build.mjs / icons.mjs（dev-time 图标数据）/ serve.mjs / validate.mjs / e2e.mjs
+├─ scripts/           # build.mjs / icons.mjs（dev-time 图标数据）/ serve.mjs / validate.mjs / e2e.mjs / check-sites.mjs
 ├─ templates/         # page.html（真实页：顶栏 / 分类导航 / 卡片 / 设置抽屉 + 图标 sprite）/ redirect.html（两个重定向壳）
 ├─ tests/             # node:test 单元测试
 ├─ .github/workflows/ # ci.yml（GitHub Actions）
@@ -82,12 +83,12 @@ SimpleSearch/
 - **禁止内联事件属性**（`onclick="..."` 之类）。事件一律在 JS 里 `addEventListener`，并在 `DOMContentLoaded` 之后由 `app.js` 装配。
 - 模块文件顶层不要直接操作 DOM；纯逻辑（URL 构建、联想、历史、主题解析）不读 DOM、不读真实 `localStorage`，由调用方注入，方便单测。
 - **脚本加载顺序**：`templates/page.html` 里按 `sites → search → suggest → history → theme → remote → input → app` 顺序挂 8 个经典脚本。新增模块文件必须同步加进模板（该文件归 lead 维护，PR 里说明让 lead 改，不要自己动）。
-- **顶栏 / 抽屉 / 设置面板**：`#nav-toggle`、`#settings-toggle`、`#site-nav`、`#settings-panel`、`#scrim` 的开合、遮罩联动和焦点进出（打开时焦点进面板、关闭后回到设置按钮）由 `app.js` 负责。两个开关 `#theme-toggle` / `#suggest-source-toggle` 的**文案固定**（永远是「夜间模式」「联网联想」），状态只用 `aria-pressed` 表达——`theme.js` / `input.js` 不得再改它们的 `textContent`。
+- **顶栏 / 抽屉 / 设置面板**：`#nav-toggle`、`#settings-toggle`、`#site-nav`、`#settings-panel`、`#scrim` 的开合、遮罩联动和焦点进出（打开时焦点进面板、关闭后回到设置按钮）由 `app.js` 负责。`#suggest-source-toggle` 文案固定「联网联想」，状态只用 `aria-pressed`；主题模式已改成 `#theme-mode` 分段控件（`.segmented-item[data-mode]`），**旧的 `#theme-toggle` 开关行已移除**，不要再加回来。
 - **视觉风格参考 MDUI 1 / Material Design 1**（主色、2px 圆角、elevation 阴影、涟漪、下划线输入框、raised button），但**全部是自研手写 CSS**：不引入 MDUI 库、不引入任何 CDN 或第三方资源。改样式时沿用 `tokens.css` 里的变量，别硬编码颜色。
 - 不引入 `!important`；保留可见的 `:focus-visible` 焦点轮廓；动画要尊重 `prefers-reduced-motion: reduce`。
 - **不新增第三方依赖、CDN、字体或追踪脚本**；所有核心功能必须断网可用。唯一的网络请求是**可关闭**的联网联想（见下）。
 - 读写 `localStorage`、`window.open` 等可能失败的调用要放在 `try/catch` 或做能力判断里（隐私模式不能报错）。
-- DOM 契约（`#search-input`、`#suggest-list`、`#nav-toggle`、`#site-nav`、`#settings-toggle`、`#settings-panel`、`#color-swatches`、`.swatch`、`#scrim`、`.nav-item`、`.nav-icon`、`.appbar-logo`、`.switch-row`、`#buttons-container .button[data-site]` 等 id/class）由 `docs/contract.md` 规定，改动前先确认没有别的模块依赖。
+- DOM 契约（`#search-input`、`#suggest-list`、`#nav-toggle`、`#site-nav`、`#settings-toggle`、`#settings-panel`、`#theme-mode`、`.segmented-item`、`#history-count`、`#history-clear`、`.panel-version`、`.suggest-delete`、`#suggest-source-toggle`、`#color-swatches`、`.swatch`、`#scrim`、`.nav-item`、`.nav-icon`、`.appbar-logo`、`#buttons-container .button[data-site]` 等 id/class）由 `docs/contract.md` 规定，改动前先确认没有别的模块依赖。
 
 ## 扩展联网联想数据源
 
@@ -117,7 +118,7 @@ SS.remote.provider = {
 - `scripts/build.mjs` 把用到的图标渲染成隐藏的 `<svg class="icon-sprite">` + `<symbol id="i-<name>">` 插到 `<body>` 开头：站点按钮输出 `<svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-<siteId>"></use></svg>`，顶栏/面板输出 `#i-menu` / `#i-settings` / `#i-close`；模板里对应 `{{ICON_SPRITE}}`、`{{GROUP_NAV}}` 两个占位符；
 - **它不属于运行时脚本**：不要把它加进 `templates/page.html` 的 `<script>` 列表（那 8 个才是运行时脚本）；
 - 风格：24×24 viewBox、`fill="none"`、`stroke="currentColor"`、线宽 1.8、圆头；画**通用几何符号**，不要精确复制他人商标（避免商标问题）；
-- 体积红线：sprite（21 个 symbol：11 站点 + 3 UI + 1 logo + 6 分类）让 HTML 的增量 ≤ 8 KB（未压缩），全站仍需 < 110 KB 预算；
+- 体积红线：sprite（21 个 symbol：11 站点 + 3 UI + 1 logo + 6 分类）让 HTML 的增量 ≤ 8 KB（未压缩），全站仍需 < 128 KB 预算；
 - 禁止：外链 favicon 服务（如 `icons.duckduckgo.com`、Google favicon API）、外部图标库/CDN、用 emoji 冒充品牌图标——前两者会新增请求，后者跨平台不一致；
 - 新增图标：站点图标在 `SITE_ICONS` 里加一条（键 = 站点 `id`）→ `npm run build`；UI 图标同理加进 `UI_ICONS`；
 - 分类导航的小图标按**固定 id** 取：`cat-<group.id>`（例如 `cat-tech`）。加新分类时 build 只用已存在的 `cat-<id>` 图标，没有对应图标就只显示文字，需要的话在 `UI_ICONS` 补一条。
@@ -142,6 +143,39 @@ SS.remote.provider = {
 - 首屏不闪错色：`templates/page.html` 的内联脚本（归 lead 维护）在设置 `data-theme` 的同时设置 `data-color`。
 - 加一种新颜色：`tokens.css` 加一组 `--c-*`，`theme.js` 的 `COLORS` / `COLOR_500` 加同名条目，再 `npm run build`；默认色不用动。
 - 不要用图片 / emoji / 第三方色板实现主题色。浅色系（黄 / 黄绿 / 浅绿 / 琥珀 / 青 / 灰）的 `--c-on` 必须用深色文字（`rgba(0, 0, 0, .87)`），否则顶栏和按钮文字会看不清。
+
+## 深链（URL 参数）
+
+三组参数只做「预填 / 预选」，**不自动提交、不自动跳转**，逻辑主要在 `app.js` 的启动流程里：
+
+- `?cat=<groupId>`：选中对应分类，等价点击 `.nav-item`（同步 `aria-current`，非法 id 忽略）；点分类时用 `history.replaceState` 把地址栏同步为 `?cat=<id>`，`all` 时删掉参数。
+- `?q=<term>`：填入 `#search-input` 并聚焦，**不触发提交**。
+- `?site=<siteId>`：选中该站点所属分类，并把焦点移到对应站点按钮，**不跳转**；非法 id 忽略。
+- 组合时执行顺序固定 **cat → site → q**（q 最后，保证焦点落在输入框）。
+- 处理完**不要**用 replaceState 删掉这些参数——它们是可分享状态，和 `?theme=` 老链接的语义不同。
+- 项目**明确不做** `?q=%s` 默认搜索引擎自动提交，别再实现它。
+
+## 主题三态
+
+- 设置里的 `#theme-mode` 分段控件：`.segmented-item[data-mode="auto|light|dark"]`，`aria-pressed` 表示当前模式。
+- `SS.theme` 提供 `getMode()` / `setMode(mode)` / `applyMode()`：`auto` = 跟随系统（**删除 `ss.theme`，不是写 `auto`**，`matchMedia` 变化实时跟随）；`light` / `dark` = 写 `ss.theme` 记住。
+- 首屏内联脚本（`templates/page.html`，归 lead 维护）优先级：`?theme=` 老参数 → `ss.theme` 显式选择 → 系统偏好 → 浅色。
+- `?theme=light|dark` 老链接仍然有效（等价 setMode 并持久化），处理后会 `history.replaceState` 去掉参数。
+- 原来的 `#theme-toggle` 开关行已移除；新增/改主题逻辑只走 `#theme-mode`。
+
+## 搜索历史管理
+
+- 设置面板 `#history-count` 显示 `SS.history.list().length` 条；`#history-clear` 在 0 条时 `disabled`，点击调用 `SS.history.clear()` 并刷新计数。
+- 联想列表里 `data-type="history"` 的项带 `.suggest-delete` 小按钮（`aria-label="删除这条历史"`、`tabindex="-1"`，点击 `stopPropagation` 后删除并重渲染）；键盘高亮历史项时按 `Delete` 删除。
+- 历史写入**仍只由 `app.js` 负责**；`app.js` 在 `record()` 后派发 `ss:history-changed` 事件，`input.js` 监听它刷新计数（清空 / 单删后也自行刷新）。
+- 仍然最多 10 条、新的在前、去重。
+
+## 站点健康自检（可选，不进 CI）
+
+- `scripts/check-sites.mjs` + `package.json` 的 `check:sites`：从 `SS.sites` 读站点，逐个请求 `home` 和把 `{q}` 换成 `test` 的 `search`，8s 超时、`redirect: 'follow'`，输出表格（站点 id / home 状态 / search 状态 / 最终 URL / 判定：OK / 重定向到首页 / 非 2xx / 网络失败）。
+- 判定分级：`OK`（2xx 正常）、`WARN`（网络失败 / 反爬 401/403/429 / 被重定向到首页 / 跨域跳转，需人工确认）、`FAIL`（404/410/5xx 真坏链）。实测当前 11 个站点是 OK 8 / WARN 3 / FAIL 0（WARN 来自 Unsplash 401、知乎 403 反爬、京东跨域跳转）。
+- 默认退出码 0（只报告）；`npm run check:sites -- --strict` 时**只有 FAIL** 才退出 1（WARN 不阻断）。
+- **不加入 `npm run check`、不进 CI**（网络抖动会误伤）。站方改版或新增站点后可以手动跑它自查。
 
 ## 新增或删除网站
 
@@ -170,8 +204,8 @@ SS.remote.provider = {
 - 单元测试用 Node 内置的 `node:test`，放在 `tests/`，文件名以 `.test.mjs` 结尾，`npm test` 用 `node --test "tests/**/*.test.mjs"` 的 glob 自动发现，不用额外登记。
 - `tests/sites.test.mjs` 要求默认内置的 11 个站点都存在、且相对顺序一致；**新增站点不会让测试变红**，删除内置站点才会失败并提示恢复。
 - 提交/开 PR 前必须本地跑通 `npm run check`（构建 + 测试 + 静态校验/产物一致性）。
-- 当前测试基线：`npm test` **147 例**、`npm run validate` **17 项**、`npm run e2e` **102 项**全绿。
-- `npm run e2e` 用本机 Edge/Chrome（CDP）跑真实浏览器检查：单页主题解析（`?theme=` → 存储 → 系统 → 浅色）、主题色切换与持久化、两个旧链接的 0 秒跳转与地址栏清理、联网联想开关 / 超时降级 / 真实百度联调、分类导航筛选与左侧抽屉开合、设置面板与 MD1 开关、图标 sprite（无额外图片请求）、960px 断点与 390px 移动端布局、`file://` 打开。CI 不跑它（需要浏览器）。
+- 当前测试基线：`npm test` **156 例**、`npm run validate` **19 项**、`npm run e2e` **121 项**全绿。
+- `npm run e2e` 用本机 Edge/Chrome（CDP）跑真实浏览器检查：单页主题解析、主题三态与主题色切换与持久化、深链 `?cat=` / `?q=` / `?site=`、两个旧链接的 0 秒跳转与地址栏清理、联网联想开关 / 超时降级 / 真实百度联调、分类导航筛选与左侧抽屉开合、设置面板与 MD1 开关、搜索历史计数 / 清空 / 单条删除、设置里的版本号、图标 sprite（无额外图片请求）、960px 断点与 390px 移动端布局、`file://` 打开。CI 不跑它（需要浏览器）。
 - GitHub Actions（`.github/workflows/ci.yml`）在 `push` 和 `pull_request` 时用 Node 22 跑 `npm run check`，并检查三个生成产物是否与 `sites.js` / 模板漂移。
 - 本项目零依赖，CI 里**不需要 `npm ci` / `npm install`**。
 - 只改文档或样式时也请跑一次 `npm run check`，确认没有把生成页改漂。
@@ -185,9 +219,13 @@ SS.remote.provider = {
 - [ ] 关闭「联网联想」后无第三方请求、断网可用；开启时请求失败/超时不阻塞搜索
 - [ ] 新增站点带了 `group`；左侧分类导航能正确筛选、`aria-current` 只有一个、刷新回「全部」
 - [ ] 桌面 ≥960px 侧栏常驻、<960px 变抽屉且汉堡可开合（点遮罩 / Esc / 选中分类后收起）；没有 `#site-footer`
-- [ ] 设置面板可从右上角打开，两个开关文案固定、状态只看 `aria-pressed`，关闭后焦点回到设置按钮
+- [ ] 设置面板可从右上角打开；联网联想开关文案固定、状态只看 `aria-pressed`；主题模式是「跟随系统 / 浅色 / 深色」三段控件；关闭后焦点回到设置按钮
 - [ ] 19 个主题色色块可切换、刷新后保持、首屏不闪错色；切换不产生任何网络请求
 - [ ] 顶栏 logo 与分类导航小图标来自内联 sprite（没有新增图片请求）
+- [ ] 深链 `?cat=` / `?q=` / `?site=` 只预填 / 预选，不自动提交、不跳转；点分类时地址栏同步 `?cat=`
+- [ ] 主题三态：跟随系统不写 `ss.theme` 且实时跟随；浅色 / 深色会记住；旧的 `#theme-toggle` 已移除
+- [ ] 搜索历史计数 / 清空（0 条禁用）与单条删除（`.suggest-delete` 或 `Delete`）正常
+- [ ] 设置面板底部版本号来自 `package.json`（改版本号后 `npm run build` 会自动更新）
 - [ ] 站点图标来自内联 sprite（没有新增图片请求）；没配图标的站点显示 monogram
 - [ ] 直接双击 `index.html`（`file://`）无报错
 - [ ] `README.md` / `docs/custom-sites.md` / `docs/CHANGELOG.md` 等受影响的文档已同步

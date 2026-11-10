@@ -3,6 +3,27 @@
 本项目的对用户可见变化都记录在这里。
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)：主版本号在页面结构/使用方式有明显变化时递增。
 
+## 2.5.0（未发布）
+
+深链、主题三态、搜索历史管理、版本号与可选的站点自检。按需求**不做**「把本站设为浏览器默认搜索引擎（`?q=%s` 自动提交）」。
+
+### 新增
+
+- **深链（只预填 / 预选，不自动跳转）**：`?cat=<id>` 进入即选中分类，点分类时地址栏同步 `?cat=`（`all` 时去掉），分类视图可收藏；`?q=<term>` 预填搜索框并聚焦、**不自动提交**；`?site=<id>` 选中该站分类并聚焦站点按钮、**不跳转**。三者可组合，顺序为 cat → site → q。
+- **主题三态**：设置里的「主题模式」改成「跟随系统 / 浅色 / 深色」分段控件；选「跟随系统」会删除 `ss.theme`（不会写 `auto`）、实时响应系统深浅色变化，选浅色 / 深色才记住。原来的「夜间模式」开关行移除；`?theme=` 老链接仍然有效。
+- **搜索历史管理**：设置里显示「搜索历史 N 条」+「清空」（0 条时禁用）；联想列表的历史项带删除按钮，键盘高亮后按 `Delete` 也能删。历史仍最多 10 条、仍只由页面记录。
+- **版本号**：设置面板底部显示「简单搜索 v2.5.0」，构建时从 `package.json` 注入。
+- **站点健康自检**：新增可选命令 `npm run check:sites`（需网络、**不进 CI**），逐个检查站点 `home` / `search` 并输出 OK / WARN / FAIL 表格（实测当前 11 站 OK 8 / WARN 3 / FAIL 0，WARN 来自 Unsplash 401、知乎 403 反爬、京东跨域跳转）；`--strict` 时只有 FAIL 退出 1。
+
+### 工程
+
+- `templates/page.html` 新增 `#theme-mode` 分段控件、搜索历史行（`#history-count` / `#history-clear`）、`.panel-version`，移除 `#theme-toggle`；build 新增 `{{APP_VERSION}}` 占位符（从 `package.json` 注入）。
+- `theme.js` 新增 `getMode()` / `setMode()` / `applyMode()`（`auto` 不写 `ss.theme`，`light`/`dark` 持久化）；`input.js` 历史项删除按钮与 `Delete` 键、清空后刷新计数；`app.js` 处理深链与 `?cat=` 的 `replaceState` 同步、派发 `ss:history-changed`。
+- 新增 `scripts/check-sites.mjs` + `check:sites` 脚本（默认只报告，`--strict` 失败退 1）；**不加入 `npm run check` / CI**。
+- 体积：单页静态资源约 115.5 KB 未压缩 / gzip 约 35 KB（预算 128 KB，gzip 是真实成本口径）；首屏 12 个请求，e2e 实测传输约 118 KB（含协议开销），没有任何图片请求。
+- 测试基线：`npm test` **156 例**、`npm run validate` **19 项**、`npm run e2e` **121 项**全绿。
+- 文档同步：README（深链、主题三态、历史管理、版本号、命令表、隐私）、CONTRIBUTING（深链/主题三态/历史管理/自检流程）、`docs/custom-sites.md`（深链与 check:sites 自查）。
+
 ## 2.4.0（未发布）
 
 主题色可选（MDUI 19 组主色）+ 顶栏圆形 logo + 分类导航小图标。

@@ -105,7 +105,7 @@ SS.siteGroups = [
 
 - 图标会被 `npm run build` **内联进 `index.html` 的 SVG sprite**（`<symbol id="i-example">` + `<use>`），不新增任何图片请求，也不会生成独立图片文件。
 - 画图标守则：24×24 viewBox、`fill="none"`、`stroke="currentColor"`、线宽 1.8、圆头；颜色跟随主题文字色，所以不需要为深浅色各画一套。
-- 请画**通用几何符号**，不要精确复制他人商标；整个 sprite 的 HTML 增量要控制在 4 KB 内（未压缩）。
+- 请画**通用几何符号**，不要精确复制他人商标；整个 sprite 的 HTML 增量要控制在 8 KB 内（未压缩）。
 - 不要用外链 favicon 服务、外部图标库/CDN 或 emoji 来替代——前者会新增请求，后者跨平台风格不统一。
 
 ## 7. 新增 / 删除网站
@@ -115,7 +115,8 @@ SS.siteGroups = [
 1. 在 `SS.sites` 末尾（或你想让它出现的位置）加一个对象，参考上一节模板；**别忘了 `group`**。
 2. 运行 `npm run build`，重新生成三个产物（`index.html` + 两个重定向壳）。
 3. 可选：`npm test` 跑单元测试，`npm run validate` 做静态检查与产物一致性检查。
-4. 本地打开 `index.html` 验证（或点两个老链接，它们会跳到首页）：空输入点按钮应打开 `home`，输入关键词点按钮应跳到站内搜索结果；左侧分类导航里应该能看到它。
+4. 本地打开 `index.html` 验证（或点两个老链接，它们会跳到首页）：空输入点按钮应打开 `home`，输入关键词点按钮应跳到站内搜索结果；左侧分类导航里应该能看到它。也可以试试深链 `?cat=<新分类>`、`?site=<新站点id>`：只预选 / 聚焦，不会自动跳转。
+5. 可选（需要网络）：`npm run check:sites` 会逐个请求各站点的 `home` / `search`，输出 OK / WARN / FAIL 表格；WARN 多为反爬 401/403 或跨域跳转（不阻断），`--strict` 时只有 FAIL 才退出 1。它**不进 CI**。
 
 删除：把对应对象从数组里删掉，再 `npm run build`。
 

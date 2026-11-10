@@ -1,8 +1,8 @@
-// SimpleSearch v2.4 静态校验与产物一致性门禁。
+// SimpleSearch v2.5 静态校验与产物一致性门禁。
 // 用法：node scripts/validate.mjs（npm run validate）
 //
-// 产物模型（docs/contract.md §7、§12、§13、§14、§15）：
-//   index.html                唯一真实页面（MDUI 文档站骨架 + 19 色主题 + 内联 SVG sprite）
+// 产物模型（docs/contract.md §7、§12、§13、§14、§15、§16）：
+//   index.html                唯一真实页面（MDUI 文档站骨架 + 19 色主题 + 主题三态 + 历史行 + 版本号 + 内联 sprite）
 //   SimpleSearch-Light.html   0 秒重定向壳 → index.html?theme=light
 //   SimpleSearch-Dark.html    0 秒重定向壳 → index.html?theme=dark
 //
@@ -15,19 +15,22 @@
 //   6. index.html 按契约顺序引用 8 个经典脚本（remote.js 在 input.js 之前）
 //   7. index.html 的 data-site 与 SS.sites 一一对应（顺序/label/数量/data-group）
 //   8. 文档站骨架：.appbar（含 .appbar-logo→#i-logo）/.shell/#main-content/.card 卡片、
-//      设置面板（dialog/hidden/2 个 .switch-row/固定文案/.settings-row+空 #color-swatches）、无页脚、#scrim[hidden]
+//      设置面板（dialog/hidden/#theme-mode 三段式/唯一 .switch-row/.settings-row+空 #color-swatches）、
+//      无页脚、无 #theme-toggle、#scrim[hidden]
 //   9. 左侧分类导航：#site-nav + nav#group-chips.nav-list 内 .nav-item（数量/顺序/data-group/aria-current），
 //      每个 nav-item 有 .nav-icon（#i-cat-<group>）+ .nav-label
 //  10. 主题色：<html data-color="indigo">；tokens.css 19 组 :root[data-color]（每组 4 个 --c-*）+ 语义变量
-//  11. 图标：sprite = 11 站点 + 3 UI(menu/settings/close) + 1 logo + 6 分类 = 21 个 symbol；
+//  11. 搜索历史行：.settings-row-inline +「搜索历史」+ #history-count「0 条」+ #history-clear[disabled]
+//  12. 版本号：.panel-version 文案为「简单搜索 v<semver>」（build 从 package.json 注入）
+//  13. 图标：sprite = 11 站点 + 3 UI(menu/settings/close) + 1 logo + 6 分类 = 21 个 symbol；
 //      每个按钮 .button-icon，所有 <use> 目标都能在 sprite 命中
-//  12. sprite 内联体积 ≤ 8KB（未压缩，契约 §15.3）
-//  13. 图标零图片请求：无 .png/.jpg/.webp/.gif/.ico 引用、无外链 favicon 服务
-//  14. 两个重定向壳：meta refresh 0 秒 + canonical + location.replace 均指向 index.html?theme=X；
+//  14. sprite 内联体积 ≤ 8KB（未压缩，契约 §15.3）
+//  15. 图标零图片请求：无 .png/.jpg/.webp/.gif/.ico 引用、无外链 favicon 服务
+//  16. 两个重定向壳：meta refresh 0 秒 + canonical + location.replace 均指向 index.html?theme=X；
 //      壳不得包含真实页内容（#buttons-container / data-site / assets/js bundle），体积 < 1KB
-//  15. 唯一性：只有 index.html 是真实页
-//  16. CSS 不含 !important（契约 §6）
-//  17. 体积信息：index.html 单页加载资源合计 < 110KB（仅提示，契约 §9.9）
+//  17. 唯一性：只有 index.html 是真实页
+//  18. CSS 不含 !important（契约 §6）
+//  19. 体积信息：index.html 单页加载资源合计 < 128KB（仅提示，契约 §9.9，gzip 为真实成本口径）
 // 任一失败 → 退出码 1，并打印失败详情。
 import fs from 'node:fs'
 import path from 'node:path'
@@ -63,7 +66,7 @@ const REQUIRED_IDS = [
   'suggest-list',
   'search-submit',
   'buttons-container',
-  'theme-toggle',
+  'theme-mode',
   'suggest-source-toggle',
   'site-nav',
   'group-chips',
@@ -74,6 +77,8 @@ const REQUIRED_IDS = [
   'settings-title',
   'settings-close',
   'color-swatches',
+  'history-count',
+  'history-clear',
   'scrim',
 ]
 
@@ -132,8 +137,8 @@ const BUILTIN_IDS = [
 ]
 
 const BUILD_MARKER = /<!--\s*由 scripts\/build\.mjs/
-// 体积预算口径（lead 2026-11-11 v2.4）：单页加载 < 110 KB（gzip 前；契约 §9.9，v2.4 主题色/logo/分类图标后更新）
-const BUDGET_KB = 110
+// 体积预算口径（lead 2026-11-11 v2.5）：单页加载 < 128 KB（gzip 前；契约 §9.9 以 gzip 为真实成本口径）
+const BUDGET_KB = 128
 const SHELL_MAX_BYTES = 1024
 
 // ---------------------------------------------------------------- 通用工具
@@ -396,7 +401,7 @@ function extractGroupNav(html) {
   return { navOpen, items }
 }
 
-/** v2.3 设置面板里的 .switch-row 按钮。 */
+/** v2.5 设置面板里的 .switch-row 按钮。 */
 function extractSwitchRows(html) {
   const clean = stripHtmlComments(html)
   const rows = []
@@ -408,6 +413,55 @@ function extractSwitchRows(html) {
     rows.push({ id: getAttr(openTag, 'id'), pressed: getAttr(openTag, 'aria-pressed'), text })
   }
   return rows
+}
+
+/** v2.5 §16.2：主题三态分段控件 #theme-mode > .segmented-item[data-mode]。 */
+function extractSegmented(html) {
+  const clean = stripHtmlComments(html)
+  const container = findTagById(clean, 'theme-mode')
+  if (!container) return null
+  const tagName = (container.match(/^<([a-zA-Z][\w:-]*)/) || [])[1]
+  const inner = innerOfTag(clean, container, tagName) || ''
+  const items = []
+  for (const match of findAll(inner, /<button\b[^>]*>[\s\S]*?<\/button>/gi)) {
+    const tag = match[0]
+    const openTag = tag.slice(0, tag.indexOf('>') + 1)
+    if (!hasClass(openTag, 'segmented-item')) continue
+    items.push({
+      mode: getAttr(openTag, 'data-mode'),
+      pressed: getAttr(openTag, 'aria-pressed'),
+      text: textOfInner(tag.slice(tag.indexOf('>') + 1, tag.lastIndexOf('</button>'))),
+    })
+  }
+  return {
+    container,
+    role: getAttr(container, 'role'),
+    label: getAttr(container, 'aria-label'),
+    hasSegmentedClass: hasClass(container, 'segmented'),
+    items,
+  }
+}
+
+/** 查找内部 HTML 含 token 的 .settings-row（v2.5 有多行，且 <div class="settings-row"> 重复出现，
+ *  必须按 match.index 计算各自的内部区域）。 */
+function findSettingsRowContaining(html, token) {
+  const clean = stripHtmlComments(html)
+  const tagRe = /<([a-zA-Z][\w:-]*)\b[^>]*>/g
+  for (const match of clean.matchAll(tagRe)) {
+    const tag = match[0]
+    if (!hasClass(tag, 'settings-row')) continue
+    const tagName = match[1]
+    const start = match.index + tag.length
+    const end = clean.indexOf(`</${tagName}>`, start)
+    if (end === -1) continue
+    const inner = clean.slice(start, end)
+    if (inner.includes(token)) return { openTag: tag, inner }
+  }
+  return null
+}
+
+function hasDisabledAttr(openTag) {
+  return /\sdisabled(?:\s|=|>|\/)/i.test(openTag)
 }
 
 /** 页面里所有 <use href="#..."> 的目标 symbol id。 */
@@ -786,7 +840,7 @@ check('index.html 站点渲染：data-site 合法、无重复、顺序/label/数
 
 // ---------------------------------------------------------------- 8. v2.3 文档站骨架 + 设置面板
 
-check('v2.3 骨架：.appbar/.shell/#main-content/.card 卡片、#scrim[hidden]、#settings-panel 对话框（2 个 .switch-row/固定文案），无页脚', () => {
+check('v2.5 骨架：.appbar/.shell/#main-content/.card、#scrim[hidden]、#settings-panel 对话框（#theme-mode 三段式 + 唯一 .switch-row），无页脚/无 #theme-toggle', () => {
   if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
   const problems = []
   const clean = stripHtmlComments(realPage.html)
@@ -838,23 +892,12 @@ check('v2.3 骨架：.appbar/.shell/#main-content/.card 卡片、#scrim[hidden]�
     if (!findTagById(clean, 'settings-close')) problems.push(`${REAL_PAGE} 缺少 #settings-close`)
     if (!findTagWithClass(clean, 'panel-link')) problems.push(`${REAL_PAGE} 缺少 .panel-link`)
 
+    // v2.5：唯一保留的 .switch-row 是联网联想；#theme-toggle 已移除
     const rows = extractSwitchRows(clean)
-    if (rows.length !== 2) problems.push(`#settings-panel 内应有 2 个 .switch-row，实际 ${rows.length}`)
-    const byId = new Map(rows.map((row) => [row.id, row]))
-
-    const themeRow = byId.get('theme-toggle')
-    if (!themeRow) {
-      problems.push('缺少 #theme-toggle.switch-row')
-    } else {
-      if (themeRow.text !== '夜间模式') {
-        problems.push(`#theme-toggle 文案应固定为「夜间模式」，实际 ${JSON.stringify(themeRow.text)}`)
-      }
-      if (themeRow.pressed !== 'false') {
-        problems.push(`#theme-toggle 初始 aria-pressed 应为 "false"，实际 ${JSON.stringify(themeRow.pressed)}`)
-      }
+    if (rows.length !== 1) {
+      problems.push(`v2.5 起 #settings-panel 内应只剩 1 个 .switch-row（联网联想），实际 ${rows.length}`)
     }
-
-    const remoteRow = byId.get('suggest-source-toggle')
+    const remoteRow = rows.find((row) => row.id === 'suggest-source-toggle')
     if (!remoteRow) {
       problems.push('缺少 #suggest-source-toggle.switch-row')
     } else {
@@ -865,19 +908,57 @@ check('v2.3 骨架：.appbar/.shell/#main-content/.card 卡片、#scrim[hidden]�
         problems.push(`#suggest-source-toggle 初始 aria-pressed 应为 "true"，实际 ${JSON.stringify(remoteRow.pressed)}`)
       }
     }
-
-    // v2.4 主题色行（§15.1）：.settings-row > .settings-label「主题色」+ 空容器 #color-swatches.swatches
-    if (!findTagWithClass(clean, 'settings-row')) {
-      problems.push(`${REAL_PAGE} 设置面板缺少 .settings-row（主题色行）`)
+    if (/id\s*=\s*["']theme-toggle["']/i.test(clean)) {
+      problems.push('v2.5 已移除 #theme-toggle（改为 #theme-mode 分段控件），产物里不应再出现')
     }
-    const settingsLabel = findTagWithClass(clean, 'settings-label')
-    if (!settingsLabel) {
-      problems.push(`${REAL_PAGE} 缺少 .settings-label`)
+
+    // v2.5 §16.2 主题三态分段控件：#theme-mode > 3 个 .segmented-item[data-mode]，初始只有 auto 选中
+    const segmented = extractSegmented(clean)
+    if (!segmented) {
+      problems.push(`${REAL_PAGE} 缺少 #theme-mode 分段控件`)
     } else {
-      const labelTagName = (settingsLabel.match(/^<([a-zA-Z][\w:-]*)/) || [])[1]
-      const labelText = textOfInner(innerOfTag(clean, settingsLabel, labelTagName))
-      if (labelText !== '主题色') {
-        problems.push(`.settings-label 文案应为「主题色」，实际 ${JSON.stringify(labelText)}`)
+      if (!segmented.hasSegmentedClass) problems.push('#theme-mode 应带 .segmented 类')
+      if ((segmented.role || '').toLowerCase() !== 'group') {
+        problems.push(`#theme-mode 的 role 应为 group，实际 ${JSON.stringify(segmented.role)}`)
+      }
+      const expectedModes = ['auto', 'light', 'dark']
+      const actualModes = segmented.items.map((item) => item.mode)
+      if (segmented.items.length !== 3) {
+        problems.push(`#theme-mode 内应有 3 个 .segmented-item，实际 ${segmented.items.length}`)
+      }
+      if (actualModes.join(',') !== expectedModes.join(',')) {
+        problems.push(
+          `#theme-mode 的 data-mode 顺序应为 auto, light, dark，实际 ${actualModes.join(', ') || '（无）'}`,
+        )
+      }
+      for (const item of segmented.items) {
+        if (item.pressed !== 'true' && item.pressed !== 'false') {
+          problems.push(`分段项 ${JSON.stringify(item.mode)} 的 aria-pressed 缺失或非法：${JSON.stringify(item.pressed)}`)
+        }
+      }
+      const current = segmented.items.filter((item) => item.pressed === 'true')
+      if (current.length !== 1) {
+        problems.push(`初始应只有一个分段项 aria-pressed="true"，实际 ${current.length} 个`)
+      } else if (current[0].mode !== 'auto') {
+        problems.push(`初始选中的分段项应为「跟随系统」(data-mode="auto")，实际 ${JSON.stringify(current[0].mode)}`)
+      }
+    }
+
+    // 主题色行（§15.1）：含 #color-swatches 的 .settings-row 内 .settings-label「主题色」+ 空容器
+    const colorRow = findSettingsRowContaining(realPage.html, 'color-swatches')
+    if (!colorRow) {
+      problems.push(`${REAL_PAGE} 设置面板缺少含 #color-swatches 的 .settings-row（主题色行）`)
+    } else {
+      const colorLabelMatch = colorRow.inner.match(
+        /<span\b[^>]*\bclass\s*=\s*["'][^"']*\bsettings-label\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/i,
+      )
+      if (!colorLabelMatch) {
+        problems.push('主题色行缺少 .settings-label')
+      } else {
+        const labelText = textOfInner(colorLabelMatch[1])
+        if (labelText !== '主题色') {
+          problems.push(`主题色行 .settings-label 文案应为「主题色」，实际 ${JSON.stringify(labelText)}`)
+        }
       }
     }
     const swatches = findTagById(clean, 'color-swatches')
@@ -1030,7 +1111,65 @@ check('v2.4 主题色：<html data-color="indigo"> + tokens.css 19 组 data-colo
   }
 })
 
-// ---------------------------------------------------------------- 11. v2.3 图标 sprite / 按钮图标
+// ---------------------------------------------------------------- 11. v2.5 搜索历史行（§16.3）
+
+check('v2.5 历史行：.settings-row-inline +「搜索历史」+ #history-count「0 条」+ #history-clear[disabled]', () => {
+  if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
+  const clean = stripHtmlComments(realPage.html)
+  const problems = []
+
+  const row = findSettingsRowContaining(realPage.html, 'history-count')
+  if (!row) {
+    problems.push(`${REAL_PAGE} 缺少含 #history-count 的 .settings-row（历史行）`)
+  } else {
+    if (!hasClass(row.openTag, 'settings-row-inline')) problems.push('历史行应带 .settings-row-inline 类')
+    const labelMatch = row.inner.match(
+      /<span\b[^>]*\bclass\s*=\s*["'][^"']*\bsettings-label\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/i,
+    )
+    if (!labelMatch) {
+      problems.push('历史行缺少 .settings-label')
+    } else if (!/搜索历史/.test(textOfInner(labelMatch[1]) || '')) {
+      problems.push('历史行 .settings-label 应含「搜索历史」')
+    }
+  }
+
+  const count = findTagById(clean, 'history-count')
+  if (!count) {
+    problems.push(`${REAL_PAGE} 缺少 #history-count`)
+  } else {
+    if (!hasClass(count, 'settings-value')) problems.push('#history-count 应带 .settings-value')
+    const countTagName = (count.match(/^<([a-zA-Z][\w:-]*)/) || [])[1]
+    const text = textOfInner(innerOfTag(clean, count, countTagName))
+    if (text !== '0 条') problems.push(`#history-count 初始应为「0 条」，实际 ${JSON.stringify(text)}`)
+  }
+
+  const clearButton = findTagById(clean, 'history-clear')
+  if (!clearButton) {
+    problems.push(`${REAL_PAGE} 缺少 #history-clear`)
+  } else {
+    if (!hasClass(clearButton, 'text-button')) problems.push('#history-clear 应带 .text-button 类')
+    if (!hasDisabledAttr(clearButton)) problems.push('#history-clear 在 0 条时初始应带 disabled')
+  }
+
+  return problems
+})
+
+// ---------------------------------------------------------------- 12. v2.5 版本号（§16.4）
+
+check('v2.5 版本号：.panel-version 文案为「简单搜索 v<semver>」', () => {
+  if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
+  const clean = stripHtmlComments(realPage.html)
+  const version = findTagWithClass(clean, 'panel-version')
+  if (!version) return [`${REAL_PAGE} 缺少 .panel-version（设置面板版本号）`]
+  const tagName = (version.match(/^<([a-zA-Z][\w:-]*)/) || [])[1]
+  const text = textOfInner(innerOfTag(clean, version, tagName))
+  if (!/^简单搜索 v\d+\.\d+\.\d+$/.test(text || '')) {
+    return [`版本号文案应为「简单搜索 vX.Y.Z」，实际 ${JSON.stringify(text)}`]
+  }
+  return { problems: [], notes: [text] }
+})
+
+// ---------------------------------------------------------------- 13. v2.3 图标 sprite / 按钮图标
 
 check('v2.4 图标：sprite = 11 站点 + 3 UI + 1 logo + 6 分类（共 21 个 symbol）；每个 data-site 按钮有 .button-icon；所有 use 目标命中', () => {
   if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
@@ -1162,7 +1301,7 @@ check('v2.4 图标：sprite = 11 站点 + 3 UI + 1 logo + 6 分类（共 21 个 
   }
 })
 
-// ---------------------------------------------------------------- 12. sprite 体积
+// ---------------------------------------------------------------- 14. sprite 体积
 
 check('sprite 内联体积 ≤ 8KB（未压缩，契约 §15.3）', () => {
   if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
@@ -1173,7 +1312,7 @@ check('sprite 内联体积 ≤ 8KB（未压缩，契约 §15.3）', () => {
   return { problems: [], notes: [`sprite ${(bytes / 1024).toFixed(2)} KB`] }
 })
 
-// ---------------------------------------------------------------- 13. 零额外图片请求
+// ---------------------------------------------------------------- 15. 零额外图片请求
 
 check('图标零图片请求：无 .png/.jpg/.webp/.gif/.ico 引用、无外链 favicon 服务', () => {
   if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
@@ -1209,7 +1348,7 @@ check('图标零图片请求：无 .png/.jpg/.webp/.gif/.ico 引用、无外链 
   return problems
 })
 
-// ---------------------------------------------------------------- 14. 重定向壳
+// ---------------------------------------------------------------- 16. 重定向壳
 
 check('两个重定向壳：meta refresh(0s) + canonical + location.replace 指向 index.html?theme=X，且不含真实页内容', () => {
   const problems = []
@@ -1280,7 +1419,7 @@ check('两个重定向壳：meta refresh(0s) + canonical + location.replace 指�
   return problems
 })
 
-// ---------------------------------------------------------------- 15. 唯一性
+// ---------------------------------------------------------------- 17. 唯一性
 
 check('唯一性：只有 index.html 是真实页（两个壳不得含真实页 DOM）', () => {
   const problems = []
@@ -1307,7 +1446,7 @@ check('唯一性：只有 index.html 是真实页（两个壳不得含真实页 
   return problems
 })
 
-// ---------------------------------------------------------------- 16. CSS 禁 !important
+// ---------------------------------------------------------------- 18. CSS 禁 !important
 
 check('CSS 不含 !important（契约 §6）', () => {
   const cssDir = path.join(ROOT, 'assets', 'css')
@@ -1328,9 +1467,9 @@ check('CSS 不含 !important（契约 §6）', () => {
   return problems
 })
 
-// ---------------------------------------------------------------- 17. 体积信息
+// ---------------------------------------------------------------- 19. 体积信息
 
-check('体积信息（index.html 单页加载预算 < 110 KB，仅供参考不阻断）', () => {
+check('体积信息（index.html 单页加载预算 < 128 KB，仅供参考不阻断）', () => {
   if (!realPage.exists) return { problems: [], notes: [`${REAL_PAGE} 不存在，跳过体积统计`] }
 
   const notes = []

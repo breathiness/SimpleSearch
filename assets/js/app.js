@@ -28,6 +28,7 @@
 
     if (decision.kind === 'search' && SS.history && SS.history.record) {
       SS.history.record(query)
+      notifyHistoryChanged()
     }
 
     const newTab = Boolean(event && (event.ctrlKey || event.metaKey || event.altKey))
@@ -58,12 +59,37 @@
         input.focus()
         return
       }
-      if (SS.history && SS.history.record) SS.history.record(query)
+      if (SS.history && SS.history.record) {
+        SS.history.record(query)
+        notifyHistoryChanged()
+      }
       // 非空交给浏览器原生 GET 提交，表单编码天然安全
     })
   }
 
   // ---------------------------------------------------------------- 分类导航
+  // 历史写入后通知输入模块刷新设置面板里的计数/清空按钮
+  function notifyHistoryChanged() {
+    try {
+      document.dispatchEvent(new CustomEvent('ss:history-changed'))
+    } catch (error) {
+      // 老浏览器不支持 CustomEvent 构造时忽略（计数只是辅助信息）
+    }
+  }
+
+  // 分类选择同步到地址栏（可收藏/分享分类视图）；'all' 时不带参数
+  function syncCategoryUrl(group) {
+    try {
+      const url = new URL(window.location.href)
+      if (group === 'all') url.searchParams.delete('cat')
+      else url.searchParams.set('cat', group)
+      const next = url.pathname + (url.search || '') + (url.hash || '')
+      window.history.replaceState(window.history.state, '', next)
+    } catch (error) {
+      // file:// 或受限环境 replaceState 失败时忽略，不影响筛选
+    }
+  }
+
   function applyGroupFilter(group) {
     const nav = $('group-chips')
     if (nav) {
@@ -76,6 +102,7 @@
       const match = group === 'all' || button.getAttribute('data-group') === group
       button.hidden = !match
     }
+    syncCategoryUrl(group)
   }
 
   function isMobileNav() {
@@ -213,7 +240,7 @@
 
   // MDUI 1 风格的涟漪反馈：点击时在宿主元素内插入一个扩散圆
   const RIPPLE_TARGETS =
-    '.button, .nav-item, .appbar-icon, .icon-button, #search-submit, .switch-row, .panel-link, .suggest-item'
+    '.button, .nav-item, .appbar-icon, .icon-button, #search-submit, .switch-row, .panel-link, .suggest-item, .segmented-item, .text-button'
 
   function prefersReducedMotion() {
     return Boolean(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)
@@ -243,6 +270,50 @@
     )
   }
 
+  // ---------------------------------------------------------------- 深链
+  // 只预填/预选，不自动跳转（用户明确不要「?q= 自动提交」的默认搜索引擎模式）
+  function applyDeepLinks() {
+    let params
+    try {
+      params = new URLSearchParams(window.location.search)
+    } catch (error) {
+      return
+    }
+    if (!params.toString()) return
+
+    const nav = $('group-chips')
+    const knownGroups = new Set(
+      nav ? [...nav.querySelectorAll('[data-group]')].map((el) => el.getAttribute('data-group')) : []
+    )
+
+    const cat = params.get('cat')
+    if (cat && knownGroups.has(cat)) applyGroupFilter(cat)
+
+    const siteId = params.get('site')
+    if (siteId && Array.isArray(SS.sites)) {
+      const site = SS.sites.find((item) => item && item.id === siteId)
+      if (site && site.group && knownGroups.has(site.group)) {
+        applyGroupFilter(site.group)
+        const button = document.querySelector(`#buttons-container [data-site="${siteId}"]`)
+        if (button && typeof button.focus === 'function') button.focus()
+      }
+    }
+
+    const query = params.get('q')
+    const input = $('search-input')
+    if (query && input) {
+      input.value = query
+      input.focus()
+      try {
+        input.setSelectionRange(query.length, query.length)
+      } catch (error) {
+        // 某些输入类型不支持 setSelectionRange，忽略
+      }
+      // 让清除按钮/联想等监听 input 的逻辑同步状态
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    }
+  }
+
   function boot() {
     initTheme()
     initInput()
@@ -251,6 +322,7 @@
     bindSearchForm()
     bindDrawers()
     bindRipple()
+    applyDeepLinks()
     // 供 E2E/调试判断"装配完成"（脚本 defer 执行完 ≠ 已绑定事件）
     document.documentElement.setAttribute('data-app-ready', '1')
   }
