@@ -1,0 +1,18 @@
+# 依赖与构建产物
+node_modules/
+npm-debug.log*
+
+# 编辑器 / 系统
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+
+# 临时文件
+*.tmp
+.tmp/
+
+# 本地验证产物（截图等）
+artifacts/

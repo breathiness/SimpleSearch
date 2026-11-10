@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<!-- 由 scripts/build.mjs 从 templates/page.html 生成，请勿手改 -->
+<html lang="zh-CN" data-theme="{{THEME}}" data-theme-default="{{THEME}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{TITLE}}</title>
+  <meta name="description" content="{{DESCRIPTION}}">
+  <meta name="theme-color" content="{{THEME_COLOR}}">
+  <meta property="og:title" content="{{TITLE}}">
+  <meta property="og:description" content="{{DESCRIPTION}}">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <script>
+    // 防闪烁：在样式表生效前确定主题。存储值优先，其次当前入口页默认主题。
+    (function () {
+      var el = document.documentElement
+      var stored = null
+      try { stored = localStorage.getItem('ss.theme') } catch (e) {}
+      if (stored !== 'light' && stored !== 'dark') {
+        stored = el.getAttribute('data-theme-default') || 'light'
+      }
+      el.setAttribute('data-theme', stored)
+    })()
+  </script>
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/base.css">
+  <link rel="stylesheet" href="assets/css/input.css">
+</head>
+<body>
+  <a class="skip-link" href="#search-input">跳到搜索框</a>
+
+  <main id="search-container">
+    <form id="search-form" role="search" action="https://www.bing.com/search" method="get" autocomplete="off">
+      <div class="search-field">
+        <input id="search-input" name="q" type="text" placeholder="搜索…" aria-label="搜索关键词"
+               aria-autocomplete="list" aria-controls="suggest-list" aria-expanded="false"
+               enterkeyhint="search" autocomplete="off" spellcheck="false" maxlength="512">
+        <button id="clear-button" class="icon-button" type="button" aria-label="清除输入内容" hidden>✕</button>
+        <ul id="suggest-list" class="suggest-list" role="listbox" aria-label="搜索建议" hidden></ul>
+      </div>
+      <button id="search-submit" class="submit-button" type="submit">搜索</button>
+    </form>
+
+    <nav id="buttons-container" aria-label="常用网站">
+{{SITE_BUTTONS}}
+    </nav>
+
+    <noscript>
+      <p class="noscript-hint">JavaScript 未启用：直接在输入框回车仍可用 Bing 搜索。</p>
+    </noscript>
+  </main>
+
+  <footer id="site-footer">
+    <button id="theme-toggle" class="footer-button" type="button">{{THEME_TOGGLE_LABEL}}</button>
+    <a class="footer-link" href="https://github.com/breathiness/SimpleSearch">关于</a>
+  </footer>
+
+  <script defer src="assets/js/sites.js"></script>
+  <script defer src="assets/js/search.js"></script>
+  <script defer src="assets/js/suggest.js"></script>
+  <script defer src="assets/js/history.js"></script>
+  <script defer src="assets/js/theme.js"></script>
+  <script defer src="assets/js/input.js"></script>
+  <script defer src="assets/js/app.js"></script>
+</body>
+</html>
