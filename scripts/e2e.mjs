@@ -18,8 +18,9 @@ const HERE = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(HERE, '..')
 const SHOTS = process.argv.includes('--shots')
 const ARTIFACTS = path.join(ROOT, 'artifacts')
-const PORT = Number(process.env.E2E_PORT || 8123)
-const CDP_PORT = Number(process.env.E2E_CDP_PORT || 9333)
+// 端口随机化：允许多个 e2e 实例（例如人 + 智能体）并行跑而不互相抢 CDP 端口
+const PORT = Number(process.env.E2E_PORT || 8000 + Math.floor(Math.random() * 900))
+const CDP_PORT = Number(process.env.E2E_CDP_PORT || 9200 + Math.floor(Math.random() * 700))
 const ORIGIN = `http://127.0.0.1:${PORT}`
 const PAGE = `${ORIGIN}/index.html`
 
@@ -209,6 +210,15 @@ function createPage(cdp) {
     const loaded = cdp.once('Page.loadEventFired', 20000).catch(() => null)
     await cdp.send('Page.navigate', { url })
     await loaded
+    // 等到应用真正装配完成，避免"脚本已加载但事件还没绑"的竞态
+    try {
+      await waitFor(
+        async () => (await evaluate("document.documentElement.getAttribute('data-app-ready') === '1'")),
+        { timeout: 5000, interval: 50, label: 'data-app-ready' }
+      )
+    } catch {
+      // 非应用页（如外部站点/尚未重定向完的壳）没有该标记，继续
+    }
     await sleep(settle)
   }
 
@@ -446,6 +456,69 @@ async function run() {
       missingBuiltin.length ? `缺少 ${missingBuiltin.join(',')}` : `${renderedSites.length} 个`
     )
 
+    // ---- 分类 chip ----
+    const chipInfo = await page.evaluate(`(() => {
+      const wrap = document.getElementById('group-chips-wrap')
+      const chips = [...document.querySelectorAll('#group-chips .chip')]
+      return {
+        wrapHidden: wrap ? wrap.hidden : null,
+        count: chips.length,
+        groups: chips.map((c) => c.getAttribute('data-group')),
+        pressed: chips.filter((c) => c.getAttribute('aria-pressed') === 'true').map((c) => c.getAttribute('data-group')),
+      }
+    })()`)
+    check('C: 分类 chip 已显示', chipInfo.wrapHidden === false && chipInfo.count >= 2, `${chipInfo.count} 个`)
+    check('C: 默认选中「全部」', chipInfo.pressed.length === 1 && chipInfo.pressed[0] === 'all', chipInfo.pressed.join(','))
+    check('C: chip 分组 id 合法', chipInfo.groups.includes('all') && chipInfo.groups.length >= 2, chipInfo.groups.join(','))
+
+    await page.evaluate(`document.querySelector('#group-chips [data-group="shopping"]').click()`)
+    await sleep(200)
+    const filtered = await page.evaluate(`(() => {
+      const buttons = [...document.querySelectorAll('#buttons-container [data-site]')]
+      const visible = buttons.filter((b) => !b.hidden)
+      return {
+        visible: visible.map((b) => b.dataset.site),
+        allShopping: visible.every((b) => b.dataset.group === 'shopping'),
+        total: buttons.length,
+        pressed: document.querySelector('#group-chips [data-group="shopping"]').getAttribute('aria-pressed'),
+      }
+    })()`)
+    check(
+      'C: 分类筛选生效',
+      filtered.visible.length > 0 && filtered.visible.length < filtered.total && filtered.allShopping,
+      `${filtered.visible.join(',')}（共 ${filtered.total}）`
+    )
+    check('C: 被选 chip 的 aria-pressed 正确', filtered.pressed === 'true', String(filtered.pressed))
+
+    await page.evaluate(`document.querySelector('#group-chips [data-group="all"]').click()`)
+    await sleep(200)
+    const restored = await page.evaluate(
+      "[...document.querySelectorAll('#buttons-container [data-site]')].filter((b) => !b.hidden).length"
+    )
+    check('C: 点「全部」恢复全量', restored === renderedSites.length, `${restored}/${renderedSites.length}`)
+
+    // ---- 内联图标（零额外请求） ----
+    const iconInfo = await page.evaluate(`(() => {
+      const symbols = [...document.querySelectorAll('.icon-sprite symbol')].map((s) => s.id)
+      const buttons = [...document.querySelectorAll('#buttons-container [data-site]')]
+      const uses = buttons.map((b) => b.querySelector('use') && b.querySelector('use').getAttribute('href')).filter(Boolean)
+      return {
+        symbols: symbols.length,
+        buttons: buttons.length,
+        withIcon: buttons.filter((b) => b.querySelector('.button-icon')).length,
+        uses: uses.length,
+        unresolved: uses.filter((href) => !document.querySelector(href)),
+      }
+    })()`)
+    check(
+      'C: 每个站点按钮都有图标',
+      iconInfo.withIcon === iconInfo.buttons && iconInfo.uses === iconInfo.buttons,
+      `${iconInfo.withIcon}/${iconInfo.buttons}`
+    )
+    check('C: 图标 sprite 覆盖全部站点', iconInfo.symbols >= iconInfo.buttons && iconInfo.unresolved.length === 0, `${iconInfo.symbols} symbols`)
+    const imageRequests = page.state.requests.filter((u) => /\.(png|jpe?g|webp|gif|ico)(\?|$)/i.test(u))
+    check('C: 图标零图片请求', imageRequests.length === 0, imageRequests[0] || '')
+
     const decision = await page.evaluate("SimpleSearch.search.resolveSite('zhihu', 'a&b c')")
     check(
       'C: 特殊字符编码',
@@ -459,8 +532,8 @@ async function run() {
     const externalAssets = page.state.requests.filter((u) => !u.startsWith(ORIGIN) && !u.startsWith('data:'))
     check('C: 首屏无第三方请求', externalAssets.length === 0, externalAssets[0] || '')
     check(
-      'C: 首屏传输体积 < 100KB',
-      page.state.transferBytes < 100 * 1024,
+      'C: 首屏传输体积 < 120KB',
+      page.state.transferBytes < 120 * 1024,
       `${(page.state.transferBytes / 1024).toFixed(1)} KB / ${page.state.requests.length} 个请求`
     )
 
@@ -539,10 +612,19 @@ async function run() {
 
     await page.evaluate("document.getElementById('suggest-source-toggle').click()")
     await sleep(200)
+    const afterClick = await page.evaluate(`(() => {
+      const b = document.getElementById('suggest-source-toggle')
+      return {
+        pressed: b && b.getAttribute('aria-pressed'),
+        text: b && b.textContent,
+        stored: (() => { try { return localStorage.getItem('ss.remote') } catch (e) { return 'ERR' } })(),
+        enabled: window.SimpleSearch && SimpleSearch.remote ? SimpleSearch.remote.enabled() : null,
+      }
+    })()`)
     check(
       'D: 点击后关闭并写入存储',
-      (await page.evaluate("document.getElementById('suggest-source-toggle').getAttribute('aria-pressed')")) ===
-        'false' && (await page.stored('ss.remote')) === 'off'
+      afterClick.pressed === 'false' && afterClick.stored === 'off',
+      `pressed=${afterClick.pressed} stored=${afterClick.stored} enabled=${afterClick.enabled} text=${afterClick.text}`
     )
 
     // 关闭状态：输入不产生任何第三方请求

@@ -35,8 +35,8 @@ SimpleSearch/
 │  ├─ img/            # favicon.svg
 │  └─ js/             # 经典脚本（sites / search / suggest / history / theme / remote / input / app）
 ├─ docs/              # 契约、自定义站点指南、更新日志
-├─ scripts/           # build.mjs / serve.mjs / validate.mjs / e2e.mjs
-├─ templates/         # page.html（真实页）/ redirect.html（两个重定向壳）
+├─ scripts/           # build.mjs / icons.mjs（dev-time 图标数据）/ serve.mjs / validate.mjs / e2e.mjs
+├─ templates/         # page.html（真实页，含分类 chip 区与图标 sprite）/ redirect.html（两个重定向壳）
 ├─ tests/             # node:test 单元测试
 ├─ .github/workflows/ # ci.yml（GitHub Actions）
 ├─ index.html         # 唯一真实页面，由 build 生成，勿手改
@@ -86,7 +86,7 @@ SimpleSearch/
 - 不引入 `!important`；保留可见的 `:focus-visible` 焦点轮廓；动画要尊重 `prefers-reduced-motion: reduce`。
 - **不新增第三方依赖、CDN、字体或追踪脚本**；所有核心功能必须断网可用。唯一的网络请求是**可关闭**的联网联想（见下）。
 - 读写 `localStorage`、`window.open` 等可能失败的调用要放在 `try/catch` 或做能力判断里（隐私模式不能报错）。
-- DOM 契约（`#search-input`、`#suggest-list`、`#theme-toggle`、`#suggest-source-toggle`、`#buttons-container .button[data-site]` 等 id/class）由 `docs/contract.md` 规定，改动前先确认没有别的模块依赖。
+- DOM 契约（`#search-input`、`#suggest-list`、`#theme-toggle`、`#suggest-source-toggle`、`#group-chips`、`#buttons-container .button[data-site]` 等 id/class）由 `docs/contract.md` 规定，改动前先确认没有别的模块依赖。
 
 ## 扩展联网联想数据源
 
@@ -108,6 +108,28 @@ SS.remote.provider = {
 - 硬约束：JSONP 只允许 `document.createElement('script')` 注入，回调用完删除 script 标签和全局回调，禁止 `eval`；结果只用 `textContent` 渲染；联网联想关闭（`ss.remote = 'off'`）时**不得发出任何第三方请求**。
 - 自测：关掉页脚「联网联想」后，浏览器 Network 面板里不应出现 `suggestion.*` 请求；断网时联想列表仍只有本地数据、搜索照常。
 
+## 站点图标（scripts/icons.mjs）
+
+图标是 **dev-time 数据**，不会被页面加载，也不会产生图片请求：
+
+- `scripts/icons.mjs` 导出 `SITE_ICONS`：键是站点 `id`，值是 `{ body: '<path .../>' }`（`viewBox` 可省略，默认 `0 0 24 24`）；
+- `scripts/build.mjs` 把用到的图标渲染成隐藏的 `<svg class="icon-sprite">` + `<symbol id="i-<siteId>">` 插到 `<body>` 开头，按钮里输出 `<svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-<siteId>"></use></svg>`；模板里对应 `{{ICON_SPRITE}}`、`{{GROUP_CHIPS}}` 两个占位符；
+- **它不属于运行时脚本**：不要把它加进 `templates/page.html` 的 `<script>` 列表（那 8 个才是运行时脚本）；
+- 风格：24×24 viewBox、`fill="none"`、`stroke="currentColor"`、线宽 1.8、圆头；画**通用几何符号**，不要精确复制他人商标（避免商标问题）；
+- 体积红线：sprite 让 HTML 的增量 ≤ 4 KB（未压缩），全站仍需 < 90 KB 预算；
+- 禁止：外链 favicon 服务（如 `icons.duckduckgo.com`、Google favicon API）、外部图标库/CDN、用 emoji 冒充品牌图标——前两者会新增请求，后者跨平台不一致；
+- 新增图标：在 `SITE_ICONS` 里加一条（键 = 站点 `id`）→ `npm run build`；
+- 没配图标的站点由 build 自动渲染首字符 monogram（`<span class="button-icon button-icon-text" aria-hidden="true">首</span>`），不用手工补。
+
+## 新增站点分组
+
+分组也是数据驱动的，只写在 `assets/js/sites.js`：
+
+- `SS.siteGroups` 数组定义 chip 的顺序，例如 `[{ id: 'tech', label: '技术开发' }, ...]`；
+- 每个站点必须带 `group`，且取值必须存在于 `SS.siteGroups`，否则 `npm run build` 会失败；分组暂时没有站点时 build 只给警告（建议别留空分组）；
+- 加新分类：往 `SS.siteGroups` 追加 `{ id, label }`，把相关站点的 `group` 指过去，再 `npm run build`；chip 顺序跟着数组顺序；
+- 交互约定：`#group-chips` 里的「全部 + 各分组」chip 由 `scripts/build.mjs` 从 `SS.siteGroups` 生成（MD1 chip），`app.js` 只负责把 `#group-chips-wrap` 的 `hidden` 去掉、点击时更新 `aria-pressed` 并按 `data-group` 隐藏其它按钮；**不写 URL、不持久化**，刷新回「全部」；无 JS 时 `#group-chips-wrap` 保持 `hidden`，避免出现点了没反应的死 chip。
+
 ## 新增或删除网站
 
 只改 `assets/js/sites.js` 的 `SS.sites` 一处，然后 `npm run build` 重新生成三个产物（`index.html` + 两个重定向壳）。字段含义、`{q}` 占位规则与完整示例见 [docs/custom-sites.md](docs/custom-sites.md)。
@@ -119,10 +141,13 @@ SS.remote.provider = {
   home: 'https://example.com',
   search: 'https://example.com/search?q={q}',
   keywords: ['示例', 'demo'],
+  group: 'tech',
 },
 ```
 
 - `id` 只能是小写字母/数字/连字符且全表唯一；`home`、`search` 必须是 `https://`；`search` 必须含 `{q}`。
+- `group` **必填**，取值见 `SS.siteGroups`（目前 `tech` / `community` / `media` / `shopping` / `content`）；新分类要先登记到 `SS.siteGroups`。
+- 图标可选：不配就自动 monogram；配图标只改 `scripts/icons.mjs`，不要引外部图标库或 CDN。
 - **不要自己编码关键词**（不要手写 `%20`），`{q}` 交给代码替换。
 - 新增站点不会影响 `npm test`；如果删掉了默认内置的站点，测试会失败并提示恢复（内置站点是契约的一部分）。
 - 改完记得把三个生成的 HTML 一起提交。
@@ -132,8 +157,8 @@ SS.remote.provider = {
 - 单元测试用 Node 内置的 `node:test`，放在 `tests/`，文件名以 `.test.mjs` 结尾，`npm test` 用 `node --test "tests/**/*.test.mjs"` 的 glob 自动发现，不用额外登记。
 - `tests/sites.test.mjs` 要求默认内置的 11 个站点都存在、且相对顺序一致；**新增站点不会让测试变红**，删除内置站点才会失败并提示恢复。
 - 提交/开 PR 前必须本地跑通 `npm run check`（构建 + 测试 + 静态校验/产物一致性）。
-- 当前测试基线：`npm test` **117 例**、`npm run validate` **11 项**、`npm run e2e` **63 项**全绿。
-- `npm run e2e` 用本机 Edge/Chrome（CDP）跑真实浏览器检查：单页主题解析（`?theme=` → 存储 → 系统 → 浅色）、两个旧链接的 0 秒跳转与地址栏清理、联网联想开关 / 超时降级 / 真实百度联调、移动端 390px、`file://` 打开。CI 不跑它（需要浏览器）。
+- 当前测试基线：`npm test` **129 例**、`npm run validate` **15 项**、`npm run e2e` **72 项**全绿。
+- `npm run e2e` 用本机 Edge/Chrome（CDP）跑真实浏览器检查：单页主题解析（`?theme=` → 存储 → 系统 → 浅色）、两个旧链接的 0 秒跳转与地址栏清理、联网联想开关 / 超时降级 / 真实百度联调、分类 chip 筛选、图标 sprite（无额外图片请求）、移动端 390px、`file://` 打开。CI 不跑它（需要浏览器）。
 - GitHub Actions（`.github/workflows/ci.yml`）在 `push` 和 `pull_request` 时用 Node 22 跑 `npm run check`，并检查三个生成产物是否与 `sites.js` / 模板漂移。
 - 本项目零依赖，CI 里**不需要 `npm ci` / `npm install`**。
 - 只改文档或样式时也请跑一次 `npm run check`，确认没有把生成页改漂。
@@ -145,6 +170,8 @@ SS.remote.provider = {
 - [ ] 新增/修改的功能在浅色与夜间两套主题下都正常，键盘可操作
 - [ ] 单页主题解析正确：`?theme=` → 上次选择 → 系统偏好 → 浅色；两个老 URL 能跳到首页并应用对应主题
 - [ ] 关闭「联网联想」后无第三方请求、断网可用；开启时请求失败/超时不阻塞搜索
+- [ ] 新增站点带了 `group`；分类 chip 能正确筛选、刷新回「全部」、无 JS 时不显示死 chip
+- [ ] 站点图标来自内联 sprite（没有新增图片请求）；没配图标的站点显示 monogram
 - [ ] 直接双击 `index.html`（`file://`）无报错
 - [ ] `README.md` / `docs/custom-sites.md` / `docs/CHANGELOG.md` 等受影响的文档已同步
 - [ ] PR 描述里写清楚改动内容、验证方式和截图（如涉及视觉变化）

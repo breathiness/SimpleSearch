@@ -296,7 +296,7 @@ npm run serve      # 本地静态服务器 http://127.0.0.1:8080
 6. 关闭联网联想（`ss.remote='off'`）时**零第三方网络请求**，全部核心功能离线可用。
 7. 开启联网联想时：请求只发往 provider 域（百度），700ms 超时/失败静默降级为本地联想，永不阻塞键盘。
 8. `file://` 直接打开可用（无 CORS 报错、无 module 加载失败；联网联想在 file:// 下也能工作）。
-9. 单文件页面 + 全部资源体积目标：< 80 KB（gzip 前，MDUI 1 风格下仍远小于引入框架的体积）。
+9. 单文件页面 + 全部资源体积目标：< 90 KB（gzip 前；当前实际约 86 KB，gzip 后约 31 KB）。v2.2 的内联图标 sprite 约 3 KB（gzip 0.75 KB）且零额外请求。
 
 ## 10. 沟通规则
 
@@ -350,3 +350,35 @@ v1/v2.0 是两个文件（Light/Dark），v2.1 合并成**一个真实页面 `in
 - 合并顺序（最多 8 条）：`[用 Bing 搜索：q]` + 站点匹配（本地，≤3） + 联网联想（≤5，sublabel 显示「百度」） + 历史匹配（本地，≤2）。去重按词面（大小写不敏感）。
 - 性能与稳健：输入防抖 140ms 之后才发请求；700ms 超时；同词并发只发一次；缓存 10 分钟、最多 100 条；结果返回时若输入已变化则丢弃；**任何失败都不影响本地联想与搜索**。
 - 隐私：开启时会把输入的关键词发给百度；README 必须明确写清，并说明「关闭后完全离线」。
+
+## 13. v2.2：站点分类 + 图标（用户要求）
+
+### 13.1 站点分类（数据驱动）
+
+- `assets/js/sites.js` 里每个站点增加字段 `group`（必填），并在文件里新增分组表：
+
+```js
+SS.siteGroups = [
+  { id: 'tech', label: '技术开发' },      // github, archwiki
+  { id: 'community', label: '社区问答' }, // zhihu, tieba
+  { id: 'media', label: '影音游戏' },     // bilibili, steam, moegirl
+  { id: 'shopping', label: '购物' },      // taobao, jd
+  { id: 'content', label: '素材资讯' },   // unsplash, sspai
+]
+```
+
+- 每个 `SS.siteGroups[i].id` 至少要有一个站点使用；`site.group` 必须存在于分组表中；分组表顺序 = chip 渲染顺序。
+- 交互：`#group-chips` 渲染「全部 + 各分组」chip（MD1 chip，32px 高、圆角 16px、`aria-pressed` 表示选中，单选语义），点击后只显示该分组的站点按钮（其余用 `hidden`），「全部」恢复全量。
+- 无 JS 兜底：`#group-chips-wrap` 初始带 `hidden`，由 `app.js` 在 init 时去掉；无 JS 时只看到全部按钮，不会出现「点了没反应」的死 chip。
+- 不引入 URL 状态（不写 hash/query），不持久化筛选（每次打开都是「全部」）。
+
+### 13.2 图标：内联 SVG sprite（零额外请求）
+
+**红线**：不得新增任何图片请求、不得引用外部 favicon 服务（如 `icons.duckduckgo.com`）、不得用 emoji 字体图标冒充品牌。图标必须**内联进生成的 HTML**：
+
+- 图标数据放 `scripts/icons.mjs`（**dev-time 资产，不进运行时、不被页面加载**），形如：
+  `export const SITE_ICONS = { github: { body: '<path .../>' }, ... }`（`viewBox` 可省略，默认 24×24）。
+- `scripts/build.mjs` 把用到的图标渲染成一个隐藏的 `<svg class="icon-sprite">` + `<symbol id="i-<siteId>">`，插在 `<body>` 开头；每个按钮里放 `<svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-<siteId>"></use></svg>`。
+- 没有配图标的站点（用户自加的站点）**不留空**：渲染 `<span class="button-icon button-icon-text" aria-hidden="true">首字符</span>` 做字母/汉字 monogram 兜底。
+- 图标风格：24×24 viewBox、`fill="none"` + `stroke="currentColor"` + 1.8 线宽 + 圆头，**通用几何符号而不是他人商标的精确复制**（避免商标问题）。
+- 体积红线：sprite 全部内联后 HTML 增量 ≤ 4 KB（未压缩），全站仍满足 §9.9 的 90 KB 预算（当前约 86 KB）；首屏不得因此新增任何网络请求。

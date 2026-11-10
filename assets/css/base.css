@@ -7,18 +7,31 @@ body{min-height:100vh;min-height:100dvh;margin:0;display:flex;flex-direction:col
 /* 涟漪（MDUI 招牌反馈）：JS 只注入 span.ripple 并写内联尺寸/位置 */
 .ripple{position:absolute;border-radius:50%;transform:scale(0);animation:ripple var(--ripple-duration) linear;background:currentColor;opacity:.24;pointer-events:none}
 @keyframes ripple{to{transform:scale(1);opacity:0}}
-.button,#search-submit,#theme-toggle,.icon-button,.suggest-item{position:relative;overflow:hidden}
+.button,.chip,#search-submit,#theme-toggle,.icon-button,.suggest-item{position:relative;overflow:hidden}
 
 /* 居中搜索区域（桌面约 38–50vh） */
 #search-container{flex:1 0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--space-6);width:100%;padding:clamp(var(--space-5),8vh,var(--space-8)) var(--space-4) var(--space-5)}
 #search-form{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:var(--space-2);width:100%;max-width:var(--content-max-width);margin:0}
 #search-form .search-field{flex:1 1 320px;min-width:0}
 
+/* 分类 chips：MD1 chip（32px 胶囊；选中态主色填充） */
+#group-chips-wrap{width:100%;max-width:var(--buttons-max-width)}
+#group-chips{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--space-2)}
+.chip{display:inline-flex;align-items:center;justify-content:center;height:32px;padding:0 14px;border:1px solid var(--divider);border-radius:var(--radius-pill);background-color:transparent;color:var(--text-secondary);font-family:var(--font-sans);font-size:var(--font-size-sm);font-weight:var(--font-weight-medium);line-height:1;white-space:nowrap;cursor:pointer;transition:background-color var(--transition-fast) var(--ease),color var(--transition-fast) var(--ease),border-color var(--transition-fast) var(--ease)}
+@media (hover:hover){.chip:hover{background-color:var(--overlay-hover);color:var(--text)}}
+.chip:active{background-color:var(--overlay-active)}
+.chip[aria-pressed='true']{background-color:var(--primary-bg);border-color:var(--primary-bg);color:var(--on-primary);box-shadow:var(--elevation-2)}
+
 /* 按钮墙 + MD1 raised button：36px 高、2px 圆角、14px/500、elevation 2dp→hover 4dp→active 8dp */
-#buttons-container{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:var(--space-2);width:100%;max-width:var(--buttons-max-width)}
-.button{display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center;min-height:var(--control-height);padding:0 var(--space-4);border:0;border-radius:var(--radius-sm);background-color:var(--button-bg);color:var(--button-text);font-size:var(--font-size-sm);font-weight:var(--font-weight-medium);letter-spacing:var(--letter-spacing);line-height:var(--line-height-tight);text-align:center;text-transform:uppercase;white-space:nowrap;cursor:pointer;box-shadow:var(--elevation-2);transition:box-shadow var(--transition-fast) var(--ease),background-color var(--transition-fast) var(--ease)}
+#buttons-container{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px;width:100%;max-width:var(--buttons-max-width)}
+.button{display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center;gap:6px;min-height:var(--control-height);padding:0 var(--space-3);border:0;border-radius:var(--radius-sm);background-color:var(--button-bg);color:var(--button-text);font-size:var(--font-size-sm);font-weight:var(--font-weight-medium);letter-spacing:var(--letter-spacing);line-height:var(--line-height-tight);text-align:center;text-transform:uppercase;white-space:nowrap;cursor:pointer;box-shadow:var(--elevation-2);transition:box-shadow var(--transition-fast) var(--ease),background-color var(--transition-fast) var(--ease)}
 @media (hover:hover){.button:hover{background-color:var(--button-bg-hover);box-shadow:var(--elevation-4)}}
 .button:active{box-shadow:var(--elevation-8)}
+
+/* 内联 SVG 图标（build 生成隐藏 sprite）与无图标站点的 monogram 兜底 */
+.icon-sprite{position:absolute;width:0;height:0;overflow:hidden}
+.button-icon{flex:0 0 auto;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.button-icon-text{display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;background-color:var(--overlay-hover);color:var(--text-secondary);font-size:11px;font-weight:var(--font-weight-medium);line-height:1}
 
 /* 页脚：MD1 flat button（主色文字 + hover 遮罩） */
 #site-footer{flex:none;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:var(--space-1) var(--space-2);width:100%;padding:var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom, 0px));font-size:var(--font-size-sm)}
@@ -42,6 +55,8 @@ body{min-height:100vh;min-height:100dvh;margin:0;display:flex;flex-direction:col
 #search-container{justify-content:flex-start;gap:var(--space-5);padding:18vh var(--space-3) var(--space-4)}
 #search-form .search-field{flex:1 1 0}
 .button{min-height:var(--control-height-lg)}
+.chip{height:36px}
+.button-icon,.button-icon-text{width:18px;height:18px}
 #site-footer{gap:var(--space-1) var(--space-2);padding-left:var(--space-3);padding-right:var(--space-3)}
 .footer-button,.footer-link{min-height:var(--control-height-lg)}
 }

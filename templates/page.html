@@ -40,6 +40,7 @@
   <link rel="stylesheet" href="assets/css/input.css">
 </head>
 <body>
+{{ICON_SPRITE}}
   <a class="skip-link" href="#search-input">跳到搜索框</a>
 
   <main id="search-container">
@@ -53,6 +54,12 @@
       </div>
       <button id="search-submit" class="submit-button" type="submit">搜索</button>
     </form>
+
+    <div id="group-chips-wrap" hidden>
+      <div id="group-chips" class="chips" role="group" aria-label="站点分类">
+{{GROUP_CHIPS}}
+      </div>
+    </div>
 
     <nav id="buttons-container" aria-label="常用网站">
 {{SITE_BUTTONS}}

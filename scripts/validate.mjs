@@ -1,8 +1,8 @@
-// SimpleSearch v2.1 静态校验与产物一致性门禁。
+// SimpleSearch v2.2 静态校验与产物一致性门禁。
 // 用法：node scripts/validate.mjs（npm run validate）
 //
-// v2.1 产物模型（docs/contract.md §7、§12）：
-//   index.html                唯一真实页面（data-theme-default="auto"，单页主题）
+// 产物模型（docs/contract.md §7、§12、§13）：
+//   index.html                唯一真实页面（data-theme-default="auto"，单页主题，v2.2 分类 chip + 内联图标 sprite）
 //   SimpleSearch-Light.html   0 秒重定向壳 → index.html?theme=light
 //   SimpleSearch-Dark.html    0 秒重定向壳 → index.html?theme=dark
 //
@@ -13,12 +13,16 @@
 //   4. index.html 硬约束：无 type="module"、无内联 on* 事件、无未替换 {{...}}、无重复 id、DOM 契约 id 齐全
 //   5. index.html 引用的所有本地 resources 真实存在
 //   6. index.html 按契约顺序引用 8 个经典脚本（remote.js 在 input.js 之前）
-//   7. index.html 的 data-site 与 SS.sites 一一对应（顺序/label/数量）
-//   8. 两个重定向壳：meta refresh 0 秒 + canonical + location.replace 均指向 index.html?theme=X；
+//   7. index.html 的 data-site 与 SS.sites 一一对应（顺序/label/数量/data-group）
+//   8. v2.2 分类 chip：#group-chips-wrap 初始 hidden、#group-chips 内 chip 数量/顺序/data-group/aria-pressed 正确
+//   9. v2.2 图标：icon-sprite 隐藏且覆盖 11 个内置站点；每个按钮 .button-icon，use 目标存在
+//  10. sprite 内联体积 ≤ 4KB（未压缩）
+//  11. 图标零图片请求：无 .png/.jpg/.webp/.gif/.ico 引用、无外链 favicon 服务
+//  12. 两个重定向壳：meta refresh 0 秒 + canonical + location.replace 均指向 index.html?theme=X；
 //      壳不得包含真实页内容（#buttons-container / data-site / assets/js bundle），体积 < 1KB
-//   9. 唯一性：只有 index.html 是真实页
-//  10. CSS 不含 !important（契约 §6）
-//  11. 体积信息：index.html 单页加载资源合计 < 80KB（仅提示）
+//  13. 唯一性：只有 index.html 是真实页
+//  14. CSS 不含 !important（契约 §6）
+//  15. 体积信息：index.html 单页加载资源合计 < 90KB（仅提示，契约 §9.9）
 // 任一失败 → 退出码 1，并打印失败详情。
 import fs from 'node:fs'
 import path from 'node:path'
@@ -59,8 +63,24 @@ const REQUIRED_IDS = [
   'site-footer',
 ]
 
+// 契约 §4.1：内置 11 站（顺序固定；v2.2 §13.2 要求 sprite symbol 数量与之对应）
+const BUILTIN_IDS = [
+  'github',
+  'unsplash',
+  'bilibili',
+  'sspai',
+  'moegirl',
+  'zhihu',
+  'tieba',
+  'taobao',
+  'jd',
+  'steam',
+  'archwiki',
+]
+
 const BUILD_MARKER = /<!--\s*由 scripts\/build\.mjs/
-const BUDGET_KB = 80
+// 体积预算口径（lead 2026-11-11 v2.2）：单页加载 < 90 KB（gzip 前，图标 sprite 内联后契约 §9.9 更新）
+const BUDGET_KB = 90
 const SHELL_MAX_BYTES = 1024
 
 // ---------------------------------------------------------------- 通用工具
@@ -181,6 +201,21 @@ function isExternalUrl(url) {
   return /^(https?:)?\/\//i.test(url) || /^(data|blob|mailto|tel):/i.test(url)
 }
 
+// 按钮文字：优先取 .button-label（v2.2 起按钮内还有 .button-icon / monogram，不能直接 stripTags）。
+function extractButtonLabel(inner) {
+  const labelSpan = inner.match(
+    /<span\b[^>]*\bclass\s*=\s*["'][^"']*\bbutton-label\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/i,
+  )
+  let source = labelSpan ? labelSpan[1] : inner
+  if (!labelSpan) {
+    // 兼容旧模板：去掉图标 svg 与 monogram span，避免把图标文字算进按钮文字
+    source = source
+      .replace(/<svg\b[\s\S]*?<\/svg>/gi, '')
+      .replace(/<span\b[^>]*\bclass\s*=\s*["'][^"']*\bbutton-icon\b[^"']*["'][^>]*>[\s\S]*?<\/span>/gi, '')
+  }
+  return decodeHtmlEntities(stripTags(source)).trim()
+}
+
 /** 把站点按钮解析为 [{ id, label }]，保持文档顺序。 */
 function extractSiteButtons(html) {
   const buttons = []
@@ -190,8 +225,12 @@ function extractSiteButtons(html) {
     const id = getAttr(buttonHtml, 'data-site')
     if (id === null) continue
     const inner = buttonHtml.slice(buttonHtml.indexOf('>') + 1, buttonHtml.lastIndexOf('</button>'))
-    const label = decodeHtmlEntities(stripTags(inner)).trim()
-    buttons.push({ id: decodeHtmlEntities(id), label })
+    buttons.push({
+      id: decodeHtmlEntities(id),
+      label: extractButtonLabel(inner),
+      group: getAttr(buttonHtml, 'data-group'),
+      inner,
+    })
   }
   return buttons
 }
@@ -203,6 +242,78 @@ function extractScriptSrcs(html) {
     if (src) srcs.push(src.trim())
   }
   return srcs
+}
+
+// ---------------------------------------------------------------- v2.2 §13 解析工具
+
+function hasHiddenAttr(openTag) {
+  return /\shidden(?:\s|=|>|\/)/i.test(openTag)
+}
+
+/** 提取内联图标 sprite：<svg class="icon-sprite">…<symbol id="i-xxx">…</symbol>…</svg> */
+function extractSprite(html) {
+  const open = String(html).match(/<svg\b[^>]*\bclass\s*=\s*["'][^"']*\bicon-sprite\b[^"']*["'][^>]*>/i)
+  if (!open) return null
+  const start = open.index + open[0].length
+  const end = String(html).indexOf('</svg>', start)
+  if (end === -1) return null
+  return {
+    openTag: open[0],
+    inner: String(html).slice(start, end),
+    outer: String(html).slice(open.index, end + '</svg>'.length),
+  }
+}
+
+function extractSymbols(spriteInner) {
+  const symbols = []
+  for (const match of findAll(spriteInner, /<symbol\b([^>]*)>([\s\S]*?)<\/symbol>/gi)) {
+    symbols.push({ id: getAttr(match[0], 'id'), body: match[2] })
+  }
+  return symbols
+}
+
+/** 解析 #group-chips-wrap / #group-chips 与其中的 chip 按钮。 */
+function extractGroupChips(html) {
+  const clean = stripHtmlComments(html)
+  const wrapMatch = clean.match(/<div\b[^>]*\bid\s*=\s*["']group-chips-wrap["'][^>]*>/i)
+  const containerMatch = clean.match(
+    /<div\b[^>]*\bid\s*=\s*["']group-chips["'][^>]*>([\s\S]*?)<\/div>/i,
+  )
+  const chips = []
+  if (containerMatch) {
+    for (const match of findAll(containerMatch[1], /<button\b[^>]*>[\s\S]*?<\/button>/gi)) {
+      const tag = match[0]
+      const inner = stripTags(tag.slice(tag.indexOf('>') + 1, tag.lastIndexOf('</button>')))
+      chips.push({
+        group: getAttr(tag, 'data-group'),
+        pressed: getAttr(tag, 'aria-pressed'),
+        label: decodeHtmlEntities(inner).trim(),
+      })
+    }
+  }
+  return {
+    wrapOpenTag: wrapMatch ? wrapMatch[0] : null,
+    container: containerMatch ? containerMatch[1] : null,
+    chips,
+  }
+}
+
+/** 检查一个按钮内部是否带 .button-icon（svg <use> 或 monogram 兜底）。 */
+function inspectButtonIcon(inner) {
+  const svgMatch = inner.match(
+    /<svg\b[^>]*\bclass\s*=\s*["'][^"']*\bbutton-icon\b[^"']*["'][^>]*>[\s\S]*?<\/svg>/i,
+  )
+  const useMatch = svgMatch
+    ? svgMatch[0].match(/<use\b[^>]*\b(?:xlink:)?href\s*=\s*["']#([^"']+)["']/i)
+    : null
+  const monogramMatch = inner.match(
+    /<span\b[^>]*\bclass\s*=\s*["'][^"']*\bbutton-icon-text\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/i,
+  )
+  return {
+    hasIconClass: /class\s*=\s*["'][^"']*\bbutton-icon\b/i.test(inner),
+    useTarget: useMatch ? useMatch[1] : null,
+    monogram: monogramMatch ? decodeHtmlEntities(stripTags(monogramMatch[1])).trim() : null,
+  }
 }
 
 function indent(text, prefix) {
@@ -248,7 +359,7 @@ async function loadRegistry() {
     if (!SS || !Array.isArray(SS.sites)) {
       return { sites: null, problem: 'assets/js/sites.js 未在 globalThis.SimpleSearch.sites 注册站点数组' }
     }
-    return { sites: SS.sites, problem: null }
+    return { sites: SS.sites, siteGroups: SS.siteGroups, problem: null }
   } catch (error) {
     return { sites: null, problem: `加载 sites.js 失败：${error && error.message ? error.message : error}` }
   }
@@ -256,6 +367,7 @@ async function loadRegistry() {
 
 const registry = await loadRegistry()
 const sites = registry.sites
+const siteGroups = registry.siteGroups || null
 const siteIds = sites ? sites.map((site) => site.id) : []
 
 const realPage = {
@@ -505,11 +617,193 @@ check('index.html 站点渲染：data-site 合法、无重复、顺序/label/数
         `${REAL_PAGE} 站点 ${button.id} 的按钮文字应为 ${JSON.stringify(site.label)}，实际为 ${JSON.stringify(button.label)}`,
       )
     }
+    // v2.2 §13.1：按钮的 data-group 必须与注册表 group 一致
+    if (typeof site.group === 'string' && button.group !== site.group) {
+      problems.push(
+        `${REAL_PAGE} 站点 ${button.id} 的 data-group 应为 ${JSON.stringify(site.group)}，实际为 ${JSON.stringify(button.group)}`,
+      )
+    }
   }
   return problems
 })
 
-// ---------------------------------------------------------------- 8. 重定向壳
+// ---------------------------------------------------------------- 8. v2.2 分类 chip
+
+check('分类 chip：#group-chips-wrap 初始 hidden、#group-chips 内 chip 数量/顺序/data-group/aria-pressed 正确', () => {
+  if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
+  if (!Array.isArray(siteGroups)) return ['SS.siteGroups 不存在或不是数组（v2.2 §13.1）']
+
+  const problems = []
+  const groupIds = siteGroups.map((group) => group.id)
+  const expectedGroups = ['all', ...groupIds]
+  const { wrapOpenTag, container, chips } = extractGroupChips(realPage.html)
+
+  if (!wrapOpenTag) problems.push(`${REAL_PAGE} 缺少 #group-chips-wrap`)
+  else if (!hasHiddenAttr(wrapOpenTag)) {
+    problems.push('#group-chips-wrap 初始应带 hidden 属性（无 JS 兜底）')
+  }
+  if (container === null) problems.push(`${REAL_PAGE} 缺少 #group-chips（或不在 #group-chips-wrap 内）`)
+
+  if (chips.length !== expectedGroups.length) {
+    problems.push(
+      `${REAL_PAGE} 的 chip 数量应为 ${expectedGroups.length}（全部 + ${groupIds.length} 类），实际 ${chips.length}`,
+    )
+  }
+
+  const actualGroups = chips.map((chip) => chip.group)
+  if (actualGroups.join(',') !== expectedGroups.join(',')) {
+    problems.push(
+      `${REAL_PAGE} 的 chip data-group 顺序不正确：\n` +
+        `        期望：${expectedGroups.join(', ')}\n` +
+        `        实际：${actualGroups.join(', ')}`,
+    )
+  }
+
+  const allowed = new Set(expectedGroups)
+  for (const chip of chips) {
+    if (!allowed.has(chip.group)) problems.push(`chip 的 data-group=${JSON.stringify(chip.group)} 非法`)
+    if (!chip.label) problems.push(`chip data-group=${JSON.stringify(chip.group)} 文案为空`)
+    if (chip.pressed !== 'true' && chip.pressed !== 'false') {
+      problems.push(
+        `chip data-group=${JSON.stringify(chip.group)} 的 aria-pressed 缺失或非法：${JSON.stringify(chip.pressed)}`,
+      )
+    }
+  }
+
+  const pressed = chips.filter((chip) => chip.pressed === 'true')
+  if (pressed.length !== 1) {
+    problems.push(`初始应只有一个 chip aria-pressed="true"，实际 ${pressed.length} 个`)
+  } else if (pressed[0].group !== 'all') {
+    problems.push('初始选中的 chip 应是「全部」(data-group="all")')
+  }
+
+  return problems
+})
+
+// ---------------------------------------------------------------- 9. v2.2 图标 sprite / 按钮图标
+
+check('图标：icon-sprite 隐藏且覆盖 11 个内置站点，每个 data-site 按钮有 .button-icon（use 目标存在）', () => {
+  if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
+  if (!sites) return [registry.problem || '无法读取 SS.sites']
+
+  const problems = []
+  const clean = stripHtmlComments(realPage.html)
+  const sprite = extractSprite(clean)
+  if (!sprite) {
+    problems.push(`${REAL_PAGE} 缺少 <svg class="icon-sprite">（v2.2 图标必须内联）`)
+    return problems
+  }
+  const hiddenOk =
+    hasHiddenAttr(sprite.openTag) ||
+    /aria-hidden\s*=\s*["']true["']/i.test(sprite.openTag) ||
+    /display\s*:\s*none/i.test(sprite.openTag)
+  if (!hiddenOk) problems.push('icon-sprite 必须是隐藏的（hidden / aria-hidden / display:none）')
+
+  // symbol 覆盖与合法性
+  const symbols = extractSymbols(sprite.inner)
+  const symbolIds = symbols.map((symbol) => symbol.id)
+  if (symbols.length === 0) problems.push('icon-sprite 里没有任何 <symbol>')
+  if (new Set(symbolIds).size !== symbolIds.length) {
+    problems.push(`symbol id 重复：${JSON.stringify(symbolIds)}`)
+  }
+  for (const id of symbolIds) {
+    if (!/^i-[a-z0-9-]+$/.test(String(id))) {
+      problems.push(`symbol id 不合法：${JSON.stringify(id)}`)
+    } else if (!siteIds.includes(String(id).slice(2))) {
+      problems.push(`symbol ${id} 对应的站点不在 SS.sites 中`)
+    }
+  }
+  for (const builtinId of BUILTIN_IDS) {
+    if (!symbolIds.includes(`i-${builtinId}`)) problems.push(`sprite 缺少内置站点图标 #i-${builtinId}`)
+  }
+  if (symbolIds.length !== BUILTIN_IDS.length) {
+    problems.push(`symbol 数量（${symbolIds.length}）应等于内置站点数（${BUILTIN_IDS.length}）`)
+  }
+  for (const symbol of symbols) {
+    if (!/<(path|rect|circle|line|polyline|polygon|ellipse)\b/i.test(symbol.body || '')) {
+      problems.push(`symbol ${symbol.id} 里没有几何图形`)
+    }
+  }
+
+  // 每个按钮的 .button-icon / use 目标
+  const buttons = extractSiteButtons(clean)
+  const builtinSet = new Set(BUILTIN_IDS)
+  const symbolSet = new Set(symbolIds)
+  let monograms = 0
+  let useIcons = 0
+  for (const button of buttons) {
+    const icon = inspectButtonIcon(button.inner)
+    if (!icon.hasIconClass) problems.push(`站点 ${button.id} 的按钮缺少 .button-icon`)
+    if (builtinSet.has(button.id)) {
+      if (icon.useTarget !== `i-${button.id}`) {
+        problems.push(
+          `内置站点 ${button.id} 应使用 <use href="#i-${button.id}">，实际 ${JSON.stringify(icon.useTarget)}`,
+        )
+      }
+    } else if (!icon.useTarget && !icon.monogram) {
+      problems.push(`自加站点 ${button.id} 既没有 svg 图标也没有 monogram 兜底`)
+    }
+    if (icon.useTarget) {
+      useIcons += 1
+      if (!symbolSet.has(icon.useTarget)) problems.push(`站点 ${button.id} 的 use 目标 #${icon.useTarget} 不在 sprite 中`)
+    } else if (icon.monogram) {
+      monograms += 1
+    }
+  }
+  return {
+    problems,
+    notes: [`symbol ${symbolIds.length} 个 / use 图标 ${useIcons} 个 / monogram ${monograms} 个`],
+  }
+})
+
+// ---------------------------------------------------------------- 10. sprite 体积
+
+check('sprite 内联体积 ≤ 4KB（未压缩）', () => {
+  if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
+  const sprite = extractSprite(stripHtmlComments(realPage.html))
+  if (!sprite) return ['缺少 icon-sprite，无法统计 sprite 体积']
+  const bytes = Buffer.byteLength(sprite.outer, 'utf8')
+  if (bytes > 4096) return [`icon-sprite 体积 ${bytes} 字节，超过 4KB 红线（未压缩）`]
+  return { problems: [], notes: [`sprite ${(bytes / 1024).toFixed(2)} KB`] }
+})
+
+// ---------------------------------------------------------------- 11. 零额外图片请求
+
+check('图标零图片请求：无 .png/.jpg/.webp/.gif/.ico 引用、无外链 favicon 服务', () => {
+  if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
+  const clean = stripHtmlComments(realPage.html)
+  const problems = []
+  const imagePattern = /\.(png|jpe?g|webp|gif|ico)(?:["'?)#\s]|$)/i
+
+  for (const match of findAll(clean, /<(link|script|img|source|iframe|embed|object)\b[^>]*>/gi)) {
+    const tag = match[0]
+    for (const attr of ['src', 'href', 'data', 'poster']) {
+      const url = getAttr(tag, attr)
+      if (!url) continue
+      if (/^(https?:)?\/\//i.test(url)) problems.push(`出现外部资源引用：<${match[1]}> ${attr}=${url}`)
+      if (imagePattern.test(url)) problems.push(`出现图片资源引用：<${match[1]}> ${attr}=${url}（v2.2 图标必须内联）`)
+    }
+  }
+  if (/<img\b/i.test(clean)) problems.push(`${REAL_PAGE} 出现 <img>，v2.2 图标必须内联 SVG`)
+  if (/icons\.duckduckgo\.com|favicon\.(io|cc|com)|google\.com\/s2\/favicons/i.test(clean)) {
+    problems.push('出现外链 favicon 服务')
+  }
+  for (const match of findAll(clean, /<style\b[^>]*>[\s\S]*?<\/style>/gi)) {
+    if (/url\(\s*['"]?(?!data:)[^)]*\.(svg|png|jpe?g|gif|webp|ico)\b/i.test(match[0])) {
+      problems.push('内联 <style> 中出现图片 url()（应使用内联 SVG）')
+    }
+  }
+  for (const match of findAll(clean, /<link\b[^>]*>/gi)) {
+    const tag = match[0]
+    const rel = (getAttr(tag, 'rel') || '').toLowerCase()
+    if (!/\bicon\b/.test(rel)) continue
+    const href = getAttr(tag, 'href') || ''
+    if (/^(https?:)?\/\//i.test(href)) problems.push(`favicon 不得外链：${href}`)
+  }
+  return problems
+})
+
+// ---------------------------------------------------------------- 12. 重定向壳
 
 check('两个重定向壳：meta refresh(0s) + canonical + location.replace 指向 index.html?theme=X，且不含真实页内容', () => {
   const problems = []
@@ -580,7 +874,7 @@ check('两个重定向壳：meta refresh(0s) + canonical + location.replace 指�
   return problems
 })
 
-// ---------------------------------------------------------------- 9. 唯一性
+// ---------------------------------------------------------------- 13. 唯一性
 
 check('唯一性：只有 index.html 是真实页（两个壳不得含真实页 DOM）', () => {
   const problems = []
@@ -607,7 +901,7 @@ check('唯一性：只有 index.html 是真实页（两个壳不得含真实页 
   return problems
 })
 
-// ---------------------------------------------------------------- 10. CSS 禁 !important
+// ---------------------------------------------------------------- 14. CSS 禁 !important
 
 check('CSS 不含 !important（契约 §6）', () => {
   const cssDir = path.join(ROOT, 'assets', 'css')
@@ -628,9 +922,9 @@ check('CSS 不含 !important（契约 §6）', () => {
   return problems
 })
 
-// ---------------------------------------------------------------- 11. 体积信息
+// ---------------------------------------------------------------- 15. 体积信息
 
-check('体积信息（index.html 单页加载预算 < 80 KB，仅供参考不阻断）', () => {
+check('体积信息（index.html 单页加载预算 < 90 KB，仅供参考不阻断）', () => {
   if (!realPage.exists) return { problems: [], notes: [`${REAL_PAGE} 不存在，跳过体积统计`] }
 
   const notes = []

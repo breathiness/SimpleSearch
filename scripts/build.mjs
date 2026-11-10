@@ -7,6 +7,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { SITE_ICONS } from './icons.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(HERE, '..')
@@ -73,15 +74,85 @@ function escapeHtml(value) {
     .replace(/"/g, '&quot;')
 }
 
-function renderSiteButtons(sites) {
+function renderSiteButtons(sites, icons) {
   return sites
     .map((site) => {
-      const extra = Array.isArray(site.keywords) && site.keywords.length
+      const keywords = Array.isArray(site.keywords) && site.keywords.length
         ? ` data-keywords="${escapeHtml(site.keywords.join(' '))}"`
         : ''
-      return `      <button class="button" type="button" data-site="${escapeHtml(site.id)}"${extra}>${escapeHtml(site.label)}</button>`
+      const group = site.group ? ` data-group="${escapeHtml(site.group)}"` : ' data-group=""'
+      const icon = icons[site.id]
+        ? `<svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-${escapeHtml(site.id)}"></use></svg>`
+        : `<span class="button-icon button-icon-text" aria-hidden="true">${escapeHtml(monogram(site.label))}</span>`
+      return `      <button class="button" type="button" data-site="${escapeHtml(site.id)}"${group}${keywords}>${icon}<span class="button-label">${escapeHtml(site.label)}</span></button>`
     })
     .join('\n')
+}
+
+// 首字符 monogram（没有配图标的站点用它兜底，零额外请求）
+function monogram(label) {
+  const chars = Array.from(String(label || '?'))
+  return chars[0] || '?'
+}
+
+// 内联 SVG sprite：图标来自 scripts/icons.mjs，构建时塞进 HTML，页面不额外发请求
+const SPRITE_ATTRS =
+  'fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"'
+
+function renderIconSprite(sites, icons) {
+  const symbols = sites
+    .filter((site) => icons[site.id])
+    .map((site) => {
+      const icon = icons[site.id]
+      const viewBox = icon.viewBox || '0 0 24 24'
+      return `    <symbol id="i-${escapeHtml(site.id)}" viewBox="${escapeHtml(viewBox)}" ${SPRITE_ATTRS}>${icon.body}</symbol>`
+    })
+    .join('\n')
+  if (!symbols) return ''
+  return `  <svg class="icon-sprite" aria-hidden="true" focusable="false" width="0" height="0" xmlns="http://www.w3.org/2000/svg">\n${symbols}\n  </svg>`
+}
+
+// 分类 chip：全部 + SS.siteGroups（顺序即渲染顺序）
+function renderGroupChips(groups) {
+  const all = '        <button class="chip" type="button" data-group="all" aria-pressed="true">全部</button>'
+  const rest = groups.map(
+    (group) =>
+      `        <button class="chip" type="button" data-group="${escapeHtml(group.id)}" aria-pressed="false">${escapeHtml(group.label)}</button>`
+  )
+  return [all, ...rest].join('\n')
+}
+
+// 分组表校验：缺失时只警告（便于先落地模板），存在则严格校验
+function loadGroups(SS, sites) {
+  const groups = Array.isArray(SS.siteGroups) ? SS.siteGroups : []
+  if (groups.length === 0) {
+    console.warn('[build] 警告：SS.siteGroups 缺失或为空，分类 chip 只会渲染「全部」')
+    for (const site of sites) {
+      if (!site.group) console.warn(`[build] 警告：站点 ${site.id} 缺少 group 字段`)
+    }
+    return []
+  }
+
+  const ids = new Set()
+  for (const group of groups) {
+    if (!group || !/^[a-z0-9-]+$/.test(String(group.id || ''))) {
+      fail(`分组 id 不合法：${JSON.stringify(group && group.id)}`)
+    }
+    if (ids.has(group.id)) fail(`分组 id 重复：${group.id}`)
+    ids.add(group.id)
+    if (!group.label || typeof group.label !== 'string') fail(`分组 ${group.id} 缺少 label`)
+  }
+
+  const used = new Set()
+  for (const site of sites) {
+    if (!site.group) fail(`站点 ${site.id} 缺少 group 字段（已存在 SS.siteGroups，必须归类）`)
+    if (!ids.has(site.group)) fail(`站点 ${site.id} 的 group「${site.group}」不在 SS.siteGroups 里`)
+    used.add(site.group)
+  }
+  for (const group of groups) {
+    if (!used.has(group.id)) console.warn(`[build] 警告：分组 ${group.id}（${group.label}）没有任何站点`)
+  }
+  return groups
 }
 
 function renderTemplate(template, values, outputName) {
@@ -106,6 +177,7 @@ async function main() {
 
   const SS = await loadRegistry()
   validateSites(SS.sites)
+  const groups = loadGroups(SS, SS.sites)
   if (!SS.engines || !SS.engines[SS.defaultEngine || 'bing']) {
     console.warn('[build] 警告：SS.engines 缺少默认引擎，页面仍可生成（无 JS 时表单回退 Bing）')
   }
@@ -115,7 +187,12 @@ async function main() {
     file: PAGE.output,
     html: renderTemplate(
       pageTemplate,
-      { ...PAGE.values, '{{SITE_BUTTONS}}': renderSiteButtons(SS.sites) },
+      {
+        ...PAGE.values,
+        '{{ICON_SPRITE}}': renderIconSprite(SS.sites, SITE_ICONS),
+        '{{GROUP_CHIPS}}': renderGroupChips(groups),
+        '{{SITE_BUTTONS}}': renderSiteButtons(SS.sites, SITE_ICONS),
+      },
       PAGE.output
     ),
   })

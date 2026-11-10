@@ -40,6 +40,19 @@
   <link rel="stylesheet" href="assets/css/input.css">
 </head>
 <body>
+  <svg class="icon-sprite" aria-hidden="true" focusable="false" width="0" height="0" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="i-github" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 6.5 3.8 12l4.7 5.5"/><path d="M15.5 6.5l4.7 5.5-4.7 5.5"/><path d="M6 20h12"/></symbol>
+    <symbol id="i-unsplash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5h3.4L9 6.5h6l1.6 2H20v10H4z"/><circle cx="12" cy="13.5" r="3"/></symbol>
+    <symbol id="i-bilibili" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="7.5" width="17" height="11" rx="2.5"/><path d="M8.5 4.5 11 7.5M15.5 4.5 13 7.5"/><path d="M10.5 11v4l3.5-2z"/></symbol>
+    <symbol id="i-sspai" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13.6 3.5 6.4 14.1h4.6l-1 6.4 7.6-10.9h-4.6z"/></symbol>
+    <symbol id="i-moegirl" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7c-1.8-1.5-4.2-1.9-7.5-1.6V18c3.3-.3 5.7.1 7.5 1.6 1.8-1.5 4.2-1.9 7.5-1.6V5.4C16.2 5.1 13.8 5.5 12 7z"/><path d="M12 7v12.6"/></symbol>
+    <symbol id="i-zhihu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5h16v10.5H10L5.5 19v-3H4z"/><circle cx="9" cy="10.8" r="1" fill="currentColor" stroke="none"/><circle cx="12.5" cy="10.8" r="1" fill="currentColor" stroke="none"/><circle cx="16" cy="10.8" r="1" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-tieba" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 5.5h11v7.5H9.2L6.4 15.6V13H3.5z"/><path d="M8.7 9.8h11.8v7.4h-2.3v2.6l-2.9-2.6H8.7z"/></symbol>
+    <symbol id="i-taobao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5.6 8h12.8l-1.2 11.5H6.8z"/><path d="M9 8V6.4a3 3 0 0 1 6 0V8"/></symbol>
+    <symbol id="i-jd" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 20 8v8l-8 4-8-4V8z"/><path d="M4 8l8 4.2L20 8"/><path d="M12 12.2V20"/></symbol>
+    <symbol id="i-steam" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="9" width="17" height="8.6" rx="4.3"/><path d="M8.4 11.8v3.2M6.8 13.4h3.2"/><circle cx="15.6" cy="13.4" r="1" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-archwiki" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M7 9.5l3 2.8-3 2.8"/><path d="M12.5 16h4"/></symbol>
+  </svg>
   <a class="skip-link" href="#search-input">跳到搜索框</a>
 
   <main id="search-container">
@@ -54,18 +67,29 @@
       <button id="search-submit" class="submit-button" type="submit">搜索</button>
     </form>
 
+    <div id="group-chips-wrap" hidden>
+      <div id="group-chips" class="chips" role="group" aria-label="站点分类">
+        <button class="chip" type="button" data-group="all" aria-pressed="true">全部</button>
+        <button class="chip" type="button" data-group="tech" aria-pressed="false">技术开发</button>
+        <button class="chip" type="button" data-group="community" aria-pressed="false">社区问答</button>
+        <button class="chip" type="button" data-group="media" aria-pressed="false">影音游戏</button>
+        <button class="chip" type="button" data-group="shopping" aria-pressed="false">购物</button>
+        <button class="chip" type="button" data-group="content" aria-pressed="false">素材资讯</button>
+      </div>
+    </div>
+
     <nav id="buttons-container" aria-label="常用网站">
-      <button class="button" type="button" data-site="github" data-keywords="gh git 代码 开源">GitHub</button>
-      <button class="button" type="button" data-site="unsplash" data-keywords="图片 壁纸 摄影 photo wallpaper">Unsplash</button>
-      <button class="button" type="button" data-site="bilibili" data-keywords="b站 哔哩 视频 弹幕 bilibili">哔哩哔哩</button>
-      <button class="button" type="button" data-site="sspai" data-keywords="少数派 效率 数码 sspai">少数派</button>
-      <button class="button" type="button" data-site="moegirl" data-keywords="萌娘 百科 二次元 moe acg">萌娘百科</button>
-      <button class="button" type="button" data-site="zhihu" data-keywords="知乎 问答 zhihu qa">知乎</button>
-      <button class="button" type="button" data-site="tieba" data-keywords="贴吧 百度 tieba forum">百度贴吧</button>
-      <button class="button" type="button" data-site="taobao" data-keywords="淘宝 购物 taobao shop">淘宝</button>
-      <button class="button" type="button" data-site="jd" data-keywords="京东 购物 jd jd.com">京东</button>
-      <button class="button" type="button" data-site="steam" data-keywords="steam 蒸汽 游戏 game">Steam</button>
-      <button class="button" type="button" data-site="archwiki" data-keywords="arch linux wiki 文档">ArchWiki</button>
+      <button class="button" type="button" data-site="github" data-group="tech" data-keywords="gh git 代码 开源"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-github"></use></svg><span class="button-label">GitHub</span></button>
+      <button class="button" type="button" data-site="unsplash" data-group="content" data-keywords="图片 壁纸 摄影 photo wallpaper"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-unsplash"></use></svg><span class="button-label">Unsplash</span></button>
+      <button class="button" type="button" data-site="bilibili" data-group="media" data-keywords="b站 哔哩 视频 弹幕 bilibili"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-bilibili"></use></svg><span class="button-label">哔哩哔哩</span></button>
+      <button class="button" type="button" data-site="sspai" data-group="content" data-keywords="少数派 效率 数码 sspai"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-sspai"></use></svg><span class="button-label">少数派</span></button>
+      <button class="button" type="button" data-site="moegirl" data-group="media" data-keywords="萌娘 百科 二次元 moe acg"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-moegirl"></use></svg><span class="button-label">萌娘百科</span></button>
+      <button class="button" type="button" data-site="zhihu" data-group="community" data-keywords="知乎 问答 zhihu qa"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-zhihu"></use></svg><span class="button-label">知乎</span></button>
+      <button class="button" type="button" data-site="tieba" data-group="community" data-keywords="贴吧 百度 tieba forum"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-tieba"></use></svg><span class="button-label">百度贴吧</span></button>
+      <button class="button" type="button" data-site="taobao" data-group="shopping" data-keywords="淘宝 购物 taobao shop"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-taobao"></use></svg><span class="button-label">淘宝</span></button>
+      <button class="button" type="button" data-site="jd" data-group="shopping" data-keywords="京东 购物 jd jd.com"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-jd"></use></svg><span class="button-label">京东</span></button>
+      <button class="button" type="button" data-site="steam" data-group="media" data-keywords="steam 蒸汽 游戏 game"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-steam"></use></svg><span class="button-label">Steam</span></button>
+      <button class="button" type="button" data-site="archwiki" data-group="tech" data-keywords="arch linux wiki 文档"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-archwiki"></use></svg><span class="button-label">ArchWiki</span></button>
     </nav>
 
     <noscript>

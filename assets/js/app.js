@@ -67,9 +67,41 @@
     if (SS.input && typeof SS.input.init === 'function') SS.input.init()
   }
 
+  // ---------------------------------------------------------------- 站点分类
+  // 无 JS 兜底：#group-chips-wrap 初始 hidden，只有这里才把它显示出来，
+  // 这样禁用 JS 时不会出现一排「点了没反应」的 chip。
+  function applyGroupFilter(group) {
+    const chips = $('group-chips')
+    if (chips) {
+      const all = chips.querySelectorAll('[data-group]')
+      for (const chip of all) {
+        const active = chip.getAttribute('data-group') === group
+        chip.setAttribute('aria-pressed', active ? 'true' : 'false')
+      }
+    }
+    const buttons = document.querySelectorAll('#buttons-container [data-site]')
+    for (const button of buttons) {
+      const match = group === 'all' || button.getAttribute('data-group') === group
+      button.hidden = !match
+    }
+  }
+
+  function bindGroupChips() {
+    const wrap = $('group-chips-wrap')
+    const chips = $('group-chips')
+    if (!wrap || !chips) return
+
+    wrap.hidden = false
+    chips.addEventListener('click', (event) => {
+      const chip = event.target.closest('[data-group]')
+      if (!chip || !chips.contains(chip)) return
+      applyGroupFilter(chip.getAttribute('data-group'))
+    })
+  }
+
   // MDUI 1 风格的涟漪反馈：点击时在宿主元素内插入一个扩散圆
   const RIPPLE_TARGETS =
-    '.button, #search-submit, #theme-toggle, #suggest-source-toggle, .icon-button, .suggest-item'
+    '.button, .chip, #search-submit, #theme-toggle, #suggest-source-toggle, .icon-button, .suggest-item'
 
   function prefersReducedMotion() {
     return Boolean(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)
@@ -102,12 +134,15 @@
   function boot() {
     initTheme()
     initInput()
+    bindGroupChips()
     bindSiteButtons()
     bindSearchForm()
     bindRipple()
+    // 供 E2E/调试判断"装配完成"（脚本 defer 执行完 ≠ 已绑定事件）
+    document.documentElement.setAttribute('data-app-ready', '1')
   }
 
-  SS.app = { boot, handleSiteClick }
+  SS.app = { boot, handleSiteClick, applyGroupFilter }
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot, { once: true })

@@ -3,6 +3,24 @@
 本项目的对用户可见变化都记录在这里。
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)：主版本号在页面结构/使用方式有明显变化时递增。
 
+## 2.2.0（未发布）
+
+站点分类 + 站点图标：更好找站点，同时把「加图标」的请求/体积成本压到接近零。
+
+### 新增
+
+- **站点分类**：按钮墙上方新增一行 MD1 chip（全部 / 技术开发 / 社区问答 / 影音游戏 / 购物 / 素材资讯），点一下只显示该分组站点，不重排 DOM；不写 URL、不持久化，刷新回「全部」。无 JS 时整行 chip 隐藏（`#group-chips-wrap` 初始 `hidden`，由 `app.js` 打开），不会出现点了没反应的死 chip。
+- **站点图标**：每个站点按钮前加图标，全部内联进 `index.html` 的隐藏 SVG sprite（`<symbol id="i-github">` + `<use href="#i-github">`），**零图片请求、不使用外部 favicon 服务**；`currentColor` 描边跟随主题文字色；没配图标的站点自动退化为首字符 monogram（`.button-icon-text`）。
+- 图标数据在 `scripts/icons.mjs`（dev-time 资产，不进运行时、不被页面加载）；加 / 换图标只改这一处再 `npm run build`。
+- 分组数据在 `assets/js/sites.js`：`SS.siteGroups`（5 项，顺序即 chip 顺序）+ 每个站点新增必填 `group` 字段。
+
+### 工程
+
+- 体积：单页静态资源 **86.2 KB 未压缩 / gzip 30.7 KB**（预算 90 KB）。其中内联图标 sprite **3.03 KB 未压缩 / gzip 0.75 KB**。**加图标 + 分类后真实传输只增加约 2.1 KB gzip**（未压缩 +9.2 KB，主要是压缩率极高的 SVG sprite 与 chip 行）。
+- `scripts/build.mjs` 新增图标 sprite 与分类 chip 渲染（`{{ICON_SPRITE}}` / `{{GROUP_CHIPS}}` 占位符）和分组校验：缺 `group` / `group` 不存在会失败，空分组只警告；`templates/page.html` 新增 `#group-chips-wrap[hidden]` + `#group-chips`；`app.js` 新增分类筛选（`.chip` 也加入涟漪目标）并对无 JS 场景兜底。
+- 测试基线：`npm test` **129 例**、`npm run validate` **15 项**、`npm run e2e` **72 项**全绿。
+- 文档同步：README（分类说明、图标方案与取舍、体积对比、自定义网站字段）、CONTRIBUTING（图标与分组流程）、`docs/custom-sites.md`（`group` 字段、图标可选、新增分类）。
+
 ## 2.1.0（未发布）
 
 单页主题 + 联网联想：明暗切换合并进同一个页面（旧链接自动跳转），并在本地联想之外增加**可一键关闭**的百度联网联想。
