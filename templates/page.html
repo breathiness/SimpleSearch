@@ -43,38 +43,68 @@
 {{ICON_SPRITE}}
   <a class="skip-link" href="#search-input">跳到搜索框</a>
 
-  <main id="search-container">
-    <form id="search-form" role="search" action="https://www.bing.com/search" method="get" autocomplete="off">
-      <div class="search-field">
-        <input id="search-input" name="q" type="text" placeholder="搜索…" aria-label="搜索关键词"
-               aria-autocomplete="list" aria-controls="suggest-list" aria-expanded="false"
-               enterkeyhint="search" autocomplete="off" spellcheck="false" maxlength="512">
-        <button id="clear-button" class="icon-button" type="button" aria-label="清除输入内容" hidden>✕</button>
-        <ul id="suggest-list" class="suggest-list" role="listbox" aria-label="搜索建议" hidden></ul>
-      </div>
-      <button id="search-submit" class="submit-button" type="submit">搜索</button>
-    </form>
+  <header class="appbar">
+    <button id="nav-toggle" class="appbar-icon" type="button" aria-label="打开站点分类"
+            aria-expanded="false" aria-controls="site-nav">
+      <svg class="appbar-icon-svg" aria-hidden="true" focusable="false"><use href="#i-menu"></use></svg>
+    </button>
+    <span class="appbar-title">简单搜索</span>
+    <button id="settings-toggle" class="appbar-icon" type="button" aria-label="设置"
+            aria-expanded="false" aria-controls="settings-panel">
+      <svg class="appbar-icon-svg" aria-hidden="true" focusable="false"><use href="#i-settings"></use></svg>
+    </button>
+  </header>
 
-    <div id="group-chips-wrap" hidden>
-      <div id="group-chips" class="chips" role="group" aria-label="站点分类">
-{{GROUP_CHIPS}}
-      </div>
-    </div>
+  <div class="shell">
+    <aside id="site-nav" class="site-nav" aria-label="站点分类">
+      <p class="nav-group-title">站点分类</p>
+      <nav id="group-chips" class="nav-list" aria-label="按分类筛选站点">
+{{GROUP_NAV}}
+      </nav>
+    </aside>
 
-    <nav id="buttons-container" aria-label="常用网站">
+    <main id="main-content">
+      <section class="card card-search" aria-label="搜索">
+        <form id="search-form" role="search" action="https://www.bing.com/search" method="get" autocomplete="off">
+          <div class="search-field">
+            <input id="search-input" name="q" type="text" placeholder="搜索…" aria-label="搜索关键词"
+                   aria-autocomplete="list" aria-controls="suggest-list" aria-expanded="false"
+                   enterkeyhint="search" autocomplete="off" spellcheck="false" maxlength="512">
+            <button id="clear-button" class="icon-button" type="button" aria-label="清除输入内容" hidden>✕</button>
+            <ul id="suggest-list" class="suggest-list" role="listbox" aria-label="搜索建议" hidden></ul>
+          </div>
+          <button id="search-submit" class="submit-button" type="submit">搜索</button>
+        </form>
+        <noscript>
+          <p class="noscript-hint">JavaScript 未启用：直接在输入框回车仍可用 Bing 搜索。</p>
+        </noscript>
+      </section>
+
+      <section class="card card-sites" aria-label="常用网站">
+        <h2 class="card-title">常用网站</h2>
+        <nav id="buttons-container" aria-label="站点快捷按钮">
 {{SITE_BUTTONS}}
-    </nav>
+        </nav>
+      </section>
+    </main>
+  </div>
 
-    <noscript>
-      <p class="noscript-hint">JavaScript 未启用：直接在输入框回车仍可用 Bing 搜索。</p>
-    </noscript>
-  </main>
+  <div id="scrim" class="scrim" hidden></div>
 
-  <footer id="site-footer">
-    <button id="suggest-source-toggle" class="footer-button" type="button" aria-pressed="true">联网联想：开</button>
-    <button id="theme-toggle" class="footer-button" type="button" aria-pressed="false">夜间模式</button>
-    <a class="footer-link" href="https://github.com/breathiness/SimpleSearch">关于</a>
-  </footer>
+  <aside id="settings-panel" class="settings-panel" role="dialog" aria-modal="true"
+         aria-labelledby="settings-title" hidden>
+    <div class="panel-header">
+      <h2 id="settings-title" class="panel-title">设置</h2>
+      <button id="settings-close" class="icon-button panel-close" type="button" aria-label="关闭设置">
+        <svg class="panel-close-svg" aria-hidden="true" focusable="false"><use href="#i-close"></use></svg>
+      </button>
+    </div>
+    <div class="panel-body">
+      <button id="theme-toggle" class="switch-row" type="button" aria-pressed="false">夜间模式</button>
+      <button id="suggest-source-toggle" class="switch-row" type="button" aria-pressed="true">联网联想</button>
+      <a class="panel-link" href="https://github.com/breathiness/SimpleSearch">GitHub 仓库 · 关于</a>
+    </div>
+  </aside>
 
   <script defer src="assets/js/sites.js"></script>
   <script defer src="assets/js/search.js"></script>

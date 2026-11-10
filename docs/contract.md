@@ -296,7 +296,7 @@ npm run serve      # 本地静态服务器 http://127.0.0.1:8080
 6. 关闭联网联想（`ss.remote='off'`）时**零第三方网络请求**，全部核心功能离线可用。
 7. 开启联网联想时：请求只发往 provider 域（百度），700ms 超时/失败静默降级为本地联想，永不阻塞键盘。
 8. `file://` 直接打开可用（无 CORS 报错、无 module 加载失败；联网联想在 file:// 下也能工作）。
-9. 单文件页面 + 全部资源体积目标：< 90 KB（gzip 前；当前实际约 86 KB，gzip 后约 31 KB）。v2.2 的内联图标 sprite 约 3 KB（gzip 0.75 KB）且零额外请求。
+9. 单文件页面 + 全部资源体积目标：< 100 KB（gzip 前；v2.3 文档站骨架后实际约 95 KB，gzip 后约 33 KB）。内联图标 sprite 约 3.8 KB（gzip 0.85 KB）且零额外请求。
 
 ## 10. 沟通规则
 
@@ -381,4 +381,53 @@ SS.siteGroups = [
 - `scripts/build.mjs` 把用到的图标渲染成一个隐藏的 `<svg class="icon-sprite">` + `<symbol id="i-<siteId>">`，插在 `<body>` 开头；每个按钮里放 `<svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-<siteId>"></use></svg>`。
 - 没有配图标的站点（用户自加的站点）**不留空**：渲染 `<span class="button-icon button-icon-text" aria-hidden="true">首字符</span>` 做字母/汉字 monogram 兜底。
 - 图标风格：24×24 viewBox、`fill="none"` + `stroke="currentColor"` + 1.8 线宽 + 圆头，**通用几何符号而不是他人商标的精确复制**（避免商标问题）。
-- 体积红线：sprite 全部内联后 HTML 增量 ≤ 4 KB（未压缩），全站仍满足 §9.9 的 90 KB 预算（当前约 86 KB）；首屏不得因此新增任何网络请求。
+- 体积红线：sprite 全部内联后 HTML 增量 ≤ 4 KB（未压缩），全站仍满足 §9.9 的 100 KB 预算（当前约 95 KB）；首屏不得因此新增任何网络请求。
+
+## 14. v2.3：改成 MDUI 文档站式骨架（用户要求）
+
+用户要求：「设置的样式」和「分类的排列方式」改成 MDUI 1 文档网页类似的样子。参考 https://www.mdui.org/zh-cn/docs/1/ 的结构：**主色顶栏 + 左侧分组导航 + 内容卡片 + 右侧设置面板（开关项）**。
+
+### 14.1 页面骨架
+
+```
+<body>
+  {{ICON_SPRITE}}
+  .skip-link
+  header.appbar        → #nav-toggle(汉堡, 仅 <960px 显示) + .appbar-title + #settings-toggle(设置图标)
+  div.shell
+    aside#site-nav     → 左侧分类导航（桌面常驻；<960px 变左侧抽屉）
+      .nav-group-title 「站点分类」+ 折叠箭头(装饰)
+      nav#group-chips.nav-list
+        button.nav-item[data-group=all|tech|…][aria-current=true|false]   ← 分类项（竖向排列）
+    main#main-content
+      section.card.card-search  → #search-form（输入框 + 清除 + 搜索按钮）
+      section.card.card-sites   → h2.card-title「常用网站」+ nav#buttons-container（站点按钮墙）
+  div#scrim.scrim[hidden]
+  aside#settings-panel[role=dialog][aria-modal=true][hidden]
+    .panel-header → h2#settings-title「设置」+ button#settings-close
+    .panel-body
+      button#theme-toggle.switch-row[aria-pressed]        文案固定「夜间模式」
+      button#suggest-source-toggle.switch-row[aria-pressed] 文案固定「联网联想」
+      a.panel-link → GitHub 仓库
+```
+
+- **移除页脚**（原 `#site-footer` 里的两个开关搬到设置面板；「关于」变成面板里的链接）。
+- 分类选中语义用 `aria-current="true"`（导航项语义，替代原来的 `aria-pressed`）；设置里两个开关仍用 `aria-pressed`（按钮式开关，视觉上是 MD1 switch）。
+- **文案固定**：`#theme-toggle` 永远显示「夜间模式」、`#suggest-source-toggle` 永远显示「联网联想」，状态只通过 `aria-pressed` 表达。因此 `theme.js` / `input.js` **不得再改这两个按钮的 textContent**（只更新 aria-pressed / title）。
+- 交互：
+  - 点 `.nav-item` → 只显示对应 group 的站点按钮（`hidden`），其余隐藏；`aria-current` 同步；「全部」恢复全量。
+  - <960px：汉堡按钮开合左侧抽屉（`#site-nav` 滑动 + `#scrim` 显示），点 scrim / Esc / 选中分类后自动关闭；`aria-expanded` 同步。
+  - 设置面板：点 `#settings-toggle` 从右侧滑出（`#scrim` 显示），点 `#settings-close` / scrim / Esc 关闭；打开时焦点移到面板内第一个开关，关闭后焦点回到 `#settings-toggle`。
+  - 面板打开时 `scrim` 全屏、点击穿透关闭；抽屉与面板共用同一个 `#scrim`，同时最多开一个。
+- 响应式：≥960px 侧边栏宽 240px 常驻、汉堡隐藏；<960px 侧边栏为抽屉、内容区满宽。
+
+### 14.2 图标（继续内联，零请求）
+
+`scripts/icons.mjs` 分两组：`SITE_ICONS`（11 个站点图标）+ `UI_ICONS`（`menu` 汉堡、`settings` 设置、`close` 关闭）。build 把两组都塞进同一个 `<svg class="icon-sprite">`，UI 图标的 `<symbol id="i-menu">` 等。sprite 体积仍须 ≤ 6 KB（未压缩），全站 ≤ 100 KB。
+
+### 14.3 验收门增补
+
+- 顶栏存在（`.appbar`）、标题正确、设置按钮可开合面板、面板内有 2 个 `.switch-row`。
+- 桌面（≥960）：`#site-nav` 可见、无横向溢出；移动（390/320）：汉堡可见、抽屉可开合、scrim 生效、无横向溢出。
+- `.nav-item` 数量 = 1 + 分组数；点分类后只有该组站点可见，`aria-current` 只有一个 true。
+- 页面无 `#site-footer`；设置面板关闭时 `#settings-panel[hidden]`。

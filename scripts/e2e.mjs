@@ -404,16 +404,21 @@ async function run() {
     await page.goto(PAGE)
     check('A5 存储优先于系统偏好', (await page.theme()) === 'light', await page.theme())
 
-    // A6 切换 + 持久化
+    // A6 切换 + 持久化（设置面板里的开关）
     await page.clearStorage()
     await emulateSystemTheme('light')
     await page.goto(PAGE)
+    await page.evaluate("SimpleSearch.app && SimpleSearch.app.openSettings()")
+    await sleep(250)
     await page.evaluate("document.getElementById('theme-toggle').click()")
-    await sleep(200)
+    await sleep(250)
     check('A6 切换生效', (await page.theme()) === 'dark', await page.theme())
     check('A6 切换写入存储', (await page.stored('ss.theme')) === 'dark')
-    const toggleLabel = await page.evaluate("document.getElementById('theme-toggle').textContent")
-    check('A6 按钮文案同步', /白天模式/.test(toggleLabel), toggleLabel)
+    const switchState = await page.evaluate(`(() => {
+      const b = document.getElementById('theme-toggle')
+      return { pressed: b.getAttribute('aria-pressed'), text: (b.textContent || '').trim() }
+    })()`)
+    check('A6 开关状态与文案', switchState.pressed === 'true' && switchState.text === '夜间模式', JSON.stringify(switchState))
     await page.goto(PAGE)
     check('A6 刷新后保持', (await page.theme()) === 'dark', await page.theme())
     await emulateSystemTheme(null)
@@ -456,31 +461,45 @@ async function run() {
       missingBuiltin.length ? `缺少 ${missingBuiltin.join(',')}` : `${renderedSites.length} 个`
     )
 
-    // ---- 分类 chip ----
-    const chipInfo = await page.evaluate(`(() => {
-      const wrap = document.getElementById('group-chips-wrap')
-      const chips = [...document.querySelectorAll('#group-chips .chip')]
+    // ---- 文档站式骨架：顶栏 + 左侧分类导航 ----
+    const shell = await page.evaluate(`(() => {
+      const appbar = document.querySelector('.appbar')
+      const title = document.querySelector('.appbar-title')
+      const nav = document.getElementById('site-nav')
+      const items = [...document.querySelectorAll('#group-chips .nav-item')]
+      const navToggle = document.getElementById('nav-toggle')
       return {
-        wrapHidden: wrap ? wrap.hidden : null,
-        count: chips.length,
-        groups: chips.map((c) => c.getAttribute('data-group')),
-        pressed: chips.filter((c) => c.getAttribute('aria-pressed') === 'true').map((c) => c.getAttribute('data-group')),
+        appbar: !!appbar,
+        title: title && title.textContent.trim(),
+        hasNav: !!nav,
+        itemCount: items.length,
+        groups: items.map((i) => i.getAttribute('data-group')),
+        current: items.filter((i) => i.getAttribute('aria-current') === 'true').map((i) => i.getAttribute('data-group')),
+        navToggleDisplayed: navToggle ? getComputedStyle(navToggle).display !== 'none' : null,
+        hasFooter: !!document.getElementById('site-footer'),
+        hasSettingsToggle: !!document.getElementById('settings-toggle'),
+        panelHidden: document.getElementById('settings-panel').hidden,
+        scrimHidden: document.getElementById('scrim').hidden,
       }
     })()`)
-    check('C: 分类 chip 已显示', chipInfo.wrapHidden === false && chipInfo.count >= 2, `${chipInfo.count} 个`)
-    check('C: 默认选中「全部」', chipInfo.pressed.length === 1 && chipInfo.pressed[0] === 'all', chipInfo.pressed.join(','))
-    check('C: chip 分组 id 合法', chipInfo.groups.includes('all') && chipInfo.groups.length >= 2, chipInfo.groups.join(','))
+    check('C: 顶栏存在且标题正确', shell.appbar && shell.title === '简单搜索', shell.title)
+    check('C: 左侧分类导航存在', shell.hasNav && shell.itemCount >= 2, `${shell.itemCount} 项`)
+    check('C: 默认只有「全部」被选中', shell.current.length === 1 && shell.current[0] === 'all', shell.current.join(','))
+    check('C: 桌面端不显示汉堡', shell.navToggleDisplayed === false, String(shell.navToggleDisplayed))
+    check('C: 页脚已移除', shell.hasFooter === false)
+    check('C: 设置面板默认隐藏且遮罩隐藏', shell.hasSettingsToggle && shell.panelHidden && shell.scrimHidden)
 
     await page.evaluate(`document.querySelector('#group-chips [data-group="shopping"]').click()`)
     await sleep(200)
     const filtered = await page.evaluate(`(() => {
       const buttons = [...document.querySelectorAll('#buttons-container [data-site]')]
       const visible = buttons.filter((b) => !b.hidden)
+      const items = [...document.querySelectorAll('#group-chips .nav-item')]
       return {
         visible: visible.map((b) => b.dataset.site),
         allShopping: visible.every((b) => b.dataset.group === 'shopping'),
         total: buttons.length,
-        pressed: document.querySelector('#group-chips [data-group="shopping"]').getAttribute('aria-pressed'),
+        current: items.filter((i) => i.getAttribute('aria-current') === 'true').map((i) => i.getAttribute('data-group')),
       }
     })()`)
     check(
@@ -488,7 +507,7 @@ async function run() {
       filtered.visible.length > 0 && filtered.visible.length < filtered.total && filtered.allShopping,
       `${filtered.visible.join(',')}（共 ${filtered.total}）`
     )
-    check('C: 被选 chip 的 aria-pressed 正确', filtered.pressed === 'true', String(filtered.pressed))
+    check('C: aria-current 同步', filtered.current.length === 1 && filtered.current[0] === 'shopping', filtered.current.join(','))
 
     await page.evaluate(`document.querySelector('#group-chips [data-group="all"]').click()`)
     await sleep(200)
@@ -496,6 +515,44 @@ async function run() {
       "[...document.querySelectorAll('#buttons-container [data-site]')].filter((b) => !b.hidden).length"
     )
     check('C: 点「全部」恢复全量', restored === renderedSites.length, `${restored}/${renderedSites.length}`)
+
+    // ---- 设置抽屉 ----
+    await page.evaluate("document.getElementById('settings-toggle').click()")
+    await sleep(350)
+    const panelState = await page.evaluate(`(() => {
+      const panel = document.getElementById('settings-panel')
+      const scrim = document.getElementById('scrim')
+      const switches = [...panel.querySelectorAll('.switch-row')]
+      const active = document.activeElement
+      return {
+        panelHidden: panel.hidden,
+        scrimHidden: scrim.hidden,
+        rows: switches.map((s) => s.id),
+        expanded: document.getElementById('settings-toggle').getAttribute('aria-expanded'),
+        focusInside: panel.contains(active),
+      }
+    })()`)
+    check('C: 点设置打开面板', panelState.panelHidden === false && panelState.expanded === 'true')
+    check('C: 遮罩显示', panelState.scrimHidden === false)
+    check(
+      'C: 面板内有两个开关行',
+      panelState.rows.includes('theme-toggle') && panelState.rows.includes('suggest-source-toggle'),
+      panelState.rows.join(',')
+    )
+    check('C: 打开后焦点进入面板', panelState.focusInside)
+    if (SHOTS) {
+      const shot = await page.screenshot('index-settings-open.png')
+      console.log(`[e2e] 截图 ${path.relative(ROOT, shot)}`)
+    }
+
+    await page.pressKey('Escape', { code: 'Escape', vk: 27 })
+    await sleep(250)
+    const afterEsc = await page.evaluate(`(() => ({
+      panelHidden: document.getElementById('settings-panel').hidden,
+      scrimHidden: document.getElementById('scrim').hidden,
+      focusId: document.activeElement && document.activeElement.id,
+    }))()`)
+    check('C: Esc 关闭面板并归还焦点', afterEsc.panelHidden === true && afterEsc.scrimHidden === true && afterEsc.focusId === 'settings-toggle')
 
     // ---- 内联图标（零额外请求） ----
     const iconInfo = await page.evaluate(`(() => {
@@ -604,28 +661,32 @@ async function run() {
     console.log('\n=== D. 联网联想：开关与隐私 ===')
     await page.clearStorage()
     await page.goto(PAGE)
+    await page.evaluate("SimpleSearch.app.openSettings()")
+    await sleep(300)
     const toggleState = await page.evaluate(`(() => {
       const b = document.getElementById('suggest-source-toggle')
-      return { exists: !!b, pressed: b && b.getAttribute('aria-pressed'), text: b && b.textContent }
+      return { exists: !!b, pressed: b && b.getAttribute('aria-pressed'), text: b && b.textContent.trim() }
     })()`)
     check('D: 开关存在且默认开启', toggleState.exists && toggleState.pressed === 'true', toggleState.text)
 
     await page.evaluate("document.getElementById('suggest-source-toggle').click()")
-    await sleep(200)
+    await sleep(250)
     const afterClick = await page.evaluate(`(() => {
       const b = document.getElementById('suggest-source-toggle')
       return {
         pressed: b && b.getAttribute('aria-pressed'),
-        text: b && b.textContent,
+        text: b && b.textContent.trim(),
         stored: (() => { try { return localStorage.getItem('ss.remote') } catch (e) { return 'ERR' } })(),
         enabled: window.SimpleSearch && SimpleSearch.remote ? SimpleSearch.remote.enabled() : null,
       }
     })()`)
     check(
       'D: 点击后关闭并写入存储',
-      afterClick.pressed === 'false' && afterClick.stored === 'off',
+      afterClick.pressed === 'false' && afterClick.stored === 'off' && afterClick.text === '联网联想',
       `pressed=${afterClick.pressed} stored=${afterClick.stored} enabled=${afterClick.enabled} text=${afterClick.text}`
     )
+    await page.evaluate("SimpleSearch.app.closeSettings()")
+    await sleep(200)
 
     // 关闭状态：输入不产生任何第三方请求
     page.resetLogs()
@@ -696,19 +757,87 @@ async function run() {
       const layout = await page.evaluate(`(() => {
         const input = document.getElementById('search-input').getBoundingClientRect()
         const submit = document.getElementById('search-submit').getBoundingClientRect()
-        const btn = Math.min(...[...document.querySelectorAll('#buttons-container .button')].map((b) => b.getBoundingClientRect().height))
-        const footer = document.getElementById('site-footer').getBoundingClientRect()
-        return { inputW: input.width, sameRow: Math.abs(input.top - submit.top) < 8, btnH: btn, footerBottom: footer.bottom, vh: window.innerHeight }
+        const buttons = [...document.querySelectorAll('#buttons-container .button')]
+        const btn = Math.min(...buttons.map((b) => b.getBoundingClientRect().height))
+        const appbar = document.querySelector('.appbar').getBoundingClientRect()
+        const navToggle = document.getElementById('nav-toggle')
+        const navToggleBox = navToggle.getBoundingClientRect()
+        const card = document.querySelector('.card-search').getBoundingClientRect()
+        return {
+          inputW: input.width,
+          sameRow: Math.abs(input.top - submit.top) < 8,
+          btnH: btn,
+          appbarH: appbar.height,
+          appbarTop: appbar.top,
+          navToggleVisible: getComputedStyle(navToggle).display !== 'none' && navToggleBox.width > 0,
+          cardLeft: card.left,
+          vh: window.innerHeight,
+        }
       })()`)
       check(`F: ${spec.name} 输入框宽度充足`, layout.inputW >= 200, `${Math.round(layout.inputW)}px`)
       check(`F: ${spec.name} 输入框与搜索按钮同一行`, layout.sameRow)
       check(`F: ${spec.name} 按钮触控高度 ≥ 40px`, layout.btnH >= 40, `${layout.btnH}px`)
-      check(`F: ${spec.name} 页脚不超出视口`, layout.footerBottom <= layout.vh + 1, `${layout.footerBottom}/${layout.vh}`)
+      check(`F: ${spec.name} 顶栏在顶部`, layout.appbarTop === 0 && layout.appbarH >= 48 && layout.appbarH <= 64, `${layout.appbarH}px`)
+      check(`F: ${spec.name} 窄屏显示汉堡`, layout.navToggleVisible)
+      check(`F: ${spec.name} 内容区左右对称（侧栏已收起）`, layout.cardLeft > 0 && layout.cardLeft < 40, `${Math.round(layout.cardLeft)}px`)
+
+      // 抽屉：汉堡打开 → 遮罩 + 导航可见 → 点分类后自动收起
+      await page.evaluate("document.getElementById('nav-toggle').click()")
+      await sleep(400)
+      const drawer = await page.evaluate(`(() => {
+        const nav = document.getElementById('site-nav').getBoundingClientRect()
+        const scrim = document.getElementById('scrim')
+        return {
+          navLeft: nav.left,
+          navVisible: nav.left >= 0 && nav.width > 100,
+          scrimHidden: scrim.hidden,
+          expanded: document.getElementById('nav-toggle').getAttribute('aria-expanded'),
+        }
+      })()`)
+      check(`F: ${spec.name} 汉堡打开分类抽屉`, drawer.navVisible && !drawer.scrimHidden && drawer.expanded === 'true', JSON.stringify(drawer))
+      await page.evaluate(`document.querySelector('#group-chips [data-group="tech"]').click()`)
+      await sleep(400)
+      const afterPick = await page.evaluate(`(() => ({
+        navOpen: document.body.classList.contains('nav-open'),
+        scrimHidden: document.getElementById('scrim').hidden,
+        visible: [...document.querySelectorAll('#buttons-container [data-site]')].filter((b) => !b.hidden).length,
+      }))()`)
+      check(
+        `F: ${spec.name} 选分类后抽屉收起且只剩该组`,
+        afterPick.navOpen === false && afterPick.scrimHidden === true && afterPick.visible > 0 && afterPick.visible < 11,
+        JSON.stringify(afterPick)
+      )
       if (SHOTS) {
         const shot = await page.screenshot(`index-${spec.name}-mobile.png`)
         console.log(`[e2e] 截图 ${path.relative(ROOT, shot)}`)
       }
     }
+    // 320×568（iPhone SE 级别）：只查不溢出 + 抽屉与搜索区可用
+    await cdp.send('Emulation.setDeviceMetricsOverride', {
+      width: 320,
+      height: 568,
+      deviceScaleFactor: 2,
+      mobile: true,
+    })
+    await page.goto(`${PAGE}?theme=light`, 400)
+    const small = await page.evaluate(`(() => {
+      const overflow = document.documentElement.scrollWidth - document.documentElement.clientWidth
+      const input = document.getElementById('search-input').getBoundingClientRect()
+      const buttons = [...document.querySelectorAll('#buttons-container .button')]
+      const btnH = Math.min(...buttons.map((b) => b.getBoundingClientRect().height))
+      const navToggle = document.getElementById('nav-toggle')
+      return {
+        overflow,
+        inputW: input.width,
+        btnH,
+        navToggleVisible: getComputedStyle(navToggle).display !== 'none',
+      }
+    })()`)
+    check('F: 320 无横向溢出', small.overflow <= 1, `溢出 ${small.overflow}px`)
+    check('F: 320 输入框可用', small.inputW >= 150, `${Math.round(small.inputW)}px`)
+    check('F: 320 按钮触控高度 ≥ 40px', small.btnH >= 40, `${small.btnH}px`)
+    check('F: 320 显示汉堡', small.navToggleVisible)
+
     await cdp.send('Emulation.clearDeviceMetricsOverride')
 
     // ================= G. 桌面截图 =================

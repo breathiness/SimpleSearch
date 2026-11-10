@@ -36,7 +36,7 @@ SimpleSearch/
 │  └─ js/             # 经典脚本（sites / search / suggest / history / theme / remote / input / app）
 ├─ docs/              # 契约、自定义站点指南、更新日志
 ├─ scripts/           # build.mjs / icons.mjs（dev-time 图标数据）/ serve.mjs / validate.mjs / e2e.mjs
-├─ templates/         # page.html（真实页，含分类 chip 区与图标 sprite）/ redirect.html（两个重定向壳）
+├─ templates/         # page.html（真实页：顶栏 / 分类导航 / 卡片 / 设置抽屉 + 图标 sprite）/ redirect.html（两个重定向壳）
 ├─ tests/             # node:test 单元测试
 ├─ .github/workflows/ # ci.yml（GitHub Actions）
 ├─ index.html         # 唯一真实页面，由 build 生成，勿手改
@@ -82,11 +82,12 @@ SimpleSearch/
 - **禁止内联事件属性**（`onclick="..."` 之类）。事件一律在 JS 里 `addEventListener`，并在 `DOMContentLoaded` 之后由 `app.js` 装配。
 - 模块文件顶层不要直接操作 DOM；纯逻辑（URL 构建、联想、历史、主题解析）不读 DOM、不读真实 `localStorage`，由调用方注入，方便单测。
 - **脚本加载顺序**：`templates/page.html` 里按 `sites → search → suggest → history → theme → remote → input → app` 顺序挂 8 个经典脚本。新增模块文件必须同步加进模板（该文件归 lead 维护，PR 里说明让 lead 改，不要自己动）。
+- **顶栏 / 抽屉 / 设置面板**：`#nav-toggle`、`#settings-toggle`、`#site-nav`、`#settings-panel`、`#scrim` 的开合、遮罩联动和焦点进出（打开时焦点进面板、关闭后回到设置按钮）由 `app.js` 负责。两个开关 `#theme-toggle` / `#suggest-source-toggle` 的**文案固定**（永远是「夜间模式」「联网联想」），状态只用 `aria-pressed` 表达——`theme.js` / `input.js` 不得再改它们的 `textContent`。
 - **视觉风格参考 MDUI 1 / Material Design 1**（主色、2px 圆角、elevation 阴影、涟漪、下划线输入框、raised button），但**全部是自研手写 CSS**：不引入 MDUI 库、不引入任何 CDN 或第三方资源。改样式时沿用 `tokens.css` 里的变量，别硬编码颜色。
 - 不引入 `!important`；保留可见的 `:focus-visible` 焦点轮廓；动画要尊重 `prefers-reduced-motion: reduce`。
 - **不新增第三方依赖、CDN、字体或追踪脚本**；所有核心功能必须断网可用。唯一的网络请求是**可关闭**的联网联想（见下）。
 - 读写 `localStorage`、`window.open` 等可能失败的调用要放在 `try/catch` 或做能力判断里（隐私模式不能报错）。
-- DOM 契约（`#search-input`、`#suggest-list`、`#theme-toggle`、`#suggest-source-toggle`、`#group-chips`、`#buttons-container .button[data-site]` 等 id/class）由 `docs/contract.md` 规定，改动前先确认没有别的模块依赖。
+- DOM 契约（`#search-input`、`#suggest-list`、`#nav-toggle`、`#site-nav`、`#settings-toggle`、`#settings-panel`、`#scrim`、`.nav-item`、`.switch-row`、`#buttons-container .button[data-site]` 等 id/class）由 `docs/contract.md` 规定，改动前先确认没有别的模块依赖。
 
 ## 扩展联网联想数据源
 
@@ -106,29 +107,29 @@ SS.remote.provider = {
 - provider 之外的逻辑（超时、缓存、并发去重、结果合并、开关）由 `remote.js` 统一处理，换源不需要动 `suggest.js`。
 - **注意**：目前联想项右侧的「百度」标注是 `input.js` 里写死的（`sublabel: '百度'`），换 provider 时还要同步改这一处；更干净的做法是让维护者把它改成读 `SS.remote.provider.label`（需要动 `input.js`，先提 issue/PR 说明）。
 - 硬约束：JSONP 只允许 `document.createElement('script')` 注入，回调用完删除 script 标签和全局回调，禁止 `eval`；结果只用 `textContent` 渲染；联网联想关闭（`ss.remote = 'off'`）时**不得发出任何第三方请求**。
-- 自测：关掉页脚「联网联想」后，浏览器 Network 面板里不应出现 `suggestion.*` 请求；断网时联想列表仍只有本地数据、搜索照常。
+- 自测：在右上角设置面板里关掉「联网联想」后，浏览器 Network 面板里不应出现 `suggestion.*` 请求；断网时联想列表仍只有本地数据、搜索照常。
 
 ## 站点图标（scripts/icons.mjs）
 
 图标是 **dev-time 数据**，不会被页面加载，也不会产生图片请求：
 
-- `scripts/icons.mjs` 导出 `SITE_ICONS`：键是站点 `id`，值是 `{ body: '<path .../>' }`（`viewBox` 可省略，默认 `0 0 24 24`）；
-- `scripts/build.mjs` 把用到的图标渲染成隐藏的 `<svg class="icon-sprite">` + `<symbol id="i-<siteId>">` 插到 `<body>` 开头，按钮里输出 `<svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-<siteId>"></use></svg>`；模板里对应 `{{ICON_SPRITE}}`、`{{GROUP_CHIPS}}` 两个占位符；
+- `scripts/icons.mjs` 导出两组：`SITE_ICONS`（站点图标，键是站点 `id`）和 `UI_ICONS`（`menu` / `settings` / `close`，给顶栏和设置面板用），值都是 `{ body: '<path .../>' }`（`viewBox` 可省略，默认 `0 0 24 24`）；
+- `scripts/build.mjs` 把用到的图标渲染成隐藏的 `<svg class="icon-sprite">` + `<symbol id="i-<name>">` 插到 `<body>` 开头：站点按钮输出 `<svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-<siteId>"></use></svg>`，顶栏/面板输出 `#i-menu` / `#i-settings` / `#i-close`；模板里对应 `{{ICON_SPRITE}}`、`{{GROUP_NAV}}` 两个占位符；
 - **它不属于运行时脚本**：不要把它加进 `templates/page.html` 的 `<script>` 列表（那 8 个才是运行时脚本）；
 - 风格：24×24 viewBox、`fill="none"`、`stroke="currentColor"`、线宽 1.8、圆头；画**通用几何符号**，不要精确复制他人商标（避免商标问题）；
-- 体积红线：sprite 让 HTML 的增量 ≤ 4 KB（未压缩），全站仍需 < 90 KB 预算；
+- 体积红线：sprite（11 个站点图标 + 3 个 UI 图标）让 HTML 的增量 ≤ 6 KB（未压缩），全站仍需 < 100 KB 预算；
 - 禁止：外链 favicon 服务（如 `icons.duckduckgo.com`、Google favicon API）、外部图标库/CDN、用 emoji 冒充品牌图标——前两者会新增请求，后者跨平台不一致；
-- 新增图标：在 `SITE_ICONS` 里加一条（键 = 站点 `id`）→ `npm run build`；
+- 新增图标：站点图标在 `SITE_ICONS` 里加一条（键 = 站点 `id`）→ `npm run build`；UI 图标同理加进 `UI_ICONS`；
 - 没配图标的站点由 build 自动渲染首字符 monogram（`<span class="button-icon button-icon-text" aria-hidden="true">首</span>`），不用手工补。
 
 ## 新增站点分组
 
 分组也是数据驱动的，只写在 `assets/js/sites.js`：
 
-- `SS.siteGroups` 数组定义 chip 的顺序，例如 `[{ id: 'tech', label: '技术开发' }, ...]`；
+- `SS.siteGroups` 数组定义**左侧分类导航条目**的顺序，例如 `[{ id: 'tech', label: '技术开发' }, ...]`；
 - 每个站点必须带 `group`，且取值必须存在于 `SS.siteGroups`，否则 `npm run build` 会失败；分组暂时没有站点时 build 只给警告（建议别留空分组）；
-- 加新分类：往 `SS.siteGroups` 追加 `{ id, label }`，把相关站点的 `group` 指过去，再 `npm run build`；chip 顺序跟着数组顺序；
-- 交互约定：`#group-chips` 里的「全部 + 各分组」chip 由 `scripts/build.mjs` 从 `SS.siteGroups` 生成（MD1 chip），`app.js` 只负责把 `#group-chips-wrap` 的 `hidden` 去掉、点击时更新 `aria-pressed` 并按 `data-group` 隐藏其它按钮；**不写 URL、不持久化**，刷新回「全部」；无 JS 时 `#group-chips-wrap` 保持 `hidden`，避免出现点了没反应的死 chip。
+- 加新分类：往 `SS.siteGroups` 追加 `{ id, label }`，把相关站点的 `group` 指过去，再 `npm run build`；导航条目顺序跟着数组顺序；
+- 交互约定：`scripts/build.mjs` 从 `SS.siteGroups` 生成 `.nav-item`（`全部` + 各分组，放在 `#group-chips.nav-list` 里），`app.js` 点击时按 `data-group` 隐藏其它站点按钮，并同步 `aria-current`（导航项语义，**不是** `aria-pressed`）；<960px 时选中分类后自动收起左侧抽屉。**不写 URL、不持久化**，刷新回「全部」。无 JS 时筛选不可用，但所有站点按钮仍然显示。
 
 ## 新增或删除网站
 
@@ -157,8 +158,8 @@ SS.remote.provider = {
 - 单元测试用 Node 内置的 `node:test`，放在 `tests/`，文件名以 `.test.mjs` 结尾，`npm test` 用 `node --test "tests/**/*.test.mjs"` 的 glob 自动发现，不用额外登记。
 - `tests/sites.test.mjs` 要求默认内置的 11 个站点都存在、且相对顺序一致；**新增站点不会让测试变红**，删除内置站点才会失败并提示恢复。
 - 提交/开 PR 前必须本地跑通 `npm run check`（构建 + 测试 + 静态校验/产物一致性）。
-- 当前测试基线：`npm test` **129 例**、`npm run validate` **15 项**、`npm run e2e` **72 项**全绿。
-- `npm run e2e` 用本机 Edge/Chrome（CDP）跑真实浏览器检查：单页主题解析（`?theme=` → 存储 → 系统 → 浅色）、两个旧链接的 0 秒跳转与地址栏清理、联网联想开关 / 超时降级 / 真实百度联调、分类 chip 筛选、图标 sprite（无额外图片请求）、移动端 390px、`file://` 打开。CI 不跑它（需要浏览器）。
+- 当前测试基线：`npm test` **136 例**、`npm run validate` **16 项**、`npm run e2e` **92 项**全绿。
+- `npm run e2e` 用本机 Edge/Chrome（CDP）跑真实浏览器检查：单页主题解析（`?theme=` → 存储 → 系统 → 浅色）、两个旧链接的 0 秒跳转与地址栏清理、联网联想开关 / 超时降级 / 真实百度联调、分类导航筛选与左侧抽屉开合、设置面板与 MD1 开关、图标 sprite（无额外图片请求）、960px 断点与 390px 移动端布局、`file://` 打开。CI 不跑它（需要浏览器）。
 - GitHub Actions（`.github/workflows/ci.yml`）在 `push` 和 `pull_request` 时用 Node 22 跑 `npm run check`，并检查三个生成产物是否与 `sites.js` / 模板漂移。
 - 本项目零依赖，CI 里**不需要 `npm ci` / `npm install`**。
 - 只改文档或样式时也请跑一次 `npm run check`，确认没有把生成页改漂。
@@ -170,7 +171,9 @@ SS.remote.provider = {
 - [ ] 新增/修改的功能在浅色与夜间两套主题下都正常，键盘可操作
 - [ ] 单页主题解析正确：`?theme=` → 上次选择 → 系统偏好 → 浅色；两个老 URL 能跳到首页并应用对应主题
 - [ ] 关闭「联网联想」后无第三方请求、断网可用；开启时请求失败/超时不阻塞搜索
-- [ ] 新增站点带了 `group`；分类 chip 能正确筛选、刷新回「全部」、无 JS 时不显示死 chip
+- [ ] 新增站点带了 `group`；左侧分类导航能正确筛选、`aria-current` 只有一个、刷新回「全部」
+- [ ] 桌面 ≥960px 侧栏常驻、<960px 变抽屉且汉堡可开合（点遮罩 / Esc / 选中分类后收起）；没有 `#site-footer`
+- [ ] 设置面板可从右上角打开，两个开关文案固定、状态只看 `aria-pressed`，关闭后焦点回到设置按钮
 - [ ] 站点图标来自内联 sprite（没有新增图片请求）；没配图标的站点显示 monogram
 - [ ] 直接双击 `index.html`（`file://`）无报错
 - [ ] `README.md` / `docs/custom-sites.md` / `docs/CHANGELOG.md` 等受影响的文档已同步

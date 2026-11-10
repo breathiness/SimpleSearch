@@ -58,3 +58,12 @@ export const SITE_ICONS = {
     body: '<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M7 9.5l3 2.8-3 2.8"/><path d="M12.5 16h4"/>',
   },
 }
+
+// UI 图标（顶栏/设置面板用；同样内联进 sprite，零请求）
+export const UI_ICONS = {
+  menu: { body: '<path d="M4 7h16M4 12h16M4 17h16"/>' },
+  settings: {
+    body: '<path d="M4 7h9M19 7h1M4 12h3M13 12h7M4 17h7M17 17h3"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="14" cy="17" r="2"/>',
+  },
+  close: { body: '<path d="M6 6l12 12M18 6 6 18"/>' },
+}

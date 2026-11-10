@@ -274,22 +274,39 @@ testTheme('readUrlTheme()：非法值 / 无参数 → null', () => {
 
 // ---------------------------------------------------------------- apply / toggle
 
-testTheme('apply()：写 <html data-theme> 并同步按钮文案 / aria-pressed / theme-color', () => {
+testTheme('apply()：写 <html data-theme> 并同步 aria-pressed / theme-color（v2.3 起文案固定不改）', () => {
   const env = createThemeEnv()
+  env.toggleButton.textContent = '夜间模式'
   env.theme.apply('dark')
   assert.equal(env.readThemeAttr(), 'dark')
-  assert.equal(env.toggleButton.textContent, '白天模式')
   assert.equal(env.toggleButton.getAttribute('aria-pressed'), 'true')
   assert.ok(env.themeColorMeta.content, 'apply 后 theme-color 不应为空')
   assert.match(env.themeColorMeta.content, /^#[0-9a-f]{6}$/i)
 
   env.theme.apply('light')
   assert.equal(env.readThemeAttr(), 'light')
-  assert.equal(env.toggleButton.textContent, '夜间模式')
   assert.equal(env.toggleButton.getAttribute('aria-pressed'), 'false')
 
   env.theme.apply('blue')
   assert.equal(env.readThemeAttr(), 'light', '非法值应被忽略')
+  assert.equal(env.toggleButton.textContent, '夜间模式', 'v2.3 §14.1：theme.js 不得改 #theme-toggle 文案')
+})
+
+testTheme('固定文案：v2.3 起 #theme-toggle 的 textContent 永不被改写（只更新 aria-pressed）', () => {
+  const env = createThemeEnv({ docTheme: 'light' })
+  env.toggleButton.textContent = '夜间模式'
+
+  env.theme.apply('dark')
+  assert.equal(env.toggleButton.textContent, '夜间模式', '切到深色时也不应改成「白天模式」')
+  assert.equal(env.toggleButton.getAttribute('aria-pressed'), 'true')
+
+  env.theme.toggle()
+  assert.equal(env.toggleButton.textContent, '夜间模式', 'toggle 也不应改文案')
+  assert.equal(env.readThemeAttr(), 'light')
+  assert.equal(env.toggleButton.getAttribute('aria-pressed'), 'false')
+
+  env.theme.init()
+  assert.equal(env.toggleButton.textContent, '夜间模式', 'init 也不应改文案')
 })
 
 testTheme('toggle()：切换、持久化并返回新主题', () => {

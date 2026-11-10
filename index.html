@@ -52,33 +52,57 @@
     <symbol id="i-jd" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 20 8v8l-8 4-8-4V8z"/><path d="M4 8l8 4.2L20 8"/><path d="M12 12.2V20"/></symbol>
     <symbol id="i-steam" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="9" width="17" height="8.6" rx="4.3"/><path d="M8.4 11.8v3.2M6.8 13.4h3.2"/><circle cx="15.6" cy="13.4" r="1" fill="currentColor" stroke="none"/></symbol>
     <symbol id="i-archwiki" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M7 9.5l3 2.8-3 2.8"/><path d="M12.5 16h4"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h9M19 7h1M4 12h3M13 12h7M4 17h7M17 17h3"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="14" cy="17" r="2"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></symbol>
   </svg>
   <a class="skip-link" href="#search-input">跳到搜索框</a>
 
-  <main id="search-container">
-    <form id="search-form" role="search" action="https://www.bing.com/search" method="get" autocomplete="off">
-      <div class="search-field">
-        <input id="search-input" name="q" type="text" placeholder="搜索…" aria-label="搜索关键词"
-               aria-autocomplete="list" aria-controls="suggest-list" aria-expanded="false"
-               enterkeyhint="search" autocomplete="off" spellcheck="false" maxlength="512">
-        <button id="clear-button" class="icon-button" type="button" aria-label="清除输入内容" hidden>✕</button>
-        <ul id="suggest-list" class="suggest-list" role="listbox" aria-label="搜索建议" hidden></ul>
-      </div>
-      <button id="search-submit" class="submit-button" type="submit">搜索</button>
-    </form>
+  <header class="appbar">
+    <button id="nav-toggle" class="appbar-icon" type="button" aria-label="打开站点分类"
+            aria-expanded="false" aria-controls="site-nav">
+      <svg class="appbar-icon-svg" aria-hidden="true" focusable="false"><use href="#i-menu"></use></svg>
+    </button>
+    <span class="appbar-title">简单搜索</span>
+    <button id="settings-toggle" class="appbar-icon" type="button" aria-label="设置"
+            aria-expanded="false" aria-controls="settings-panel">
+      <svg class="appbar-icon-svg" aria-hidden="true" focusable="false"><use href="#i-settings"></use></svg>
+    </button>
+  </header>
 
-    <div id="group-chips-wrap" hidden>
-      <div id="group-chips" class="chips" role="group" aria-label="站点分类">
-        <button class="chip" type="button" data-group="all" aria-pressed="true">全部</button>
-        <button class="chip" type="button" data-group="tech" aria-pressed="false">技术开发</button>
-        <button class="chip" type="button" data-group="community" aria-pressed="false">社区问答</button>
-        <button class="chip" type="button" data-group="media" aria-pressed="false">影音游戏</button>
-        <button class="chip" type="button" data-group="shopping" aria-pressed="false">购物</button>
-        <button class="chip" type="button" data-group="content" aria-pressed="false">素材资讯</button>
-      </div>
-    </div>
+  <div class="shell">
+    <aside id="site-nav" class="site-nav" aria-label="站点分类">
+      <p class="nav-group-title">站点分类</p>
+      <nav id="group-chips" class="nav-list" aria-label="按分类筛选站点">
+        <button class="nav-item" type="button" data-group="all" aria-current="true">全部</button>
+        <button class="nav-item" type="button" data-group="tech" aria-current="false">技术开发</button>
+        <button class="nav-item" type="button" data-group="community" aria-current="false">社区问答</button>
+        <button class="nav-item" type="button" data-group="media" aria-current="false">影音游戏</button>
+        <button class="nav-item" type="button" data-group="shopping" aria-current="false">购物</button>
+        <button class="nav-item" type="button" data-group="content" aria-current="false">素材资讯</button>
+      </nav>
+    </aside>
 
-    <nav id="buttons-container" aria-label="常用网站">
+    <main id="main-content">
+      <section class="card card-search" aria-label="搜索">
+        <form id="search-form" role="search" action="https://www.bing.com/search" method="get" autocomplete="off">
+          <div class="search-field">
+            <input id="search-input" name="q" type="text" placeholder="搜索…" aria-label="搜索关键词"
+                   aria-autocomplete="list" aria-controls="suggest-list" aria-expanded="false"
+                   enterkeyhint="search" autocomplete="off" spellcheck="false" maxlength="512">
+            <button id="clear-button" class="icon-button" type="button" aria-label="清除输入内容" hidden>✕</button>
+            <ul id="suggest-list" class="suggest-list" role="listbox" aria-label="搜索建议" hidden></ul>
+          </div>
+          <button id="search-submit" class="submit-button" type="submit">搜索</button>
+        </form>
+        <noscript>
+          <p class="noscript-hint">JavaScript 未启用：直接在输入框回车仍可用 Bing 搜索。</p>
+        </noscript>
+      </section>
+
+      <section class="card card-sites" aria-label="常用网站">
+        <h2 class="card-title">常用网站</h2>
+        <nav id="buttons-container" aria-label="站点快捷按钮">
       <button class="button" type="button" data-site="github" data-group="tech" data-keywords="gh git 代码 开源"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-github"></use></svg><span class="button-label">GitHub</span></button>
       <button class="button" type="button" data-site="unsplash" data-group="content" data-keywords="图片 壁纸 摄影 photo wallpaper"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-unsplash"></use></svg><span class="button-label">Unsplash</span></button>
       <button class="button" type="button" data-site="bilibili" data-group="media" data-keywords="b站 哔哩 视频 弹幕 bilibili"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-bilibili"></use></svg><span class="button-label">哔哩哔哩</span></button>
@@ -90,18 +114,27 @@
       <button class="button" type="button" data-site="jd" data-group="shopping" data-keywords="京东 购物 jd jd.com"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-jd"></use></svg><span class="button-label">京东</span></button>
       <button class="button" type="button" data-site="steam" data-group="media" data-keywords="steam 蒸汽 游戏 game"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-steam"></use></svg><span class="button-label">Steam</span></button>
       <button class="button" type="button" data-site="archwiki" data-group="tech" data-keywords="arch linux wiki 文档"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-archwiki"></use></svg><span class="button-label">ArchWiki</span></button>
-    </nav>
+        </nav>
+      </section>
+    </main>
+  </div>
 
-    <noscript>
-      <p class="noscript-hint">JavaScript 未启用：直接在输入框回车仍可用 Bing 搜索。</p>
-    </noscript>
-  </main>
+  <div id="scrim" class="scrim" hidden></div>
 
-  <footer id="site-footer">
-    <button id="suggest-source-toggle" class="footer-button" type="button" aria-pressed="true">联网联想：开</button>
-    <button id="theme-toggle" class="footer-button" type="button" aria-pressed="false">夜间模式</button>
-    <a class="footer-link" href="https://github.com/breathiness/SimpleSearch">关于</a>
-  </footer>
+  <aside id="settings-panel" class="settings-panel" role="dialog" aria-modal="true"
+         aria-labelledby="settings-title" hidden>
+    <div class="panel-header">
+      <h2 id="settings-title" class="panel-title">设置</h2>
+      <button id="settings-close" class="icon-button panel-close" type="button" aria-label="关闭设置">
+        <svg class="panel-close-svg" aria-hidden="true" focusable="false"><use href="#i-close"></use></svg>
+      </button>
+    </div>
+    <div class="panel-body">
+      <button id="theme-toggle" class="switch-row" type="button" aria-pressed="false">夜间模式</button>
+      <button id="suggest-source-toggle" class="switch-row" type="button" aria-pressed="true">联网联想</button>
+      <a class="panel-link" href="https://github.com/breathiness/SimpleSearch">GitHub 仓库 · 关于</a>
+    </div>
+  </aside>
 
   <script defer src="assets/js/sites.js"></script>
   <script defer src="assets/js/search.js"></script>

@@ -22,8 +22,6 @@
   // 向 SS.suggest 要足够多候选，避免其默认 8 条上限把历史项截掉
   const LOCAL_ITEM_CAP = 24
   const REMOTE_WORD_MAX_LENGTH = 100
-  const TOGGLE_ON_TEXT = '联网联想：开'
-  const TOGGLE_OFF_TEXT = '联网联想：关闭'
 
   // 查询词规范化：去首尾空白，连续空白折叠
   function normalize(raw) {
@@ -124,10 +122,10 @@
       }
     }
 
+    // 开关文案固定（由模板给出「联网联想」），这里只同步 aria-pressed 状态
     function syncRemoteToggle() {
       if (!remoteToggle || !SS.remote) return
       const on = remoteEnabled()
-      remoteToggle.textContent = on ? TOGGLE_ON_TEXT : TOGGLE_OFF_TEXT
       remoteToggle.setAttribute('aria-pressed', on ? 'true' : 'false')
     }
 

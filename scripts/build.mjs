@@ -7,7 +7,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { SITE_ICONS } from './icons.mjs'
+import { SITE_ICONS, UI_ICONS } from './icons.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(HERE, '..')
@@ -108,16 +108,25 @@ function renderIconSprite(sites, icons) {
       return `    <symbol id="i-${escapeHtml(site.id)}" viewBox="${escapeHtml(viewBox)}" ${SPRITE_ATTRS}>${icon.body}</symbol>`
     })
     .join('\n')
-  if (!symbols) return ''
-  return `  <svg class="icon-sprite" aria-hidden="true" focusable="false" width="0" height="0" xmlns="http://www.w3.org/2000/svg">\n${symbols}\n  </svg>`
+
+  const uiSymbols = Object.entries(UI_ICONS)
+    .map(([name, icon]) => {
+      const viewBox = icon.viewBox || '0 0 24 24'
+      return `    <symbol id="i-${escapeHtml(name)}" viewBox="${escapeHtml(viewBox)}" ${SPRITE_ATTRS}>${icon.body}</symbol>`
+    })
+    .join('\n')
+
+  const all = [symbols, uiSymbols].filter(Boolean).join('\n')
+  if (!all) return ''
+  return `  <svg class="icon-sprite" aria-hidden="true" focusable="false" width="0" height="0" xmlns="http://www.w3.org/2000/svg">\n${all}\n  </svg>`
 }
 
-// 分类 chip：全部 + SS.siteGroups（顺序即渲染顺序）
-function renderGroupChips(groups) {
-  const all = '        <button class="chip" type="button" data-group="all" aria-pressed="true">全部</button>'
+// 左侧分类导航（MDUI 文档站式）：全部 + SS.siteGroups，竖向排列
+function renderGroupNav(groups) {
+  const all = '        <button class="nav-item" type="button" data-group="all" aria-current="true">全部</button>'
   const rest = groups.map(
     (group) =>
-      `        <button class="chip" type="button" data-group="${escapeHtml(group.id)}" aria-pressed="false">${escapeHtml(group.label)}</button>`
+      `        <button class="nav-item" type="button" data-group="${escapeHtml(group.id)}" aria-current="false">${escapeHtml(group.label)}</button>`
   )
   return [all, ...rest].join('\n')
 }
@@ -190,7 +199,7 @@ async function main() {
       {
         ...PAGE.values,
         '{{ICON_SPRITE}}': renderIconSprite(SS.sites, SITE_ICONS),
-        '{{GROUP_CHIPS}}': renderGroupChips(groups),
+        '{{GROUP_NAV}}': renderGroupNav(groups),
         '{{SITE_BUTTONS}}': renderSiteButtons(SS.sites, SITE_ICONS),
       },
       PAGE.output

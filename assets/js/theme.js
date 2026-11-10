@@ -12,8 +12,6 @@
 
   // 与 tokens.css 的 --bg 保持一致；仅当无法读取 CSS 变量时兜底
   const THEME_COLORS = { light: '#f5f5f5', dark: '#303030' }
-  // 文案表示「点击后会切到哪个主题」
-  const TOGGLE_LABELS = { light: '夜间模式', dark: '白天模式' }
 
   // 把任意值收敛为 'light' | 'dark' | null
   function normalize(theme) {
@@ -104,13 +102,13 @@
     return THEME_COLORS[theme] || THEME_COLORS[LIGHT]
   }
 
-  // 同步主题切换按钮：文案 + aria-pressed（true 表示当前处于夜间/深色）
+  // 同步主题开关：文案由模板固定（永远「夜间模式」），只用 aria-pressed 表达状态
   function syncToggle(doc, theme) {
     if (typeof doc.getElementById !== 'function') return
     const button = doc.getElementById('theme-toggle')
     if (!button) return
-    button.textContent = TOGGLE_LABELS[theme]
     button.setAttribute('aria-pressed', theme === DARK ? 'true' : 'false')
+    button.setAttribute('title', '切换深浅色主题')
   }
 
   function syncThemeColor(doc, theme) {

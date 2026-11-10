@@ -1,8 +1,8 @@
-// SimpleSearch v2.2 静态校验与产物一致性门禁。
+// SimpleSearch v2.3 静态校验与产物一致性门禁。
 // 用法：node scripts/validate.mjs（npm run validate）
 //
-// 产物模型（docs/contract.md §7、§12、§13）：
-//   index.html                唯一真实页面（data-theme-default="auto"，单页主题，v2.2 分类 chip + 内联图标 sprite）
+// 产物模型（docs/contract.md §7、§12、§13、§14）：
+//   index.html                唯一真实页面（MDUI 文档站骨架：appbar + 左侧分类导航 + 内容卡片 + 右侧设置面板）
 //   SimpleSearch-Light.html   0 秒重定向壳 → index.html?theme=light
 //   SimpleSearch-Dark.html    0 秒重定向壳 → index.html?theme=dark
 //
@@ -14,15 +14,19 @@
 //   5. index.html 引用的所有本地 resources 真实存在
 //   6. index.html 按契约顺序引用 8 个经典脚本（remote.js 在 input.js 之前）
 //   7. index.html 的 data-site 与 SS.sites 一一对应（顺序/label/数量/data-group）
-//   8. v2.2 分类 chip：#group-chips-wrap 初始 hidden、#group-chips 内 chip 数量/顺序/data-group/aria-pressed 正确
-//   9. v2.2 图标：icon-sprite 隐藏且覆盖 11 个内置站点；每个按钮 .button-icon，use 目标存在
-//  10. sprite 内联体积 ≤ 4KB（未压缩）
-//  11. 图标零图片请求：无 .png/.jpg/.webp/.gif/.ico 引用、无外链 favicon 服务
-//  12. 两个重定向壳：meta refresh 0 秒 + canonical + location.replace 均指向 index.html?theme=X；
+//   8. v2.3 骨架：.appbar/.shell/#main-content/.card 卡片、设置面板（dialog/hidden/2 个 .switch-row/固定文案）、
+//      无页脚；#scrim 初始 hidden
+//   9. v2.3 左侧分类导航：#site-nav + nav#group-chips.nav-list 内 .nav-item 数量/顺序/data-group，
+//      选中语义 aria-current（初始只有「全部」为 true）
+//  10. v2.3 图标：sprite = 11 个站点 symbol + 3 个 UI symbol（i-menu/i-settings/i-close）；
+//      每个按钮 .button-icon，所有 <use> 目标都能在 sprite 命中
+//  11. sprite 内联体积 ≤ 6KB（未压缩，契约 §14.2）
+//  12. 图标零图片请求：无 .png/.jpg/.webp/.gif/.ico 引用、无外链 favicon 服务
+//  13. 两个重定向壳：meta refresh 0 秒 + canonical + location.replace 均指向 index.html?theme=X；
 //      壳不得包含真实页内容（#buttons-container / data-site / assets/js bundle），体积 < 1KB
-//  13. 唯一性：只有 index.html 是真实页
-//  14. CSS 不含 !important（契约 §6）
-//  15. 体积信息：index.html 单页加载资源合计 < 90KB（仅提示，契约 §9.9）
+//  14. 唯一性：只有 index.html 是真实页
+//  15. CSS 不含 !important（契约 §6）
+//  16. 体积信息：index.html 单页加载资源合计 < 100KB（仅提示，契约 §9.9）
 // 任一失败 → 退出码 1，并打印失败详情。
 import fs from 'node:fs'
 import path from 'node:path'
@@ -50,7 +54,7 @@ const EXPECTED_SCRIPTS = [
   'assets/js/app.js',
 ]
 
-// 契约 §6：真实页必须存在的 DOM 挂载点
+// 契约 §6 / §14.1：真实页必须存在的 DOM 挂载点（v2.3 移除 #site-footer，新增文档站骨架与设置面板）
 const REQUIRED_IDS = [
   'search-form',
   'search-input',
@@ -60,8 +64,19 @@ const REQUIRED_IDS = [
   'buttons-container',
   'theme-toggle',
   'suggest-source-toggle',
-  'site-footer',
+  'site-nav',
+  'group-chips',
+  'main-content',
+  'nav-toggle',
+  'settings-toggle',
+  'settings-panel',
+  'settings-title',
+  'settings-close',
+  'scrim',
 ]
+
+// 契约 §14.2：sprite 里的 UI 图标（与 11 个站点图标共存）
+const UI_SYMBOL_IDS = ['i-menu', 'i-settings', 'i-close']
 
 // 契约 §4.1：内置 11 站（顺序固定；v2.2 §13.2 要求 sprite symbol 数量与之对应）
 const BUILTIN_IDS = [
@@ -79,8 +94,8 @@ const BUILTIN_IDS = [
 ]
 
 const BUILD_MARKER = /<!--\s*由 scripts\/build\.mjs/
-// 体积预算口径（lead 2026-11-11 v2.2）：单页加载 < 90 KB（gzip 前，图标 sprite 内联后契约 §9.9 更新）
-const BUDGET_KB = 90
+// 体积预算口径（lead 2026-11-11 v2.3）：单页加载 < 100 KB（gzip 前；契约 §9.9，v2.3 应用外壳后更新）
+const BUDGET_KB = 100
 const SHELL_MAX_BYTES = 1024
 
 // ---------------------------------------------------------------- 通用工具
@@ -272,30 +287,87 @@ function extractSymbols(spriteInner) {
   return symbols
 }
 
-/** 解析 #group-chips-wrap / #group-chips 与其中的 chip 按钮。 */
-function extractGroupChips(html) {
+/** 扫描所有起始标签（v2.3 骨架/面板按 id/class 定位用）。 */
+function findAllTags(source) {
+  return findAll(String(source), /<[a-zA-Z][\w:-]*\b[^>]*>/g).map((match) => match[0])
+}
+
+function findTagById(source, id) {
+  for (const tag of findAllTags(source)) {
+    if (getAttr(tag, 'id') === id) return tag
+  }
+  return null
+}
+
+function hasClass(tag, className) {
+  const cls = getAttr(tag, 'class')
+  if (!cls) return false
+  return cls.split(/\s+/).includes(className)
+}
+
+function findTagWithClass(source, className) {
+  for (const tag of findAllTags(source)) {
+    if (hasClass(tag, className)) return tag
+  }
+  return null
+}
+
+/** 取某个 id 元素的内部文本（按同名闭合标签截取）。 */
+function textOfId(source, id) {
+  const tag = findTagById(source, id)
+  if (!tag) return null
+  const tagName = (tag.match(/^<([a-zA-Z][\w:-]*)/) || [])[1]
+  const start = source.indexOf(tag) + tag.length
+  const end = source.indexOf(`</${tagName}>`, start)
+  if (end === -1) return null
+  return decodeHtmlEntities(stripTags(source.slice(start, end))).trim()
+}
+
+/** v2.3 左侧分类导航：nav#group-chips.nav-list 内的 button.nav-item[data-group][aria-current]。 */
+function extractGroupNav(html) {
   const clean = stripHtmlComments(html)
-  const wrapMatch = clean.match(/<div\b[^>]*\bid\s*=\s*["']group-chips-wrap["'][^>]*>/i)
-  const containerMatch = clean.match(
-    /<div\b[^>]*\bid\s*=\s*["']group-chips["'][^>]*>([\s\S]*?)<\/div>/i,
-  )
-  const chips = []
-  if (containerMatch) {
-    for (const match of findAll(containerMatch[1], /<button\b[^>]*>[\s\S]*?<\/button>/gi)) {
-      const tag = match[0]
-      const inner = stripTags(tag.slice(tag.indexOf('>') + 1, tag.lastIndexOf('</button>')))
-      chips.push({
-        group: getAttr(tag, 'data-group'),
-        pressed: getAttr(tag, 'aria-pressed'),
-        label: decodeHtmlEntities(inner).trim(),
-      })
-    }
+  const navOpen = findTagById(clean, 'group-chips')
+  if (!navOpen) return null
+  const start = clean.indexOf(navOpen) + navOpen.length
+  const end = clean.indexOf('</nav>', start)
+  if (end === -1) return null
+  const inner = clean.slice(start, end)
+  const items = []
+  for (const match of findAll(inner, /<button\b[^>]*>[\s\S]*?<\/button>/gi)) {
+    const tag = match[0]
+    const openTag = tag.slice(0, tag.indexOf('>') + 1)
+    if (!hasClass(openTag, 'nav-item')) continue
+    const text = decodeHtmlEntities(stripTags(tag.slice(tag.indexOf('>') + 1, tag.lastIndexOf('</button>')))).trim()
+    items.push({
+      group: getAttr(openTag, 'data-group'),
+      current: getAttr(openTag, 'aria-current'),
+      label: text,
+    })
   }
-  return {
-    wrapOpenTag: wrapMatch ? wrapMatch[0] : null,
-    container: containerMatch ? containerMatch[1] : null,
-    chips,
+  return { navOpen, items }
+}
+
+/** v2.3 设置面板里的 .switch-row 按钮。 */
+function extractSwitchRows(html) {
+  const clean = stripHtmlComments(html)
+  const rows = []
+  for (const match of findAll(clean, /<button\b[^>]*>[\s\S]*?<\/button>/gi)) {
+    const tag = match[0]
+    const openTag = tag.slice(0, tag.indexOf('>') + 1)
+    if (!hasClass(openTag, 'switch-row')) continue
+    const text = decodeHtmlEntities(stripTags(tag.slice(tag.indexOf('>') + 1, tag.lastIndexOf('</button>')))).trim()
+    rows.push({ id: getAttr(openTag, 'id'), pressed: getAttr(openTag, 'aria-pressed'), text })
   }
+  return rows
+}
+
+/** 页面里所有 <use href="#..."> 的目标 symbol id。 */
+function extractUseTargets(html) {
+  const targets = []
+  for (const match of findAll(html, /<use\b[^>]*\b(?:xlink:)?href\s*=\s*["']#([^"']+)["']/gi)) {
+    targets.push(match[1])
+  }
+  return targets
 }
 
 /** 检查一个按钮内部是否带 .button-icon（svg <use> 或 monogram 兜底）。 */
@@ -627,70 +699,148 @@ check('index.html 站点渲染：data-site 合法、无重复、顺序/label/数
   return problems
 })
 
-// ---------------------------------------------------------------- 8. v2.2 分类 chip
+// ---------------------------------------------------------------- 8. v2.3 文档站骨架 + 设置面板
 
-check('分类 chip：#group-chips-wrap 初始 hidden、#group-chips 内 chip 数量/顺序/data-group/aria-pressed 正确', () => {
+check('v2.3 骨架：.appbar/.shell/#main-content/.card 卡片、#scrim[hidden]、#settings-panel 对话框（2 个 .switch-row/固定文案），无页脚', () => {
   if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
-  if (!Array.isArray(siteGroups)) return ['SS.siteGroups 不存在或不是数组（v2.2 §13.1）']
+  const problems = []
+  const clean = stripHtmlComments(realPage.html)
+
+  // 顶栏与布局
+  if (!findTagWithClass(clean, 'appbar')) problems.push(`${REAL_PAGE} 缺少 header.appbar`)
+  if (!findTagWithClass(clean, 'appbar-title')) problems.push(`${REAL_PAGE} 缺少 .appbar-title`)
+  if (!findTagById(clean, 'nav-toggle')) problems.push(`${REAL_PAGE} 缺少 #nav-toggle（汉堡按钮）`)
+  if (!findTagById(clean, 'settings-toggle')) problems.push(`${REAL_PAGE} 缺少 #settings-toggle（设置按钮）`)
+  if (!findTagWithClass(clean, 'shell')) problems.push(`${REAL_PAGE} 缺少 .shell 布局容器`)
+  if (!findTagById(clean, 'main-content')) problems.push(`${REAL_PAGE} 缺少 #main-content`)
+  if (!findTagWithClass(clean, 'card-search')) problems.push(`${REAL_PAGE} 缺少 .card.card-search`)
+  if (!findTagWithClass(clean, 'card-sites')) problems.push(`${REAL_PAGE} 缺少 .card.card-sites`)
+  if (!findTagWithClass(clean, 'card-title')) problems.push(`${REAL_PAGE} 缺少 h2.card-title`)
+  if (!findTagWithClass(clean, 'nav-group-title')) problems.push(`${REAL_PAGE} 缺少 .nav-group-title`)
+
+  // scrim（抽屉/面板共用遮罩）
+  const scrim = findTagById(clean, 'scrim')
+  if (!scrim) {
+    problems.push(`${REAL_PAGE} 缺少 #scrim`)
+  } else {
+    if (!hasClass(scrim, 'scrim')) problems.push('#scrim 应带 .scrim 类')
+    if (!hasHiddenAttr(scrim)) problems.push('#scrim 初始应带 hidden')
+  }
+
+  // 设置面板
+  const panel = findTagById(clean, 'settings-panel')
+  if (!panel) {
+    problems.push(`${REAL_PAGE} 缺少 #settings-panel`)
+  } else {
+    if ((getAttr(panel, 'role') || '').toLowerCase() !== 'dialog') {
+      problems.push(`#settings-panel 的 role 应为 dialog，实际 ${JSON.stringify(getAttr(panel, 'role'))}`)
+    }
+    if (getAttr(panel, 'aria-modal') !== 'true') problems.push('#settings-panel 的 aria-modal 应为 true')
+    if (!hasHiddenAttr(panel)) problems.push('#settings-panel 初始应带 hidden（关闭状态）')
+    if (!findTagById(clean, 'settings-title')) problems.push(`${REAL_PAGE} 缺少 #settings-title`)
+    if (!findTagById(clean, 'settings-close')) problems.push(`${REAL_PAGE} 缺少 #settings-close`)
+    if (!findTagWithClass(clean, 'panel-link')) problems.push(`${REAL_PAGE} 缺少 .panel-link`)
+
+    const rows = extractSwitchRows(clean)
+    if (rows.length !== 2) problems.push(`#settings-panel 内应有 2 个 .switch-row，实际 ${rows.length}`)
+    const byId = new Map(rows.map((row) => [row.id, row]))
+
+    const themeRow = byId.get('theme-toggle')
+    if (!themeRow) {
+      problems.push('缺少 #theme-toggle.switch-row')
+    } else {
+      if (themeRow.text !== '夜间模式') {
+        problems.push(`#theme-toggle 文案应固定为「夜间模式」，实际 ${JSON.stringify(themeRow.text)}`)
+      }
+      if (themeRow.pressed !== 'false') {
+        problems.push(`#theme-toggle 初始 aria-pressed 应为 "false"，实际 ${JSON.stringify(themeRow.pressed)}`)
+      }
+    }
+
+    const remoteRow = byId.get('suggest-source-toggle')
+    if (!remoteRow) {
+      problems.push('缺少 #suggest-source-toggle.switch-row')
+    } else {
+      if (remoteRow.text !== '联网联想') {
+        problems.push(`#suggest-source-toggle 文案应固定为「联网联想」，实际 ${JSON.stringify(remoteRow.text)}`)
+      }
+      if (remoteRow.pressed !== 'true') {
+        problems.push(`#suggest-source-toggle 初始 aria-pressed 应为 "true"，实际 ${JSON.stringify(remoteRow.pressed)}`)
+      }
+    }
+  }
+
+  // v2.3 移除页脚
+  if (/id\s*=\s*["']site-footer["']/i.test(clean)) problems.push('v2.3 已移除 #site-footer，产物里不应出现')
+  if (/<footer\b/i.test(clean)) problems.push('v2.3 已移除页脚，产物里不应出现 <footer>')
+
+  return problems
+})
+
+// ---------------------------------------------------------------- 9. v2.3 左侧分类导航
+
+check('v2.3 左侧分类导航：#site-nav + #group-chips.nav-list，.nav-item 数量/顺序/data-group/aria-current 正确', () => {
+  if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
+  if (!Array.isArray(siteGroups)) return ['SS.siteGroups 不存在或不是数组（§13.1）']
 
   const problems = []
+  const clean = stripHtmlComments(realPage.html)
+  if (!findTagById(clean, 'site-nav')) problems.push(`${REAL_PAGE} 缺少 aside#site-nav（左侧分类导航）`)
+
+  const nav = extractGroupNav(clean)
+  if (!nav) return [...problems, `${REAL_PAGE} 缺少 nav#group-chips`]
+  if (!hasClass(nav.navOpen, 'nav-list')) problems.push('#group-chips 应带 .nav-list 类')
+  if (!/^<nav\b/i.test(nav.navOpen)) problems.push('#group-chips 应是 <nav> 元素')
+
   const groupIds = siteGroups.map((group) => group.id)
   const expectedGroups = ['all', ...groupIds]
-  const { wrapOpenTag, container, chips } = extractGroupChips(realPage.html)
-
-  if (!wrapOpenTag) problems.push(`${REAL_PAGE} 缺少 #group-chips-wrap`)
-  else if (!hasHiddenAttr(wrapOpenTag)) {
-    problems.push('#group-chips-wrap 初始应带 hidden 属性（无 JS 兜底）')
-  }
-  if (container === null) problems.push(`${REAL_PAGE} 缺少 #group-chips（或不在 #group-chips-wrap 内）`)
-
-  if (chips.length !== expectedGroups.length) {
+  if (nav.items.length !== expectedGroups.length) {
     problems.push(
-      `${REAL_PAGE} 的 chip 数量应为 ${expectedGroups.length}（全部 + ${groupIds.length} 类），实际 ${chips.length}`,
+      `nav-item 数量应为 ${expectedGroups.length}（全部 + ${groupIds.length} 类），实际 ${nav.items.length}`,
     )
   }
 
-  const actualGroups = chips.map((chip) => chip.group)
+  const actualGroups = nav.items.map((item) => item.group)
   if (actualGroups.join(',') !== expectedGroups.join(',')) {
     problems.push(
-      `${REAL_PAGE} 的 chip data-group 顺序不正确：\n` +
-        `        期望：${expectedGroups.join(', ')}\n` +
-        `        实际：${actualGroups.join(', ')}`,
+      `nav-item 顺序/data-group 不正确：\n        期望：${expectedGroups.join(', ')}\n        实际：${actualGroups.join(', ')}`,
     )
   }
 
   const allowed = new Set(expectedGroups)
-  for (const chip of chips) {
-    if (!allowed.has(chip.group)) problems.push(`chip 的 data-group=${JSON.stringify(chip.group)} 非法`)
-    if (!chip.label) problems.push(`chip data-group=${JSON.stringify(chip.group)} 文案为空`)
-    if (chip.pressed !== 'true' && chip.pressed !== 'false') {
+  for (const item of nav.items) {
+    if (!allowed.has(item.group)) problems.push(`nav-item 的 data-group=${JSON.stringify(item.group)} 非法`)
+    if (!item.label) problems.push(`nav-item data-group=${JSON.stringify(item.group)} 文案为空`)
+    if (item.current !== 'true' && item.current !== 'false') {
       problems.push(
-        `chip data-group=${JSON.stringify(chip.group)} 的 aria-pressed 缺失或非法：${JSON.stringify(chip.pressed)}`,
+        `nav-item data-group=${JSON.stringify(item.group)} 的 aria-current 缺失或非法：${JSON.stringify(item.current)}`,
       )
     }
   }
 
-  const pressed = chips.filter((chip) => chip.pressed === 'true')
-  if (pressed.length !== 1) {
-    problems.push(`初始应只有一个 chip aria-pressed="true"，实际 ${pressed.length} 个`)
-  } else if (pressed[0].group !== 'all') {
-    problems.push('初始选中的 chip 应是「全部」(data-group="all")')
+  const current = nav.items.filter((item) => item.current === 'true')
+  if (current.length !== 1) {
+    problems.push(`初始应只有一个 nav-item aria-current="true"，实际 ${current.length} 个`)
+  } else if (current[0].group !== 'all') {
+    problems.push('初始选中的 nav-item 应是「全部」(data-group="all")')
   }
 
   return problems
 })
 
-// ---------------------------------------------------------------- 9. v2.2 图标 sprite / 按钮图标
+// ---------------------------------------------------------------- 10. v2.3 图标 sprite / 按钮图标
 
-check('图标：icon-sprite 隐藏且覆盖 11 个内置站点，每个 data-site 按钮有 .button-icon（use 目标存在）', () => {
+check('v2.3 图标：sprite = 11 站点 symbol + 3 UI symbol；每个 data-site 按钮有 .button-icon；所有 use 目标命中', () => {
   if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
   if (!sites) return [registry.problem || '无法读取 SS.sites']
 
   const problems = []
   const clean = stripHtmlComments(realPage.html)
+
+  // sprite 本体
   const sprite = extractSprite(clean)
   if (!sprite) {
-    problems.push(`${REAL_PAGE} 缺少 <svg class="icon-sprite">（v2.2 图标必须内联）`)
+    problems.push(`${REAL_PAGE} 缺少 <svg class="icon-sprite">（图标必须内联）`)
     return problems
   }
   const hiddenOk =
@@ -699,9 +849,11 @@ check('图标：icon-sprite 隐藏且覆盖 11 个内置站点，每个 data-sit
     /display\s*:\s*none/i.test(sprite.openTag)
   if (!hiddenOk) problems.push('icon-sprite 必须是隐藏的（hidden / aria-hidden / display:none）')
 
-  // symbol 覆盖与合法性
   const symbols = extractSymbols(sprite.inner)
   const symbolIds = symbols.map((symbol) => symbol.id)
+  const symbolSet = new Set(symbolIds)
+  const siteIdSet = new Set(siteIds)
+
   if (symbols.length === 0) problems.push('icon-sprite 里没有任何 <symbol>')
   if (new Set(symbolIds).size !== symbolIds.length) {
     problems.push(`symbol id 重复：${JSON.stringify(symbolIds)}`)
@@ -709,26 +861,73 @@ check('图标：icon-sprite 隐藏且覆盖 11 个内置站点，每个 data-sit
   for (const id of symbolIds) {
     if (!/^i-[a-z0-9-]+$/.test(String(id))) {
       problems.push(`symbol id 不合法：${JSON.stringify(id)}`)
-    } else if (!siteIds.includes(String(id).slice(2))) {
-      problems.push(`symbol ${id} 对应的站点不在 SS.sites 中`)
     }
   }
+
+  // 站点 symbol：11 个内置站点全覆盖
+  const siteSymbols = symbolIds.filter((id) => id !== null && siteIdSet.has(String(id).slice(2)))
   for (const builtinId of BUILTIN_IDS) {
     if (!symbolIds.includes(`i-${builtinId}`)) problems.push(`sprite 缺少内置站点图标 #i-${builtinId}`)
   }
-  if (symbolIds.length !== BUILTIN_IDS.length) {
-    problems.push(`symbol 数量（${symbolIds.length}）应等于内置站点数（${BUILTIN_IDS.length}）`)
+  if (siteSymbols.length !== BUILTIN_IDS.length) {
+    problems.push(`站点 symbol 数量（${siteSymbols.length}）应等于内置站点数（${BUILTIN_IDS.length}）`)
   }
+
+  // UI symbol：i-menu / i-settings / i-close
+  for (const uiId of UI_SYMBOL_IDS) {
+    if (!symbolIds.includes(uiId)) problems.push(`sprite 缺少 UI 图标 #${uiId}`)
+  }
+  if (symbolIds.length !== BUILTIN_IDS.length + UI_SYMBOL_IDS.length) {
+    problems.push(
+      `symbol 总数（${symbolIds.length}）应为 ${BUILTIN_IDS.length + UI_SYMBOL_IDS.length}（${BUILTIN_IDS.length} 站点 + ${UI_SYMBOL_IDS.length} UI）`,
+    )
+  }
+
+  // 不允许孤儿 symbol
+  for (const id of symbolIds) {
+    if (UI_SYMBOL_IDS.includes(id)) continue
+    if (!siteIdSet.has(String(id).slice(2))) {
+      problems.push(`symbol ${id} 既不是站点图标也不是约定的 UI 图标`)
+    }
+  }
+
   for (const symbol of symbols) {
     if (!/<(path|rect|circle|line|polyline|polygon|ellipse)\b/i.test(symbol.body || '')) {
       problems.push(`symbol ${symbol.id} 里没有几何图形`)
     }
   }
 
-  // 每个按钮的 .button-icon / use 目标
+  // 所有 <use> 目标必须能在 sprite 里命中
+  const useTargets = extractUseTargets(clean)
+  if (useTargets.length === 0) problems.push('页面里没有任何 <use> 图标引用')
+  for (const target of useTargets) {
+    if (!symbolSet.has(target)) problems.push(`use 目标 #${target} 不在 sprite 中`)
+  }
+
+  // 顶栏/面板的 3 个 UI 图标引用
+  const uiExpectations = [
+    ['nav-toggle', 'i-menu'],
+    ['settings-toggle', 'i-settings'],
+    ['settings-close', 'i-close'],
+  ]
+  for (const [elementId, symbolId] of uiExpectations) {
+    const tag = findTagById(clean, elementId)
+    if (!tag) {
+      problems.push(`缺少 #${elementId}`)
+      continue
+    }
+    const start = clean.indexOf(tag) + tag.length
+    const tagName = (tag.match(/^<([a-zA-Z][\w:-]*)/) || [])[1]
+    const end = clean.indexOf(`</${tagName}>`, start)
+    const inner = clean.slice(start, end === -1 ? undefined : end)
+    if (!new RegExp(`<use\\b[^>]*\\bhref\\s*=\\s*["']#${symbolId}["']`, 'i').test(inner)) {
+      problems.push(`#${elementId} 应引用图标 #${symbolId}`)
+    }
+  }
+
+  // 每个 data-site 按钮的 .button-icon / use 目标
   const buttons = extractSiteButtons(clean)
   const builtinSet = new Set(BUILTIN_IDS)
-  const symbolSet = new Set(symbolIds)
   let monograms = 0
   let useIcons = 0
   for (const button of buttons) {
@@ -745,29 +944,34 @@ check('图标：icon-sprite 隐藏且覆盖 11 个内置站点，每个 data-sit
     }
     if (icon.useTarget) {
       useIcons += 1
-      if (!symbolSet.has(icon.useTarget)) problems.push(`站点 ${button.id} 的 use 目标 #${icon.useTarget} 不在 sprite 中`)
+      if (!symbolSet.has(icon.useTarget)) {
+        problems.push(`站点 ${button.id} 的 use 目标 #${icon.useTarget} 不在 sprite 中`)
+      }
     } else if (icon.monogram) {
       monograms += 1
     }
   }
+
   return {
     problems,
-    notes: [`symbol ${symbolIds.length} 个 / use 图标 ${useIcons} 个 / monogram ${monograms} 个`],
+    notes: [
+      `symbol ${symbolIds.length} 个（站点 ${siteSymbols.length} + UI ${UI_SYMBOL_IDS.length}）/ 按钮 use 图标 ${useIcons} 个 / monogram ${monograms} 个`,
+    ],
   }
 })
 
-// ---------------------------------------------------------------- 10. sprite 体积
+// ---------------------------------------------------------------- 11. sprite 体积
 
-check('sprite 内联体积 ≤ 4KB（未压缩）', () => {
+check('sprite 内联体积 ≤ 6KB（未压缩，契约 §14.2）', () => {
   if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
   const sprite = extractSprite(stripHtmlComments(realPage.html))
   if (!sprite) return ['缺少 icon-sprite，无法统计 sprite 体积']
   const bytes = Buffer.byteLength(sprite.outer, 'utf8')
-  if (bytes > 4096) return [`icon-sprite 体积 ${bytes} 字节，超过 4KB 红线（未压缩）`]
+  if (bytes > 6144) return [`icon-sprite 体积 ${bytes} 字节，超过 6KB 红线（未压缩）`]
   return { problems: [], notes: [`sprite ${(bytes / 1024).toFixed(2)} KB`] }
 })
 
-// ---------------------------------------------------------------- 11. 零额外图片请求
+// ---------------------------------------------------------------- 12. 零额外图片请求
 
 check('图标零图片请求：无 .png/.jpg/.webp/.gif/.ico 引用、无外链 favicon 服务', () => {
   if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
@@ -803,7 +1007,7 @@ check('图标零图片请求：无 .png/.jpg/.webp/.gif/.ico 引用、无外链 
   return problems
 })
 
-// ---------------------------------------------------------------- 12. 重定向壳
+// ---------------------------------------------------------------- 13. 重定向壳
 
 check('两个重定向壳：meta refresh(0s) + canonical + location.replace 指向 index.html?theme=X，且不含真实页内容', () => {
   const problems = []
@@ -874,7 +1078,7 @@ check('两个重定向壳：meta refresh(0s) + canonical + location.replace 指�
   return problems
 })
 
-// ---------------------------------------------------------------- 13. 唯一性
+// ---------------------------------------------------------------- 14. 唯一性
 
 check('唯一性：只有 index.html 是真实页（两个壳不得含真实页 DOM）', () => {
   const problems = []
@@ -901,7 +1105,7 @@ check('唯一性：只有 index.html 是真实页（两个壳不得含真实页 
   return problems
 })
 
-// ---------------------------------------------------------------- 14. CSS 禁 !important
+// ---------------------------------------------------------------- 15. CSS 禁 !important
 
 check('CSS 不含 !important（契约 §6）', () => {
   const cssDir = path.join(ROOT, 'assets', 'css')
@@ -922,9 +1126,9 @@ check('CSS 不含 !important（契约 §6）', () => {
   return problems
 })
 
-// ---------------------------------------------------------------- 15. 体积信息
+// ---------------------------------------------------------------- 16. 体积信息
 
-check('体积信息（index.html 单页加载预算 < 90 KB，仅供参考不阻断）', () => {
+check('体积信息（index.html 单页加载预算 < 100 KB，仅供参考不阻断）', () => {
   if (!realPage.exists) return { problems: [], notes: [`${REAL_PAGE} 不存在，跳过体积统计`] }
 
   const notes = []

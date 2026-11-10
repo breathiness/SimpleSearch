@@ -1,6 +1,6 @@
 {
   "name": "simple-search",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "private": true,
   "type": "module",
   "description": "简单搜索 - 极简聚合搜索页，纯静态、零运行时依赖",
