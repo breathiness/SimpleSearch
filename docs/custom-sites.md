@@ -83,7 +83,7 @@ SS.siteGroups = [
 - 分类写在 `assets/js/sites.js` 的 `SS.siteGroups` 里，每个站点用 `group` 字段指过去。
 - 页面左侧的分类导航是「全部 + 每个分组」，**顺序跟 `SS.siteGroups` 数组一致**；点某个条目只显示该分组站点，点「全部」恢复。宽屏（≥960px）导航常驻 240px；窄屏（<960px）变成左侧抽屉，用顶栏汉堡按钮打开，点遮罩 / 按 `Esc` / 选中分类后自动收起。
 - 筛选**不记忆、不写 URL**，刷新或重新打开都回到「全部」。
-- 新增分类：在 `SS.siteGroups` 里追加 `{ id: 'xxx', label: '显示名' }`（`id` 用小写 `[a-z0-9-]`，不能重复），把相关站点的 `group` 改成 `xxx`，再 `npm run build`。
+- 新增分类：在 `SS.siteGroups` 里追加 `{ id: 'xxx', label: '显示名' }`（`id` 用小写 `[a-z0-9-]`，不能重复），把相关站点的 `group` 改成 `xxx`，再 `npm run build`。**导航图标按 `cat-<分组 id>` 取名**：内置 5 个分类已有图标；新分类还要在 `scripts/icons.mjs` 的 `UI_ICONS` 里加一条 `'cat-xxx'`，否则导航项的图标引用不到目标，`npm run validate` 会报错。
 - 删除分类：先把该分类下的站点挪到别的分类（或一起删掉），再从 `SS.siteGroups` 移除。空分组 build 只会警告，但站点 `group` 指向不存在的分类会让 build 失败。
 
 ## 6. 图标（可选）

@@ -431,3 +431,52 @@ SS.siteGroups = [
 - 桌面（≥960）：`#site-nav` 可见、无横向溢出；移动（390/320）：汉堡可见、抽屉可开合、scrim 生效、无横向溢出。
 - `.nav-item` 数量 = 1 + 分组数；点分类后只有该组站点可见，`aria-current` 只有一个 true。
 - 页面无 `#site-footer`；设置面板关闭时 `#settings-panel[hidden]`。
+
+## 15. v2.4：顶栏 logo + 分类图标 + 主题色可选（MDUI 19 色）
+
+### 15.1 主题色（MDUI 19 组主色）
+
+- 存储键 `ss.color`，值为颜色 id；缺省 `indigo`。首屏内联脚本在设置 `data-theme` 的同时设置 `<html data-color="<id>">`（非法值回退 indigo），保证不闪错色。
+- `tokens.css` 用「一层色值 + 一层语义变量」：
+```css
+:root {
+  --primary-bg: var(--c-500); --primary-bg-hover: var(--c-700);
+  --primary: var(--c-700); --focus-ring: var(--c-700); --on-primary: var(--c-on);
+}
+:root[data-theme='dark'] { --primary: var(--c-200); --focus-ring: var(--c-200); }
+:root[data-color='red'] { --c-500:#f44336; --c-700:#d32f2f; --c-200:#ef9a9a; --c-on:#fff }
+/* …19 组，每组一行… */
+```
+- 19 组（id / 中文名 / 500 / 700 / 200 / on-primary）：
+  - red 红 `#F44336` `#D32F2F` `#EF9A9A` #fff
+  - pink 粉 `#E91E63` `#C2185B` `#F48FB1` #fff
+  - purple 紫 `#9C27B0` `#7B1FA2` `#CE93D8` #fff
+  - deep-purple 深紫 `#673AB7` `#512DA8` `#B39DDB` #fff
+  - indigo 靛蓝 `#3F51B5` `#303F9F` `#9FA8DA` #fff（默认）
+  - blue 蓝 `#2196F3` `#1976D2` `#90CAF9` #fff
+  - light-blue 浅蓝 `#03A9F4` `#0288D1` `#81D4FA` #fff
+  - cyan 青 `#00BCD4` `#0097A7` `#80DEEA` `rgba(0,0,0,.87)`
+  - teal 蓝绿 `#009688` `#00796B` `#80CBC4` #fff
+  - green 绿 `#4CAF50` `#388E3C` `#A5D6A7` #fff
+  - light-green 浅绿 `#8BC34A` `#689F38` `#C5E1A5` `rgba(0,0,0,.87)`
+  - lime 黄绿 `#CDDC39` `#AFB42B` `#E6EE9C` `rgba(0,0,0,.87)`
+  - yellow 黄 `#FFEB3B` `#FBC02D` `#FFF59D` `rgba(0,0,0,.87)`
+  - amber 琥珀 `#FFC107` `#FFA000` `#FFE082` `rgba(0,0,0,.87)`
+  - orange 橙 `#FF9800` `#F57C00` `#FFCC80` `rgba(0,0,0,.87)`
+  - deep-orange 深橙 `#FF5722` `#E64A19` `#FFAB91` #fff
+  - brown 棕 `#795548` `#5D4037` `#BCAAA4` #fff
+  - grey 灰 `#9E9E9E` `#616161` `#E0E0E0` `rgba(0,0,0,.87)`
+  - blue-grey 蓝灰 `#607D8B` `#455A64` `#B0BEC5` #fff
+- 设置面板新增一行：`<div class="settings-row"><span class="settings-label">主题色</span><div id="color-swatches" class="swatches" role="group" aria-label="主题色"></div></div>`；色块由 `theme.js` 运行时生成（不在构建产物里，避免 HTML 变大）。
+- `theme.js` 新增：`SS.theme.COLORS = [{ id, label }, …]`（19 项，顺序同表）、`applyColor(id)`（写 `data-color`）、`initColor()`（读存储→applyColor）、点击色块时 applyColor + 持久化 + 更新 `aria-pressed`；`init()` 里调用 initColor。
+- 色块 `.swatch`：圆形 28px、背景为该色 500、`aria-pressed="true"` 时外圈 2px 主色或勾选标记、`:focus-visible` 轮廓。用 `<button type="button" class="swatch" data-color="…" aria-pressed="false" title="靛蓝" aria-label="靛蓝">`。
+
+### 15.2 顶栏圆形 logo
+
+- appbar 标题左侧新增 `<span class="appbar-logo"><svg class="appbar-logo-svg"><use href="#i-logo"></use></svg></span>`，logo 用 `UI_ICONS.logo`：圆环 + 放大镜（通用几何，不抄商标）。
+
+### 15.3 分类小图标
+
+- 每个 `.nav-item` 内含 `<svg class="nav-icon"><use href="#i-cat-<group>"></use></svg>` + `<span class="nav-label">…</span>`；`all` 用网格图标。
+- `UI_ICONS` 新增 `cat-all`（九宫格）、`cat-tech`（终端）、`cat-community`（对话气泡）、`cat-media`（播放电视）、`cat-shopping`（手提袋）、`cat-content`（相机）。
+- sprite 体积红线：≤ 8 KB（未压缩）；全站预算 ≤ 110 KB。

@@ -1,8 +1,8 @@
-// SimpleSearch v2.3 静态校验与产物一致性门禁。
+// SimpleSearch v2.4 静态校验与产物一致性门禁。
 // 用法：node scripts/validate.mjs（npm run validate）
 //
-// 产物模型（docs/contract.md §7、§12、§13、§14）：
-//   index.html                唯一真实页面（MDUI 文档站骨架：appbar + 左侧分类导航 + 内容卡片 + 右侧设置面板）
+// 产物模型（docs/contract.md §7、§12、§13、§14、§15）：
+//   index.html                唯一真实页面（MDUI 文档站骨架 + 19 色主题 + 内联 SVG sprite）
 //   SimpleSearch-Light.html   0 秒重定向壳 → index.html?theme=light
 //   SimpleSearch-Dark.html    0 秒重定向壳 → index.html?theme=dark
 //
@@ -14,19 +14,20 @@
 //   5. index.html 引用的所有本地 resources 真实存在
 //   6. index.html 按契约顺序引用 8 个经典脚本（remote.js 在 input.js 之前）
 //   7. index.html 的 data-site 与 SS.sites 一一对应（顺序/label/数量/data-group）
-//   8. v2.3 骨架：.appbar/.shell/#main-content/.card 卡片、设置面板（dialog/hidden/2 个 .switch-row/固定文案）、
-//      无页脚；#scrim 初始 hidden
-//   9. v2.3 左侧分类导航：#site-nav + nav#group-chips.nav-list 内 .nav-item 数量/顺序/data-group，
-//      选中语义 aria-current（初始只有「全部」为 true）
-//  10. v2.3 图标：sprite = 11 个站点 symbol + 3 个 UI symbol（i-menu/i-settings/i-close）；
+//   8. 文档站骨架：.appbar（含 .appbar-logo→#i-logo）/.shell/#main-content/.card 卡片、
+//      设置面板（dialog/hidden/2 个 .switch-row/固定文案/.settings-row+空 #color-swatches）、无页脚、#scrim[hidden]
+//   9. 左侧分类导航：#site-nav + nav#group-chips.nav-list 内 .nav-item（数量/顺序/data-group/aria-current），
+//      每个 nav-item 有 .nav-icon（#i-cat-<group>）+ .nav-label
+//  10. 主题色：<html data-color="indigo">；tokens.css 19 组 :root[data-color]（每组 4 个 --c-*）+ 语义变量
+//  11. 图标：sprite = 11 站点 + 3 UI(menu/settings/close) + 1 logo + 6 分类 = 21 个 symbol；
 //      每个按钮 .button-icon，所有 <use> 目标都能在 sprite 命中
-//  11. sprite 内联体积 ≤ 6KB（未压缩，契约 §14.2）
-//  12. 图标零图片请求：无 .png/.jpg/.webp/.gif/.ico 引用、无外链 favicon 服务
-//  13. 两个重定向壳：meta refresh 0 秒 + canonical + location.replace 均指向 index.html?theme=X；
+//  12. sprite 内联体积 ≤ 8KB（未压缩，契约 §15.3）
+//  13. 图标零图片请求：无 .png/.jpg/.webp/.gif/.ico 引用、无外链 favicon 服务
+//  14. 两个重定向壳：meta refresh 0 秒 + canonical + location.replace 均指向 index.html?theme=X；
 //      壳不得包含真实页内容（#buttons-container / data-site / assets/js bundle），体积 < 1KB
-//  14. 唯一性：只有 index.html 是真实页
-//  15. CSS 不含 !important（契约 §6）
-//  16. 体积信息：index.html 单页加载资源合计 < 100KB（仅提示，契约 §9.9）
+//  15. 唯一性：只有 index.html 是真实页
+//  16. CSS 不含 !important（契约 §6）
+//  17. 体积信息：index.html 单页加载资源合计 < 110KB（仅提示，契约 §9.9）
 // 任一失败 → 退出码 1，并打印失败详情。
 import fs from 'node:fs'
 import path from 'node:path'
@@ -72,11 +73,48 @@ const REQUIRED_IDS = [
   'settings-panel',
   'settings-title',
   'settings-close',
+  'color-swatches',
   'scrim',
 ]
 
-// 契约 §14.2：sprite 里的 UI 图标（与 11 个站点图标共存）
-const UI_SYMBOL_IDS = ['i-menu', 'i-settings', 'i-close']
+// 契约 §14.2 + §15.2/§15.3：sprite 里的非站点图标
+//   3 个 UI（menu/settings/close）+ 1 个 logo + 6 个分类（cat-all/tech/community/media/shopping/content）
+const UI_SYMBOL_IDS = [
+  'i-menu',
+  'i-settings',
+  'i-close',
+  'i-logo',
+  'i-cat-all',
+  'i-cat-tech',
+  'i-cat-community',
+  'i-cat-media',
+  'i-cat-shopping',
+  'i-cat-content',
+]
+
+// 契约 §15.1：19 组 MDUI 主色（顺序同表）与语义变量
+const COLOR_IDS = [
+  'red',
+  'pink',
+  'purple',
+  'deep-purple',
+  'indigo',
+  'blue',
+  'light-blue',
+  'cyan',
+  'teal',
+  'green',
+  'light-green',
+  'lime',
+  'yellow',
+  'amber',
+  'orange',
+  'deep-orange',
+  'brown',
+  'grey',
+  'blue-grey',
+]
+const SEMANTIC_VARS = ['--primary-bg', '--primary-bg-hover', '--primary', '--focus-ring', '--on-primary']
 
 // 契约 §4.1：内置 11 站（顺序固定；v2.2 §13.2 要求 sprite symbol 数量与之对应）
 const BUILTIN_IDS = [
@@ -94,8 +132,8 @@ const BUILTIN_IDS = [
 ]
 
 const BUILD_MARKER = /<!--\s*由 scripts\/build\.mjs/
-// 体积预算口径（lead 2026-11-11 v2.3）：单页加载 < 100 KB（gzip 前；契约 §9.9，v2.3 应用外壳后更新）
-const BUDGET_KB = 100
+// 体积预算口径（lead 2026-11-11 v2.4）：单页加载 < 110 KB（gzip 前；契约 §9.9，v2.4 主题色/logo/分类图标后更新）
+const BUDGET_KB = 110
 const SHELL_MAX_BYTES = 1024
 
 // ---------------------------------------------------------------- 通用工具
@@ -337,11 +375,22 @@ function extractGroupNav(html) {
     const tag = match[0]
     const openTag = tag.slice(0, tag.indexOf('>') + 1)
     if (!hasClass(openTag, 'nav-item')) continue
-    const text = decodeHtmlEntities(stripTags(tag.slice(tag.indexOf('>') + 1, tag.lastIndexOf('</button>')))).trim()
+    const itemInner = tag.slice(tag.indexOf('>') + 1, tag.lastIndexOf('</button>'))
+    const iconSvg = itemInner.match(
+      /<svg\b[^>]*\bclass\s*=\s*["'][^"']*\bnav-icon\b[^"']*["'][^>]*>[\s\S]*?<\/svg>/i,
+    )
+    const iconUse = iconSvg
+      ? iconSvg[0].match(/<use\b[^>]*\b(?:xlink:)?href\s*=\s*["']#([^"']+)["']/i)
+      : null
+    const labelSpan = itemInner.match(
+      /<span\b[^>]*\bclass\s*=\s*["'][^"']*\bnav-label\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/i,
+    )
     items.push({
       group: getAttr(openTag, 'data-group'),
       current: getAttr(openTag, 'aria-current'),
-      label: text,
+      hasIconClass: /class\s*=\s*["'][^"']*\bnav-icon\b/i.test(itemInner),
+      iconTarget: iconUse ? iconUse[1] : null,
+      label: labelSpan ? decodeHtmlEntities(stripTags(labelSpan[1])).trim() : textOfInner(itemInner),
     })
   }
   return { navOpen, items }
@@ -368,6 +417,42 @@ function extractUseTargets(html) {
     targets.push(match[1])
   }
   return targets
+}
+
+/** 取起始标签对应的内部 HTML（按同名闭合标签截取）。 */
+function innerOfTag(source, tag, tagName) {
+  const start = source.indexOf(tag) + tag.length
+  const end = source.indexOf(`</${tagName}>`, start)
+  return end === -1 ? null : source.slice(start, end)
+}
+
+function textOfInner(inner) {
+  if (inner === null) return null
+  return decodeHtmlEntities(stripTags(inner)).trim()
+}
+
+// ---------------------------------------------------------------- tokens.css 解析（v2.4 §15.1）
+
+/** 解析 :root[data-color='X'] { … } 分组，返回 Map<颜色 id, 声明块>。 */
+function parseColorGroups(css) {
+  const groups = new Map()
+  for (const match of findAll(
+    css,
+    /:root\s*\[\s*data-color\s*=\s*["']?([a-z-]+)["']?\s*\]\s*\{([^}]*)\}/g,
+  )) {
+    groups.set(match[1], match[2])
+  }
+  return groups
+}
+
+function cssVar(block, name) {
+  const match = block.match(new RegExp(`${name.replace(/-/g, '\\-')}\\s*:\\s*([^;]+?)\\s*(?:;|$)`))
+  return match ? match[1].trim() : null
+}
+
+function rootBlock(css) {
+  const match = css.match(/(?:^|\n)\s*:root\s*\{([^}]*)\}/)
+  return match ? match[1] : null
 }
 
 /** 检查一个按钮内部是否带 .button-icon（svg <use> 或 monogram 兜底）。 */
@@ -718,6 +803,18 @@ check('v2.3 骨架：.appbar/.shell/#main-content/.card 卡片、#scrim[hidden]�
   if (!findTagWithClass(clean, 'card-title')) problems.push(`${REAL_PAGE} 缺少 h2.card-title`)
   if (!findTagWithClass(clean, 'nav-group-title')) problems.push(`${REAL_PAGE} 缺少 .nav-group-title`)
 
+  // v2.4 顶栏圆形 logo（§15.2）
+  const logo = findTagWithClass(clean, 'appbar-logo')
+  if (!logo) {
+    problems.push(`${REAL_PAGE} 缺少 .appbar-logo（顶栏 logo）`)
+  } else {
+    const logoTagName = (logo.match(/^<([a-zA-Z][\w:-]*)/) || [])[1]
+    const logoInner = innerOfTag(clean, logo, logoTagName)
+    if (!/<use\b[^>]*\bhref\s*=\s*["']#i-logo["']/i.test(logoInner || '')) {
+      problems.push('.appbar-logo 内应有 <use href="#i-logo">')
+    }
+  }
+
   // scrim（抽屉/面板共用遮罩）
   const scrim = findTagById(clean, 'scrim')
   if (!scrim) {
@@ -768,6 +865,34 @@ check('v2.3 骨架：.appbar/.shell/#main-content/.card 卡片、#scrim[hidden]�
         problems.push(`#suggest-source-toggle 初始 aria-pressed 应为 "true"，实际 ${JSON.stringify(remoteRow.pressed)}`)
       }
     }
+
+    // v2.4 主题色行（§15.1）：.settings-row > .settings-label「主题色」+ 空容器 #color-swatches.swatches
+    if (!findTagWithClass(clean, 'settings-row')) {
+      problems.push(`${REAL_PAGE} 设置面板缺少 .settings-row（主题色行）`)
+    }
+    const settingsLabel = findTagWithClass(clean, 'settings-label')
+    if (!settingsLabel) {
+      problems.push(`${REAL_PAGE} 缺少 .settings-label`)
+    } else {
+      const labelTagName = (settingsLabel.match(/^<([a-zA-Z][\w:-]*)/) || [])[1]
+      const labelText = textOfInner(innerOfTag(clean, settingsLabel, labelTagName))
+      if (labelText !== '主题色') {
+        problems.push(`.settings-label 文案应为「主题色」，实际 ${JSON.stringify(labelText)}`)
+      }
+    }
+    const swatches = findTagById(clean, 'color-swatches')
+    if (!swatches) {
+      problems.push(`${REAL_PAGE} 缺少 #color-swatches`)
+    } else {
+      if (!hasClass(swatches, 'swatches')) problems.push('#color-swatches 应带 .swatches 类')
+      const swatchTagName = (swatches.match(/^<([a-zA-Z][\w:-]*)/) || [])[1]
+      const swatchInner = innerOfTag(clean, swatches, swatchTagName)
+      if (swatchInner === null || swatchInner.trim() !== '') {
+        problems.push(
+          `#color-swatches 在产物里必须是空容器（色块由 theme.js 运行时生成），实际内容：${JSON.stringify((swatchInner || '').trim())}`,
+        )
+      }
+    }
   }
 
   // v2.3 移除页脚
@@ -808,12 +933,32 @@ check('v2.3 左侧分类导航：#site-nav + #group-chips.nav-list，.nav-item �
   }
 
   const allowed = new Set(expectedGroups)
+  const expectedLabels = new Map([['all', '全部']])
+  for (const group of siteGroups) expectedLabels.set(group.id, group.label)
+
+  const sprite = extractSprite(clean)
+  const symbolSet = sprite ? new Set(extractSymbols(sprite.inner).map((symbol) => symbol.id)) : new Set()
+
   for (const item of nav.items) {
     if (!allowed.has(item.group)) problems.push(`nav-item 的 data-group=${JSON.stringify(item.group)} 非法`)
     if (!item.label) problems.push(`nav-item data-group=${JSON.stringify(item.group)} 文案为空`)
     if (item.current !== 'true' && item.current !== 'false') {
       problems.push(
         `nav-item data-group=${JSON.stringify(item.group)} 的 aria-current 缺失或非法：${JSON.stringify(item.current)}`,
+      )
+    }
+    // v2.4 §15.3：每个 nav-item 有 .nav-icon（use #i-cat-<group>）+ .nav-label
+    if (!item.hasIconClass) problems.push(`nav-item data-group=${JSON.stringify(item.group)} 缺少 .nav-icon`)
+    if (item.iconTarget !== `i-cat-${item.group}`) {
+      problems.push(
+        `nav-item data-group=${JSON.stringify(item.group)} 的图标应为 #i-cat-${item.group}，实际 ${JSON.stringify(item.iconTarget)}`,
+      )
+    } else if (!symbolSet.has(item.iconTarget)) {
+      problems.push(`nav-item 图标 #${item.iconTarget} 不在 sprite 中`)
+    }
+    if (expectedLabels.has(item.group) && item.label !== expectedLabels.get(item.group)) {
+      problems.push(
+        `nav-item data-group=${item.group} 的 .nav-label 应为 ${JSON.stringify(expectedLabels.get(item.group))}，实际 ${JSON.stringify(item.label)}`,
       )
     }
   }
@@ -828,9 +973,66 @@ check('v2.3 左侧分类导航：#site-nav + #group-chips.nav-list，.nav-item �
   return problems
 })
 
-// ---------------------------------------------------------------- 10. v2.3 图标 sprite / 按钮图标
+// ---------------------------------------------------------------- 10. v2.4 主题色（§15.1）
 
-check('v2.3 图标：sprite = 11 站点 symbol + 3 UI symbol；每个 data-site 按钮有 .button-icon；所有 use 目标命中', () => {
+check('v2.4 主题色：<html data-color="indigo"> + tokens.css 19 组 data-color（每组 4 个 --c-*）+ 语义变量', () => {
+  if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
+  const problems = []
+  const clean = stripHtmlComments(realPage.html)
+
+  // <html data-color="indigo">
+  const htmlTag = clean.match(/<html\b[^>]*>/i)
+  if (!htmlTag) {
+    problems.push(`${REAL_PAGE} 找不到 <html> 标签`)
+  } else {
+    const dataColor = getAttr(htmlTag[0], 'data-color')
+    if (dataColor !== 'indigo') {
+      problems.push(`<html> 的 data-color 缺省应为 "indigo"，实际 ${JSON.stringify(dataColor)}`)
+    }
+  }
+
+  // tokens.css：19 组色值 + 语义变量
+  const tokensPath = path.join(ROOT, 'assets', 'css', 'tokens.css')
+  if (!fs.existsSync(tokensPath)) return [...problems, '缺少 assets/css/tokens.css']
+  const css = fs.readFileSync(tokensPath, 'utf8')
+  const groups = parseColorGroups(css)
+
+  if (groups.size !== COLOR_IDS.length) {
+    problems.push(
+      `tokens.css 的 :root[data-color] 分组应为 ${COLOR_IDS.length} 组，实际 ${groups.size} 组：${[...groups.keys()].join(', ')}`,
+    )
+  }
+  for (const colorId of COLOR_IDS) {
+    if (!groups.has(colorId)) {
+      problems.push(`tokens.css 缺少 :root[data-color='${colorId}'] 分组`)
+      continue
+    }
+    const block = groups.get(colorId)
+    for (const varName of ['--c-500', '--c-700', '--c-200', '--c-on']) {
+      if (!cssVar(block, varName)) problems.push(`主题色 ${colorId} 缺少 ${varName} 或值为空`)
+    }
+  }
+
+  const root = rootBlock(css)
+  let foundSemantic = 0
+  if (!root) {
+    problems.push('tokens.css 缺少基础 :root 块')
+  } else {
+    for (const varName of SEMANTIC_VARS) {
+      if (cssVar(root, varName)) foundSemantic += 1
+      else problems.push(`tokens.css 的 :root 缺少语义变量 ${varName}`)
+    }
+  }
+
+  return {
+    problems,
+    notes: [`tokens.css 分组 ${groups.size} 组 / 语义变量 ${foundSemantic}/${SEMANTIC_VARS.length} 个`],
+  }
+})
+
+// ---------------------------------------------------------------- 11. v2.3 图标 sprite / 按钮图标
+
+check('v2.4 图标：sprite = 11 站点 + 3 UI + 1 logo + 6 分类（共 21 个 symbol）；每个 data-site 按钮有 .button-icon；所有 use 目标命中', () => {
   if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
   if (!sites) return [registry.problem || '无法读取 SS.sites']
 
@@ -960,18 +1162,18 @@ check('v2.3 图标：sprite = 11 站点 symbol + 3 UI symbol；每个 data-site 
   }
 })
 
-// ---------------------------------------------------------------- 11. sprite 体积
+// ---------------------------------------------------------------- 12. sprite 体积
 
-check('sprite 内联体积 ≤ 6KB（未压缩，契约 §14.2）', () => {
+check('sprite 内联体积 ≤ 8KB（未压缩，契约 §15.3）', () => {
   if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
   const sprite = extractSprite(stripHtmlComments(realPage.html))
   if (!sprite) return ['缺少 icon-sprite，无法统计 sprite 体积']
   const bytes = Buffer.byteLength(sprite.outer, 'utf8')
-  if (bytes > 6144) return [`icon-sprite 体积 ${bytes} 字节，超过 6KB 红线（未压缩）`]
+  if (bytes > 8192) return [`icon-sprite 体积 ${bytes} 字节，超过 8KB 红线（未压缩）`]
   return { problems: [], notes: [`sprite ${(bytes / 1024).toFixed(2)} KB`] }
 })
 
-// ---------------------------------------------------------------- 12. 零额外图片请求
+// ---------------------------------------------------------------- 13. 零额外图片请求
 
 check('图标零图片请求：无 .png/.jpg/.webp/.gif/.ico 引用、无外链 favicon 服务', () => {
   if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
@@ -1007,7 +1209,7 @@ check('图标零图片请求：无 .png/.jpg/.webp/.gif/.ico 引用、无外链 
   return problems
 })
 
-// ---------------------------------------------------------------- 13. 重定向壳
+// ---------------------------------------------------------------- 14. 重定向壳
 
 check('两个重定向壳：meta refresh(0s) + canonical + location.replace 指向 index.html?theme=X，且不含真实页内容', () => {
   const problems = []
@@ -1078,7 +1280,7 @@ check('两个重定向壳：meta refresh(0s) + canonical + location.replace 指�
   return problems
 })
 
-// ---------------------------------------------------------------- 14. 唯一性
+// ---------------------------------------------------------------- 15. 唯一性
 
 check('唯一性：只有 index.html 是真实页（两个壳不得含真实页 DOM）', () => {
   const problems = []
@@ -1105,7 +1307,7 @@ check('唯一性：只有 index.html 是真实页（两个壳不得含真实页 
   return problems
 })
 
-// ---------------------------------------------------------------- 15. CSS 禁 !important
+// ---------------------------------------------------------------- 16. CSS 禁 !important
 
 check('CSS 不含 !important（契约 §6）', () => {
   const cssDir = path.join(ROOT, 'assets', 'css')
@@ -1126,9 +1328,9 @@ check('CSS 不含 !important（契约 §6）', () => {
   return problems
 })
 
-// ---------------------------------------------------------------- 16. 体积信息
+// ---------------------------------------------------------------- 17. 体积信息
 
-check('体积信息（index.html 单页加载预算 < 100 KB，仅供参考不阻断）', () => {
+check('体积信息（index.html 单页加载预算 < 110 KB，仅供参考不阻断）', () => {
   if (!realPage.exists) return { problems: [], notes: [`${REAL_PAGE} 不存在，跳过体积统计`] }
 
   const notes = []

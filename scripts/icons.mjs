@@ -67,3 +67,28 @@ export const UI_ICONS = {
   },
   close: { body: '<path d="M6 6l12 12M18 6 6 18"/>' },
 }
+
+// v2.4：顶栏 logo + 分类导航小图标（同样内联进 sprite，零请求）
+Object.assign(UI_ICONS, {
+  logo: {
+    body: '<circle cx="12" cy="12" r="9"/><circle cx="10.6" cy="10.6" r="3.6"/><path d="M13.4 13.4 16.6 16.6"/>',
+  },
+  'cat-all': {
+    body: '<rect x="4" y="4" width="6.4" height="6.4" rx="1"/><rect x="13.6" y="4" width="6.4" height="6.4" rx="1"/><rect x="4" y="13.6" width="6.4" height="6.4" rx="1"/><rect x="13.6" y="13.6" width="6.4" height="6.4" rx="1"/>',
+  },
+  'cat-tech': {
+    body: '<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M7 9.5l3 2.8-3 2.8"/><path d="M12.5 16h4"/>',
+  },
+  'cat-community': {
+    body: '<path d="M3.5 5.5h11v7.5H9.2L6.4 15.6V13H3.5z"/><path d="M8.7 9.8h11.8v7.4h-2.3v2.6l-2.9-2.6H8.7z"/>',
+  },
+  'cat-media': {
+    body: '<rect x="3.5" y="7.5" width="17" height="11" rx="2.5"/><path d="M8.5 4.5 11 7.5M15.5 4.5 13 7.5"/><path d="M10.5 11v4l3.5-2z"/>',
+  },
+  'cat-shopping': {
+    body: '<path d="M5.6 8h12.8l-1.2 11.5H6.8z"/><path d="M9 8V6.4a3 3 0 0 1 6 0V8"/>',
+  },
+  'cat-content': {
+    body: '<path d="M4 8.5h3.4L9 6.5h6l1.6 2H20v10H4z"/><circle cx="12" cy="13.5" r="3"/>',
+  },
+})

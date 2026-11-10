@@ -445,6 +445,17 @@ async function run() {
     page.resetLogs()
     await page.goto(PAGE)
 
+    // 网络与体积：首屏加载后立刻采样（后面有交互和导航，别把它们的流量算进来）
+    const earlyRequests = [...page.state.requests]
+    const earlyBytes = page.state.transferBytes
+    const externalAssets = earlyRequests.filter((u) => !u.startsWith(ORIGIN) && !u.startsWith('data:'))
+    check('C: 首屏无第三方请求', externalAssets.length === 0, externalAssets[0] || '')
+    check(
+      'C: 首屏传输体积 < 120KB',
+      earlyBytes < 120 * 1024,
+      `${(earlyBytes / 1024).toFixed(1)} KB / ${earlyRequests.length} 个请求`
+    )
+
     check('C: 无 JS 异常', page.state.exceptions.length === 0, page.state.exceptions[0] || '')
     const scriptReady = await page.evaluate(
       '!!(window.SimpleSearch && SimpleSearch.sites && SimpleSearch.search && SimpleSearch.theme && SimpleSearch.input && SimpleSearch.remote)'
@@ -480,6 +491,12 @@ async function run() {
         hasSettingsToggle: !!document.getElementById('settings-toggle'),
         panelHidden: document.getElementById('settings-panel').hidden,
         scrimHidden: document.getElementById('scrim').hidden,
+        logo: (() => {
+          const logo = document.querySelector('.appbar-logo use')
+          return logo ? logo.getAttribute('href') : null
+        })(),
+        navIcons: [...document.querySelectorAll('#group-chips .nav-icon use')].map((u) => u.getAttribute('href')),
+        navLabels: [...document.querySelectorAll('#group-chips .nav-label')].map((s) => s.textContent.trim()),
       }
     })()`)
     check('C: 顶栏存在且标题正确', shell.appbar && shell.title === '简单搜索', shell.title)
@@ -488,6 +505,12 @@ async function run() {
     check('C: 桌面端不显示汉堡', shell.navToggleDisplayed === false, String(shell.navToggleDisplayed))
     check('C: 页脚已移除', shell.hasFooter === false)
     check('C: 设置面板默认隐藏且遮罩隐藏', shell.hasSettingsToggle && shell.panelHidden && shell.scrimHidden)
+    check('C: 顶栏 logo 存在', shell.logo === '#i-logo', String(shell.logo))
+    check(
+      'C: 分类导航有图标与文字',
+      shell.navIcons.length === shell.itemCount && shell.navLabels.length === shell.itemCount && shell.navLabels[0] === '全部',
+      `${shell.navIcons.length} 图标 / ${shell.navLabels.join('·')}`
+    )
 
     await page.evaluate(`document.querySelector('#group-chips [data-group="shopping"]').click()`)
     await sleep(200)
@@ -540,6 +563,50 @@ async function run() {
       panelState.rows.join(',')
     )
     check('C: 打开后焦点进入面板', panelState.focusInside)
+
+    // ---- 主题色（MDUI 19 色）----
+    const colorInfo = await page.evaluate(`(() => {
+      const html = document.documentElement
+      const swatches = [...document.querySelectorAll('#color-swatches .swatch')]
+      return {
+        color: html.getAttribute('data-color'),
+        count: swatches.length,
+        pressed: swatches.filter((s) => s.getAttribute('aria-pressed') === 'true').map((s) => s.getAttribute('data-color')),
+        primaryVar: getComputedStyle(html).getPropertyValue('--primary-bg').trim().toLowerCase(),
+      }
+    })()`)
+    check(
+      'C: 默认主题色 indigo',
+      colorInfo.color === 'indigo' && colorInfo.pressed.length === 1 && colorInfo.pressed[0] === 'indigo',
+      JSON.stringify(colorInfo)
+    )
+    check('C: 19 个主题色块', colorInfo.count === 19, String(colorInfo.count))
+    check('C: 默认主色变量', colorInfo.primaryVar === '#3f51b5', colorInfo.primaryVar)
+
+    await page.evaluate(`document.querySelector('#color-swatches .swatch[data-color="orange"]').click()`)
+    await sleep(300)
+    const afterColor = await page.evaluate(`(() => {
+      const html = document.documentElement
+      const swatches = [...document.querySelectorAll('#color-swatches .swatch')]
+      return {
+        color: html.getAttribute('data-color'),
+        appbar: getComputedStyle(document.querySelector('.appbar')).backgroundColor,
+        pressed: swatches.filter((s) => s.getAttribute('aria-pressed') === 'true').map((s) => s.getAttribute('data-color')),
+        stored: (() => { try { return localStorage.getItem('ss.color') } catch (e) { return null } })(),
+      }
+    })()`)
+    check(
+      'C: 换主题色生效（顶栏变色）',
+      afterColor.color === 'orange' && afterColor.appbar === 'rgb(255, 152, 0)',
+      `${afterColor.color} / ${afterColor.appbar}`
+    )
+    check('C: 主题色写入存储', afterColor.stored === 'orange', String(afterColor.stored))
+    check('C: 色块选中态唯一', afterColor.pressed.length === 1 && afterColor.pressed[0] === 'orange', afterColor.pressed.join(','))
+
+    if (SHOTS) {
+      const shot = await page.screenshot('index-settings-color.png')
+      console.log(`[e2e] 截图 ${path.relative(ROOT, shot)}`)
+    }
     if (SHOTS) {
       const shot = await page.screenshot('index-settings-open.png')
       console.log(`[e2e] 截图 ${path.relative(ROOT, shot)}`)
@@ -553,6 +620,24 @@ async function run() {
       focusId: document.activeElement && document.activeElement.id,
     }))()`)
     check('C: Esc 关闭面板并归还焦点', afterEsc.panelHidden === true && afterEsc.scrimHidden === true && afterEsc.focusId === 'settings-toggle')
+
+    // 主题色刷新保持 + 复位
+    await page.goto(PAGE)
+    const persistedColor = await page.evaluate(`(() => ({
+      color: document.documentElement.getAttribute('data-color'),
+      appbar: getComputedStyle(document.querySelector('.appbar')).backgroundColor,
+    }))()`)
+    check(
+      'C: 主题色刷新保持',
+      persistedColor.color === 'orange' && persistedColor.appbar === 'rgb(255, 152, 0)',
+      JSON.stringify(persistedColor)
+    )
+    await page.clearStorage()
+    await page.goto(PAGE)
+    check(
+      'C: 清空存储后回默认色',
+      (await page.evaluate("document.documentElement.getAttribute('data-color')")) === 'indigo'
+    )
 
     // ---- 内联图标（零额外请求） ----
     const iconInfo = await page.evaluate(`(() => {
@@ -585,14 +670,6 @@ async function run() {
     const navDecision = await page.evaluate("SimpleSearch.search.resolveSite('github', '  ')")
     check('C: 空词直达', navDecision && navDecision.kind === 'nav' && navDecision.url === 'https://github.com')
 
-    // 静态资源只同源
-    const externalAssets = page.state.requests.filter((u) => !u.startsWith(ORIGIN) && !u.startsWith('data:'))
-    check('C: 首屏无第三方请求', externalAssets.length === 0, externalAssets[0] || '')
-    check(
-      'C: 首屏传输体积 < 120KB',
-      page.state.transferBytes < 120 * 1024,
-      `${(page.state.transferBytes / 1024).toFixed(1)} KB / ${page.state.requests.length} 个请求`
-    )
 
     // 联想 + 键盘
     await page.evaluate("(() => { document.getElementById('search-input').focus() })()")

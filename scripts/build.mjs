@@ -121,13 +121,18 @@ function renderIconSprite(sites, icons) {
   return `  <svg class="icon-sprite" aria-hidden="true" focusable="false" width="0" height="0" xmlns="http://www.w3.org/2000/svg">\n${all}\n  </svg>`
 }
 
-// 左侧分类导航（MDUI 文档站式）：全部 + SS.siteGroups，竖向排列
-function renderGroupNav(groups) {
-  const all = '        <button class="nav-item" type="button" data-group="all" aria-current="true">全部</button>'
-  const rest = groups.map(
-    (group) =>
-      `        <button class="nav-item" type="button" data-group="${escapeHtml(group.id)}" aria-current="false">${escapeHtml(group.label)}</button>`
+// 左侧分类导航（MDUI 文档站式）：全部 + SS.siteGroups，竖向排列，带分类小图标
+function renderNavItem(group, label, current) {
+  return (
+    `        <button class="nav-item" type="button" data-group="${escapeHtml(group)}" aria-current="${current ? 'true' : 'false'}">` +
+    `<svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-${escapeHtml(group)}"></use></svg>` +
+    `<span class="nav-label">${escapeHtml(label)}</span></button>`
   )
+}
+
+function renderGroupNav(groups) {
+  const all = renderNavItem('all', '全部', true)
+  const rest = groups.map((group) => renderNavItem(group.id, group.label, false))
   return [all, ...rest].join('\n')
 }
 

@@ -13,6 +13,53 @@
   // 与 tokens.css 的 --bg 保持一致；仅当无法读取 CSS 变量时兜底
   const THEME_COLORS = { light: '#f5f5f5', dark: '#303030' }
 
+  // 主题色（MDUI 19 组主色，顺序与契约 §15.1 一致）
+  const COLOR_KEY = 'ss.color'
+  const DEFAULT_COLOR = 'indigo'
+  const COLORS = [
+    { id: 'red', label: '红' },
+    { id: 'pink', label: '粉' },
+    { id: 'purple', label: '紫' },
+    { id: 'deep-purple', label: '深紫' },
+    { id: 'indigo', label: '靛蓝' },
+    { id: 'blue', label: '蓝' },
+    { id: 'light-blue', label: '浅蓝' },
+    { id: 'cyan', label: '青' },
+    { id: 'teal', label: '蓝绿' },
+    { id: 'green', label: '绿' },
+    { id: 'light-green', label: '浅绿' },
+    { id: 'lime', label: '黄绿' },
+    { id: 'yellow', label: '黄' },
+    { id: 'amber', label: '琥珀' },
+    { id: 'orange', label: '橙' },
+    { id: 'deep-orange', label: '深橙' },
+    { id: 'brown', label: '棕' },
+    { id: 'grey', label: '灰' },
+    { id: 'blue-grey', label: '蓝灰' },
+  ]
+  // 色块背景用各色 500 档（与 tokens.css 的 --c-500 一致）
+  const COLOR_500 = {
+    red: '#f44336',
+    pink: '#e91e63',
+    purple: '#9c27b0',
+    'deep-purple': '#673ab7',
+    indigo: '#3f51b5',
+    blue: '#2196f3',
+    'light-blue': '#03a9f4',
+    cyan: '#00bcd4',
+    teal: '#009688',
+    green: '#4caf50',
+    'light-green': '#8bc34a',
+    lime: '#cddc39',
+    yellow: '#ffeb3b',
+    amber: '#ffc107',
+    orange: '#ff9800',
+    'deep-orange': '#ff5722',
+    brown: '#795548',
+    grey: '#9e9e9e',
+    'blue-grey': '#607d8b',
+  }
+
   // 把任意值收敛为 'light' | 'dark' | null
   function normalize(theme) {
     return theme === LIGHT || theme === DARK ? theme : null
@@ -39,6 +86,93 @@
       if (storage) storage.setItem(KEY, theme)
     } catch (error) {
       // 存储失败不影响本次切换
+    }
+  }
+
+  // ---------------------------------------------------------------- 主题色
+
+  function normalizeColor(id) {
+    for (const color of COLORS) {
+      if (color.id === id) return id
+    }
+    return DEFAULT_COLOR
+  }
+
+  // 读主题色存储：缺省 / 非法值都回退 indigo
+  function getColor() {
+    try {
+      const storage = root.localStorage
+      if (!storage) return DEFAULT_COLOR
+      return normalizeColor(storage.getItem(COLOR_KEY))
+    } catch (error) {
+      return DEFAULT_COLOR
+    }
+  }
+
+  function saveColor(id) {
+    try {
+      const storage = root.localStorage
+      if (storage) storage.setItem(COLOR_KEY, id)
+    } catch (error) {
+      // 存储失败不影响本次换色
+    }
+  }
+
+  // 同步色块选中态（色块可能尚未渲染 / 测试环境无 querySelectorAll）
+  function syncSwatches(doc, active) {
+    if (typeof doc.querySelectorAll !== 'function') return
+    const swatches = doc.querySelectorAll('#color-swatches .swatch')
+    for (let i = 0; i < swatches.length; i++) {
+      const item = swatches[i]
+      if (!item || typeof item.getAttribute !== 'function') continue
+      item.setAttribute('aria-pressed', item.getAttribute('data-color') === active ? 'true' : 'false')
+    }
+  }
+
+  // 应用主题色：只写 <html data-color>，CSS 由 tokens.css 的语义变量接管
+  function applyColor(id) {
+    const next = normalizeColor(id)
+    const doc = getDoc()
+    const el = doc && doc.documentElement
+    if (!el) return next
+    el.setAttribute('data-color', next)
+    syncSwatches(doc, next)
+    return next
+  }
+
+  // 渲染色块（只渲一次）+ 应用存储里的主题色
+  function initColor() {
+    const doc = getDoc()
+    if (!doc) return
+    const color = getColor()
+    applyColor(color)
+
+    if (typeof doc.getElementById !== 'function') return
+    const container = doc.getElementById('color-swatches')
+    if (!container || typeof doc.createElement !== 'function') return
+    const existing =
+      typeof container.querySelectorAll === 'function' ? container.querySelectorAll('.swatch').length : 0
+    if (existing >= COLORS.length) {
+      syncSwatches(doc, color)
+      return
+    }
+
+    for (const item of COLORS) {
+      const button = doc.createElement('button')
+      button.type = 'button'
+      button.className = 'swatch'
+      button.setAttribute('data-color', item.id)
+      button.setAttribute('aria-pressed', item.id === color ? 'true' : 'false')
+      button.setAttribute('title', item.label)
+      button.setAttribute('aria-label', item.label)
+      if (button.style) button.style.backgroundColor = COLOR_500[item.id]
+      if (typeof button.addEventListener === 'function') {
+        button.addEventListener('click', function () {
+          saveColor(item.id)
+          applyColor(item.id)
+        })
+      }
+      if (typeof container.appendChild === 'function') container.appendChild(button)
     }
   }
 
@@ -198,6 +332,9 @@
     //    存储 > 系统偏好 > 浅色（data-theme-default 为 auto）
     apply(fromUrl || resolve(el.getAttribute('data-theme-default')))
 
+    // 2.5) 主题色：读取/应用存储色，并渲染设置面板的 19 个色块
+    initColor()
+
     // 3) 从未显式选择过时，实时跟随系统深浅色变化
     if (!get()) followSystem()
 
@@ -214,5 +351,18 @@
     })
   }
 
-  SS.theme = { KEY, get, resolve, apply, toggle, init, readUrlTheme }
+  SS.theme = {
+    KEY,
+    COLOR_KEY,
+    COLORS,
+    get,
+    resolve,
+    apply,
+    toggle,
+    init,
+    readUrlTheme,
+    getColor,
+    applyColor,
+    initColor,
+  }
 })(typeof globalThis !== 'undefined' ? globalThis : this)

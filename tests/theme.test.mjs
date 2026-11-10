@@ -68,12 +68,123 @@ function makeMatchMedia(systemTheme) {
   }
 }
 
+function camelToKebab(name) {
+  return String(name).replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)
+}
+
+function classListContains(element, name) {
+  return (element.getAttribute('class') || '').split(/\s+/).includes(name)
+}
+
+// v2.4 主题色运行时由 theme.js 生成色块，需要一个能 createElement/appendChild 的最小假元素。
+function makeElement(tagName) {
+  const attrs = new Map()
+  const children = []
+  const listeners = {}
+  const dataset = new Proxy(
+    {},
+    {
+      get: (_, key) => attrs.get(`data-${camelToKebab(String(key))}`) ?? undefined,
+      set: (_, key, value) => {
+        attrs.set(`data-${camelToKebab(String(key))}`, String(value))
+        return true
+      },
+      has: (_, key) => attrs.has(`data-${camelToKebab(String(key))}`),
+    },
+  )
+
+  const element = {
+    tagName: String(tagName).toUpperCase(),
+    children,
+    textContent: '',
+    style: {},
+    dataset,
+    listeners,
+    setAttribute(name, value) {
+      attrs.set(String(name).toLowerCase(), String(value))
+    },
+    getAttribute(name) {
+      const key = String(name).toLowerCase()
+      return attrs.has(key) ? attrs.get(key) : null
+    },
+    hasAttribute(name) {
+      return attrs.has(String(name).toLowerCase())
+    },
+    removeAttribute(name) {
+      attrs.delete(String(name).toLowerCase())
+    },
+    appendChild(child) {
+      children.push(child)
+      child.parentNode = element
+      return child
+    },
+    append(...nodes) {
+      for (const node of nodes) element.appendChild(node)
+    },
+    remove() {
+      element.removed = true
+    },
+    addEventListener(type, handler) {
+      listeners[type] = handler
+    },
+    removeEventListener(type) {
+      delete listeners[type]
+    },
+    querySelector(selector) {
+      if (String(selector) === '.swatch') {
+        return children.find((child) => classListContains(child, 'swatch')) || null
+      }
+      return null
+    },
+    querySelectorAll(selector) {
+      if (String(selector) === '.swatch') return children.filter((child) => classListContains(child, 'swatch'))
+      return []
+    },
+    focus() {
+      element.focused = true
+    },
+    classList: {
+      add(...names) {
+        const set = new Set((attrs.get('class') || '').split(/\s+/).filter(Boolean))
+        for (const name of names) set.add(name)
+        attrs.set('class', [...set].join(' '))
+      },
+      remove(...names) {
+        const set = new Set((attrs.get('class') || '').split(/\s+/).filter(Boolean))
+        for (const name of names) set.delete(name)
+        attrs.set('class', [...set].join(' '))
+      },
+      contains(name) {
+        return (attrs.get('class') || '').split(/\s+/).includes(name)
+      },
+      toggle(name, force) {
+        const want = force === undefined ? !element.classList.contains(name) : Boolean(force)
+        if (want) element.classList.add(name)
+        else element.classList.remove(name)
+        return want
+      },
+    },
+  }
+
+  Object.defineProperty(element, 'className', {
+    get() {
+      return attrs.get('class') || ''
+    },
+    set(value) {
+      attrs.set('class', String(value))
+    },
+  })
+  return element
+}
+
 /**
  * 造最小环境并执行 theme.js。
  * @param {object} options
  * @param {'light'|'dark'|null} [options.storedTheme]  localStorage['ss.theme']
+ * @param {string|null} [options.storedColor]          localStorage['ss.color']
  * @param {'auto'|'light'|'dark'|null} [options.defaultTheme] <html data-theme-default>
  * @param {'light'|'dark'|null} [options.docTheme]      <html data-theme> 初始值
+ * @param {string|null} [options.docColor]              <html data-color> 初始值（缺省 indigo）
  * @param {'dark'|'light'|null} [options.systemTheme]   null = 环境不支持 matchMedia
  * @param {string} [options.urlSearch]                  location.search
  * @param {boolean} [options.storageThrows]
@@ -82,8 +193,10 @@ function makeMatchMedia(systemTheme) {
 function createThemeEnv(options = {}) {
   const {
     storedTheme = null,
+    storedColor = null,
     defaultTheme = 'auto',
     docTheme = null,
+    docColor = 'indigo',
     systemTheme = null,
     urlSearch = '',
     storageThrows = false,
@@ -92,6 +205,7 @@ function createThemeEnv(options = {}) {
 
   const store = new Map()
   if (storedTheme !== null) store.set('ss.theme', storedTheme)
+  if (storedColor !== null) store.set('ss.color', storedColor)
 
   const localStorage = {
     getItem(key) {
@@ -111,6 +225,7 @@ function createThemeEnv(options = {}) {
   const attributes = new Map()
   if (defaultTheme !== null) attributes.set('data-theme-default', defaultTheme)
   if (docTheme !== null) attributes.set('data-theme', docTheme)
+  if (docColor !== null) attributes.set('data-color', docColor)
 
   const documentElement = {
     getAttribute(name) {
@@ -137,14 +252,24 @@ function createThemeEnv(options = {}) {
 
   const toggleButton = makeToggleButton()
   const themeColorMeta = makeThemeColorMeta()
+  const swatchesContainer = makeElement('div')
 
   const document = {
     documentElement,
+    body: makeElement('body'),
+    createElement: (tagName) => makeElement(tagName),
+    createDocumentFragment: () => makeElement('fragment'),
     getElementById(id) {
-      return id === 'theme-toggle' ? toggleButton : null
+      if (id === 'theme-toggle') return toggleButton
+      if (id === 'color-swatches') return swatchesContainer
+      return null
     },
     querySelector(selector) {
       return /theme-color/.test(String(selector)) ? themeColorMeta : null
+    },
+    querySelectorAll(selector) {
+      if (String(selector) === '.swatch') return swatchesContainer.querySelectorAll('.swatch')
+      return []
     },
   }
 
@@ -188,9 +313,14 @@ function createThemeEnv(options = {}) {
     documentElement,
     toggleButton,
     themeColorMeta,
+    swatchesContainer,
     history,
     readThemeAttr() {
       const value = documentElement.getAttribute('data-theme')
+      return value === undefined ? null : value
+    },
+    readColorAttr() {
+      const value = documentElement.getAttribute('data-color')
       return value === undefined ? null : value
     },
   }
@@ -391,4 +521,82 @@ testTheme('init()：绑定 #theme-toggle 点击切换并持久化', () => {
 
   env.toggleButton.fire('click')
   assert.equal(env.readThemeAttr(), 'light')
+})
+
+// ---------------------------------------------------------------- v2.4 主题色（加分项，§15.1）
+
+const EXPECTED_COLOR_IDS = [
+  'red',
+  'pink',
+  'purple',
+  'deep-purple',
+  'indigo',
+  'blue',
+  'light-blue',
+  'cyan',
+  'teal',
+  'green',
+  'light-green',
+  'lime',
+  'yellow',
+  'amber',
+  'orange',
+  'deep-orange',
+  'brown',
+  'grey',
+  'blue-grey',
+]
+
+testTheme('CSS/API 形态：SS.theme 暴露 COLORS / applyColor / getColor / initColor', () => {
+  const env = createThemeEnv()
+  assert.ok(Array.isArray(env.theme.COLORS), 'SS.theme.COLORS 必须是数组')
+  for (const name of ['applyColor', 'getColor', 'initColor']) {
+    assert.equal(typeof env.theme[name], 'function', `SS.theme.${name} 必须是函数`)
+  }
+})
+
+testTheme('SS.theme.COLORS：19 项、顺序与契约 §15.1 一致、id 唯一、label 非空', () => {
+  const env = createThemeEnv()
+  const colors = env.theme.COLORS
+  assert.equal(colors.length, EXPECTED_COLOR_IDS.length, `COLORS 应为 ${EXPECTED_COLOR_IDS.length} 项`)
+  assert.deepEqual(
+    [...colors.map((color) => color.id)],
+    EXPECTED_COLOR_IDS,
+    'COLORS 顺序应与契约 §15.1 一致',
+  )
+  assert.equal(new Set(colors.map((color) => color.id)).size, colors.length, 'COLORS id 必须唯一')
+  for (const color of colors) {
+    assert.equal(typeof color.label, 'string', `颜色 ${color.id} 的 label 必须是字符串`)
+    assert.ok(color.label.trim().length > 0, `颜色 ${color.id} 的 label 不能为空`)
+  }
+})
+
+testTheme('applyColor(id)：写 <html data-color>', () => {
+  const env = createThemeEnv()
+  env.theme.applyColor('orange')
+  assert.equal(env.readColorAttr(), 'orange')
+  env.theme.applyColor('red')
+  assert.equal(env.readColorAttr(), 'red')
+})
+
+testTheme('getColor()：存储优先，非法值/无值回退 indigo', () => {
+  assert.equal(createThemeEnv().theme.getColor(), 'indigo')
+  assert.equal(createThemeEnv({ storedColor: 'teal' }).theme.getColor(), 'teal')
+  assert.equal(createThemeEnv({ storedColor: 'bogus' }).theme.getColor(), 'indigo')
+})
+
+testTheme('initColor()：读存储并应用；非法存储回退 indigo', () => {
+  const teal = createThemeEnv({ storedColor: 'teal' })
+  teal.theme.initColor()
+  assert.equal(teal.readColorAttr(), 'teal')
+
+  const invalid = createThemeEnv({ storedColor: 'bogus' })
+  invalid.theme.initColor()
+  assert.equal(invalid.readColorAttr(), 'indigo')
+})
+
+testTheme('init() 会应用存储的主题色', () => {
+  const env = createThemeEnv({ storedColor: 'orange' })
+  env.theme.init()
+  assert.equal(env.readColorAttr(), 'orange')
 })

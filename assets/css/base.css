@@ -14,6 +14,8 @@ body{min-height:100vh;min-height:100dvh;margin:0;display:flex;flex-direction:col
 /* ------------------------------------------------------------ 顶栏 */
 .appbar{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:var(--space-2);height:64px;padding:0 var(--space-2);background-color:var(--primary-bg);color:var(--on-primary);box-shadow:var(--elevation-2)}
 .appbar-title{flex:1;min-width:0;font-size:var(--font-size-lg);font-weight:var(--font-weight-medium);letter-spacing:var(--letter-spacing);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.appbar-logo{display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center;width:32px;height:32px;margin-right:var(--space-1);border-radius:var(--radius-full);background-color:rgba(255,255,255,.18)}
+.appbar-logo-svg{width:20px;height:20px;fill:none;stroke:var(--on-primary);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .appbar-icon{display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center;width:40px;height:40px;padding:0;border:0;border-radius:var(--radius-full);background-color:transparent;color:var(--on-primary);cursor:pointer;transition:background-color var(--transition-fast) var(--ease)}
 @media (hover:hover){.appbar-icon:hover{background-color:rgba(255,255,255,.12)}}
 .appbar-icon:active{background-color:rgba(255,255,255,.2)}
@@ -32,6 +34,8 @@ body{min-height:100vh;min-height:100dvh;margin:0;display:flex;flex-direction:col
 .nav-item{display:flex;align-items:center;width:100%;min-height:44px;padding:0 var(--space-5);border:0;background-color:transparent;color:var(--text);font-family:var(--font-sans);font-size:var(--font-size-sm);font-weight:var(--font-weight-medium);line-height:var(--line-height-tight);text-align:left;cursor:pointer;box-shadow:inset 0 0 0 transparent;transition:background-color var(--transition-fast) var(--ease),color var(--transition-fast) var(--ease),box-shadow var(--transition-fast) var(--ease)}
 @media (hover:hover){.nav-item:hover{background-color:var(--overlay-hover)}}
 .nav-item[aria-current='true']{background-color:var(--overlay-active);color:var(--primary);box-shadow:inset 3px 0 0 var(--primary)}
+.nav-icon{flex:0 0 auto;width:18px;height:18px;margin-right:var(--space-3);fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.nav-label{flex:1;text-align:left}
 
 /* ------------------------------------------------------------ 内容区卡片 */
 #main-content{flex:1;min-width:0;padding:var(--space-5)}
@@ -63,6 +67,16 @@ body.panel-open #settings-panel{transform:none}
 .panel-link{display:flex;align-items:center;min-height:48px;padding:0 8px;border-top:1px solid var(--divider);margin-top:8px;color:var(--primary);font-size:var(--font-size-sm);font-weight:var(--font-weight-medium);text-decoration:none}
 @media (hover:hover){.panel-link:hover{background-color:var(--overlay-hover)}}
 
+/* 设置里的「主题色」行与 MDUI 色块 */
+.settings-row{display:flex;flex-direction:column;gap:var(--space-2);padding:var(--space-2) var(--space-2) var(--space-1)}
+.settings-label{font-size:13px;color:var(--text-secondary)}
+.swatches{display:flex;flex-wrap:wrap;gap:var(--space-2)}
+.swatch{width:28px;height:28px;padding:0;border:0;border-radius:var(--radius-full);cursor:pointer;transition:transform var(--transition-fast) var(--ease),box-shadow var(--transition-fast) var(--ease)}
+@media (hover:hover){.swatch:hover{transform:scale(1.12)}}
+.swatch:active{transform:scale(.96)}
+.swatch[aria-pressed='true']{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--primary-bg)}
+.swatch:focus-visible{outline:var(--focus-ring-width) solid var(--focus-ring);outline-offset:2px}
+
 /* MD1 switch：文字在左，::after 轨道 / ::before 滑块，只靠 aria-pressed 切换 */
 .switch-row{display:flex;align-items:center;width:100%;min-height:56px;padding:0 56px 0 8px;border:0;border-radius:var(--radius-sm);background-color:transparent;color:var(--text);font-family:var(--font-sans);font-size:15px;font-weight:var(--font-weight-medium);line-height:var(--line-height-tight);text-align:left;cursor:pointer;transition:background-color var(--transition-fast) var(--ease)}
 @media (hover:hover){.switch-row:hover{background-color:var(--overlay-hover)}}
@@ -93,6 +107,8 @@ body.nav-open .site-nav{transform:none}
 }
 @media (max-width:480px){
 .appbar{height:56px;padding:0 var(--space-1)}
+.appbar-logo{width:28px;height:28px}
+.appbar-logo-svg{width:18px;height:18px}
 .site-nav{top:56px}
 .card,#main-content{padding:var(--space-4)}
 /* 窄屏：输入框与搜索按钮同一行，站点按钮触控 ≥44px */

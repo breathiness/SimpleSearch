@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- 由 scripts/build.mjs 从 templates/page.html 生成，请勿手改 -->
-<html lang="zh-CN" data-theme="light" data-theme-default="auto">
+<html lang="zh-CN" data-theme="light" data-theme-default="auto" data-color="indigo">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -33,6 +33,12 @@
         } catch (e) {}
       }
       el.setAttribute('data-theme', theme || 'light')
+      // 主题色：在样式表生效前贴到 <html>，避免闪一下默认色
+      var color = null
+      try { color = localStorage.getItem('ss.color') } catch (e) {}
+      // 只接受形如 indigo / deep-purple 的合法 id，其余落回默认色
+      if (!/^[a-z][a-z-]{2,11}$/.test(color || '')) color = 'indigo'
+      el.setAttribute('data-color', color)
     })()
   </script>
   <link rel="stylesheet" href="assets/css/tokens.css">
@@ -55,6 +61,13 @@
     <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
     <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h9M19 7h1M4 12h3M13 12h7M4 17h7M17 17h3"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="14" cy="17" r="2"/></symbol>
     <symbol id="i-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="i-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="10.6" cy="10.6" r="3.6"/><path d="M13.4 13.4 16.6 16.6"/></symbol>
+    <symbol id="i-cat-all" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="6.4" height="6.4" rx="1"/><rect x="13.6" y="4" width="6.4" height="6.4" rx="1"/><rect x="4" y="13.6" width="6.4" height="6.4" rx="1"/><rect x="13.6" y="13.6" width="6.4" height="6.4" rx="1"/></symbol>
+    <symbol id="i-cat-tech" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M7 9.5l3 2.8-3 2.8"/><path d="M12.5 16h4"/></symbol>
+    <symbol id="i-cat-community" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 5.5h11v7.5H9.2L6.4 15.6V13H3.5z"/><path d="M8.7 9.8h11.8v7.4h-2.3v2.6l-2.9-2.6H8.7z"/></symbol>
+    <symbol id="i-cat-media" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="7.5" width="17" height="11" rx="2.5"/><path d="M8.5 4.5 11 7.5M15.5 4.5 13 7.5"/><path d="M10.5 11v4l3.5-2z"/></symbol>
+    <symbol id="i-cat-shopping" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5.6 8h12.8l-1.2 11.5H6.8z"/><path d="M9 8V6.4a3 3 0 0 1 6 0V8"/></symbol>
+    <symbol id="i-cat-content" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5h3.4L9 6.5h6l1.6 2H20v10H4z"/><circle cx="12" cy="13.5" r="3"/></symbol>
   </svg>
   <a class="skip-link" href="#search-input">跳到搜索框</a>
 
@@ -63,6 +76,7 @@
             aria-expanded="false" aria-controls="site-nav">
       <svg class="appbar-icon-svg" aria-hidden="true" focusable="false"><use href="#i-menu"></use></svg>
     </button>
+    <span class="appbar-logo" aria-hidden="true"><svg class="appbar-logo-svg" focusable="false"><use href="#i-logo"></use></svg></span>
     <span class="appbar-title">简单搜索</span>
     <button id="settings-toggle" class="appbar-icon" type="button" aria-label="设置"
             aria-expanded="false" aria-controls="settings-panel">
@@ -74,12 +88,12 @@
     <aside id="site-nav" class="site-nav" aria-label="站点分类">
       <p class="nav-group-title">站点分类</p>
       <nav id="group-chips" class="nav-list" aria-label="按分类筛选站点">
-        <button class="nav-item" type="button" data-group="all" aria-current="true">全部</button>
-        <button class="nav-item" type="button" data-group="tech" aria-current="false">技术开发</button>
-        <button class="nav-item" type="button" data-group="community" aria-current="false">社区问答</button>
-        <button class="nav-item" type="button" data-group="media" aria-current="false">影音游戏</button>
-        <button class="nav-item" type="button" data-group="shopping" aria-current="false">购物</button>
-        <button class="nav-item" type="button" data-group="content" aria-current="false">素材资讯</button>
+        <button class="nav-item" type="button" data-group="all" aria-current="true"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-all"></use></svg><span class="nav-label">全部</span></button>
+        <button class="nav-item" type="button" data-group="tech" aria-current="false"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-tech"></use></svg><span class="nav-label">技术开发</span></button>
+        <button class="nav-item" type="button" data-group="community" aria-current="false"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-community"></use></svg><span class="nav-label">社区问答</span></button>
+        <button class="nav-item" type="button" data-group="media" aria-current="false"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-media"></use></svg><span class="nav-label">影音游戏</span></button>
+        <button class="nav-item" type="button" data-group="shopping" aria-current="false"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-shopping"></use></svg><span class="nav-label">购物</span></button>
+        <button class="nav-item" type="button" data-group="content" aria-current="false"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-content"></use></svg><span class="nav-label">素材资讯</span></button>
       </nav>
     </aside>
 
@@ -132,6 +146,10 @@
     <div class="panel-body">
       <button id="theme-toggle" class="switch-row" type="button" aria-pressed="false">夜间模式</button>
       <button id="suggest-source-toggle" class="switch-row" type="button" aria-pressed="true">联网联想</button>
+      <div class="settings-row">
+        <span class="settings-label">主题色</span>
+        <div id="color-swatches" class="swatches" role="group" aria-label="主题色"></div>
+      </div>
       <a class="panel-link" href="https://github.com/breathiness/SimpleSearch">GitHub 仓库 · 关于</a>
     </div>
   </aside>
