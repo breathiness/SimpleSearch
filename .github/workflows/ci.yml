@@ -27,7 +27,7 @@ jobs:
         # 先 build 再 diff 才能发现「改了 sites.js / 模板却忘了提交生成页」的漂移。
         run: |
           npm run build
-          git diff --exit-code -- SimpleSearch-Light.html SimpleSearch-Dark.html
+          git diff --exit-code -- index.html SimpleSearch-Light.html SimpleSearch-Dark.html
 
       - name: 构建、单元测试、静态校验
         run: npm run check

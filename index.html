@@ -1,131 +1,91 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="light">
+<!-- 由 scripts/build.mjs 从 templates/page.html 生成，请勿手改 -->
+<html lang="zh-CN" data-theme="light" data-theme-default="auto">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>简单搜索 SimpleSearch</title>
-  <meta name="description" content="一款超简单的聚合搜索网站：输入关键词，点击网站即可在该站内搜索；不输入则直接打开网站。">
-  <meta name="theme-color" content="#f5f5f5" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#303030" media="(prefers-color-scheme: dark)">
+  <title>简单搜索</title>
+  <meta name="description" content="一款超简单的聚合搜索网站：输入关键词，点击网站即可在该站内搜索；不输入则直接打开网站。自动跟随系统深浅色，也可一键切换。">
+  <meta name="theme-color" content="#f5f5f5">
+  <meta property="og:title" content="简单搜索">
+  <meta property="og:description" content="一款超简单的聚合搜索网站：输入关键词，点击网站即可在该站内搜索；不输入则直接打开网站。自动跟随系统深浅色，也可一键切换。">
+  <meta property="og:type" content="website">
   <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
-  <style>
-    /* 落地页：自包含的 MDUI 1 / Material Design 1 观感（与入口页同一套视觉语言）。
-       颜色参考 MDUI 1 官方色表：primary #3f51b5，grey-100 #f5f5f5，grey-800 #424242。 */
-    :root {
-      --bg: #f5f5f5;
-      --surface: #ffffff;
-      --text: rgba(0, 0, 0, .87);
-      --text-secondary: rgba(0, 0, 0, .54);
-      --divider: rgba(0, 0, 0, .12);
-      --primary: #3f51b5;
-      --primary-bg: #3f51b5;
-      --on-primary: #ffffff;
-      --elevation-2: 0 1px 3px rgba(0, 0, 0, .12), 0 1px 2px rgba(0, 0, 0, .24);
-      --elevation-4: 0 2px 4px -1px rgba(0, 0, 0, .2), 0 4px 5px 0 rgba(0, 0, 0, .14), 0 1px 10px 0 rgba(0, 0, 0, .12);
-      --ease: cubic-bezier(.4, 0, .2, 1);
-      color-scheme: light;
-    }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg: #303030;
-        --surface: #424242;
-        --text: rgba(255, 255, 255, .87);
-        --text-secondary: rgba(255, 255, 255, .7);
-        --divider: rgba(255, 255, 255, .12);
-        --primary: #9fa8da;
-        --primary-bg: #3f51b5;
-        color-scheme: dark;
+  <script>
+    // 防闪烁：样式表生效前确定主题。优先级与 theme.js 一致：
+    // ?theme= 参数 → localStorage ss.theme → 系统深色偏好 → 浅色
+    (function () {
+      var el = document.documentElement
+      var theme = null
+      try {
+        var matched = /[?&]theme=(light|dark)(?:&|$)/.exec(location.search || '')
+        if (matched) theme = matched[1]
+      } catch (e) {}
+      if (!theme) {
+        try {
+          var stored = localStorage.getItem('ss.theme')
+          if (stored === 'light' || stored === 'dark') theme = stored
+        } catch (e) {}
       }
-    }
-    *, *::before, *::after { box-sizing: border-box; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      min-height: 100dvh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 32px;
-      padding: 48px 20px;
-      border-top: 4px solid var(--primary-bg);
-      background-color: var(--bg);
-      color: var(--text);
-      font-family: Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
-      font-size: 14px;
-      line-height: 1.5;
-    }
-    header { max-width: 32rem; text-align: center; }
-    h1 {
-      margin: 0 0 8px;
-      color: var(--primary);
-      font-size: clamp(1.5rem, 5vw, 2rem);
-      font-weight: 500;
-      letter-spacing: .5px;
-    }
-    .lead { margin: 0; color: var(--text-secondary); font-size: 16px; }
-    .cards {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 16px;
-      justify-content: center;
-      width: 100%;
-      max-width: 44rem;
-    }
-    /* MD1 卡片：2px 圆角 + elevation 2dp，hover 升到 4dp */
-    .card {
-      flex: 1 1 16rem;
-      display: block;
-      padding: 20px 24px;
-      border: 1px solid var(--divider);
-      border-radius: 2px;
-      background-color: var(--surface);
-      color: inherit;
-      text-decoration: none;
-      box-shadow: var(--elevation-2);
-      transition: box-shadow 200ms var(--ease), background-color 200ms var(--ease);
-    }
-    @media (hover: hover) {
-      .card:hover { box-shadow: var(--elevation-4); }
-    }
-    .card:active { box-shadow: var(--elevation-4); }
-    .card strong {
-      display: block;
-      margin-bottom: 4px;
-      color: var(--text);
-      font-size: 16px;
-      font-weight: 500;
-    }
-    .card span { color: var(--text-secondary); font-size: 14px; }
-    .card:focus-visible, a:focus-visible {
-      outline: 2px solid var(--primary);
-      outline-offset: 2px;
-    }
-    footer { color: var(--text-secondary); font-size: 14px; }
-    footer a { color: var(--primary); text-decoration: none; }
-    @media (hover: hover) { footer a:hover { text-decoration: underline; } }
-    @media (prefers-reduced-motion: reduce) {
-      .card { transition: none; }
-    }
-  </style>
+      if (!theme) {
+        try {
+          if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) theme = 'dark'
+        } catch (e) {}
+      }
+      el.setAttribute('data-theme', theme || 'light')
+    })()
+  </script>
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/base.css">
+  <link rel="stylesheet" href="assets/css/input.css">
 </head>
 <body>
-  <header>
-    <h1>简单搜索</h1>
-    <p class="lead">输入关键词，点击网站即在该站内搜索；不输入则直接打开网站。</p>
-  </header>
-  <div class="cards">
-    <a class="card" href="SimpleSearch-Light.html">
-      <strong>浅色模式 →</strong>
-      <span>明亮背景，白天使用</span>
-    </a>
-    <a class="card" href="SimpleSearch-Dark.html">
-      <strong>夜间模式 →</strong>
-      <span>深色背景，暗光环境更舒适</span>
-    </a>
-  </div>
-  <footer>
-    <a href="https://github.com/breathiness/SimpleSearch">GitHub 仓库</a> · MIT License
+  <a class="skip-link" href="#search-input">跳到搜索框</a>
+
+  <main id="search-container">
+    <form id="search-form" role="search" action="https://www.bing.com/search" method="get" autocomplete="off">
+      <div class="search-field">
+        <input id="search-input" name="q" type="text" placeholder="搜索…" aria-label="搜索关键词"
+               aria-autocomplete="list" aria-controls="suggest-list" aria-expanded="false"
+               enterkeyhint="search" autocomplete="off" spellcheck="false" maxlength="512">
+        <button id="clear-button" class="icon-button" type="button" aria-label="清除输入内容" hidden>✕</button>
+        <ul id="suggest-list" class="suggest-list" role="listbox" aria-label="搜索建议" hidden></ul>
+      </div>
+      <button id="search-submit" class="submit-button" type="submit">搜索</button>
+    </form>
+
+    <nav id="buttons-container" aria-label="常用网站">
+      <button class="button" type="button" data-site="github" data-keywords="gh git 代码 开源">GitHub</button>
+      <button class="button" type="button" data-site="unsplash" data-keywords="图片 壁纸 摄影 photo wallpaper">Unsplash</button>
+      <button class="button" type="button" data-site="bilibili" data-keywords="b站 哔哩 视频 弹幕 bilibili">哔哩哔哩</button>
+      <button class="button" type="button" data-site="sspai" data-keywords="少数派 效率 数码 sspai">少数派</button>
+      <button class="button" type="button" data-site="moegirl" data-keywords="萌娘 百科 二次元 moe acg">萌娘百科</button>
+      <button class="button" type="button" data-site="zhihu" data-keywords="知乎 问答 zhihu qa">知乎</button>
+      <button class="button" type="button" data-site="tieba" data-keywords="贴吧 百度 tieba forum">百度贴吧</button>
+      <button class="button" type="button" data-site="taobao" data-keywords="淘宝 购物 taobao shop">淘宝</button>
+      <button class="button" type="button" data-site="jd" data-keywords="京东 购物 jd jd.com">京东</button>
+      <button class="button" type="button" data-site="steam" data-keywords="steam 蒸汽 游戏 game">Steam</button>
+      <button class="button" type="button" data-site="archwiki" data-keywords="arch linux wiki 文档">ArchWiki</button>
+    </nav>
+
+    <noscript>
+      <p class="noscript-hint">JavaScript 未启用：直接在输入框回车仍可用 Bing 搜索。</p>
+    </noscript>
+  </main>
+
+  <footer id="site-footer">
+    <button id="suggest-source-toggle" class="footer-button" type="button" aria-pressed="true">联网联想：开</button>
+    <button id="theme-toggle" class="footer-button" type="button" aria-pressed="false">夜间模式</button>
+    <a class="footer-link" href="https://github.com/breathiness/SimpleSearch">关于</a>
   </footer>
+
+  <script defer src="assets/js/sites.js"></script>
+  <script defer src="assets/js/search.js"></script>
+  <script defer src="assets/js/suggest.js"></script>
+  <script defer src="assets/js/history.js"></script>
+  <script defer src="assets/js/theme.js"></script>
+  <script defer src="assets/js/remote.js"></script>
+  <script defer src="assets/js/input.js"></script>
+  <script defer src="assets/js/app.js"></script>
 </body>
 </html>

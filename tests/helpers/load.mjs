@@ -8,7 +8,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 export const JS_DIR = path.join(ROOT, 'assets', 'js')
 
-export const ENTRY_FILES = ['SimpleSearch-Light.html', 'SimpleSearch-Dark.html']
+// v2.1 起 index.html 是唯一真实页面；两个旧入口是重定向壳，同样受 file:// 红线约束。
+export const ENTRY_FILES = ['index.html', 'SimpleSearch-Light.html', 'SimpleSearch-Dark.html']
 
 // build.mjs 生成的产物顶部会带这段注释；没有它说明还没构建过（或被人手改）。
 export const BUILD_MARKER = /<!--\s*由 scripts\/build\.mjs/

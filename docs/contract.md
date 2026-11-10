@@ -7,7 +7,7 @@
 1. **纯静态**：GitHub Pages 直接托管，**零运行时依赖**，不引入 CDN、字体、框架。
 2. **`file://` 双击可用**：直接双击 `SimpleSearch-Light.html` 打开必须完整可用（这是原项目的核心卖点：「本地版加载时间 3 毫秒」）。**因此 `assets/js/*.js` 一律使用经典脚本（classic script），禁止在 `assets/js/` 内出现 `import` / `export` 语句、禁止 `type="module"`。**
 3. **保留原入口 URL**：`SimpleSearch-Light.html`、`SimpleSearch-Dark.html` 继续存在且可访问（README 里的在线地址不能 404）。
-4. **单一数据源**：站点列表只写在 `assets/js/sites.js` 一处。两个入口页由 `scripts/build.mjs` 在**开发时**生成为静态 HTML 后提交入库；线上仍是无构建的静态文件。
+4. **单一数据源**：站点列表只写在 `assets/js/sites.js` 一处。v2.1 起只有一个真实页面 `index.html`，由 `scripts/build.mjs` 在**开发时**生成为静态 HTML 后提交入库；线上仍是无构建的静态文件。旧的 `SimpleSearch-Light.html` / `-Dark.html` 保留为 0 秒重定向壳。
 5. **视觉风格克制**：延续原项目的极简风格（居中输入框 + 下方按钮墙），不改成卡片站导航或花哨动效。明暗两套配色都要好看、可读（正文对比度 ≥ 4.5:1）。
 6. 不引入任何追踪、不请求任何非必要第三方资源。搜狗/必应联想等网络请求必须可选、可失败、失败即静默降级。
 
@@ -80,8 +80,9 @@ SS.defaultEngine = 'bing'
 
 | 键 | 类型 | 说明 |
 |---|---|---|
-| `ss.theme` | `'light' \| 'dark'` | 用户显式选择的主题；无值则用当前入口页默认值 |
+| `ss.theme` | `'light' \| 'dark'` | 用户显式选择的主题；无值则按 `?theme=` → 系统偏好 → 浅色（见 §12） |
 | `ss.history` | `string[]` | 最近搜索词，最多 10 条，新的在前，去重 |
+| `ss.remote` | `'on' \| 'off'` | 联网联想开关；缺省视为 `on`（见 §12） |
 
 读写在 `try/catch` 内（隐私模式/禁用 localStorage 不能报错）。
 
@@ -150,7 +151,8 @@ SS.theme = {
 ```
 
 - 主题通过 `<html data-theme="light|dark">` 生效，CSS 只认这个属性。
-- 防闪烁：`templates/page.html` 里已有一小段内联脚本，在 CSS 之前设置 `data-theme`；`theme.js` 不要重复造轮子，只做交互与持久化。
+- 防闪烁：`templates/page.html` 里已有一小段内联脚本，在 CSS 之前按 `?theme=` → 存储 → 系统偏好 → 浅色 的顺序设置 `data-theme`；`theme.js` 不要重复造轮子，只做交互与持久化。
+- **单页模式（§12）**：`data-theme-default` 固定为 `auto`，主题解析优先级见 §12；`theme.js` 的 `resolve(pageDefault)` 需实现该系统偏好回退，并在检测到 `?theme=` 时把它持久化、再用 `history.replaceState` 把参数从地址栏去掉。
 - 主题按钮文案/`aria-pressed` 由 `theme.js` 更新；`#theme-toggle` 初始内容由模板给出。
 
 ### 5.5 `SS.input`（input-ux）
@@ -168,14 +170,43 @@ SS.input = {
 - 联想项被采用后：`type==='engine'` → 用默认引擎搜索该词；`site` → `SS.search.resolveSite`；`history` → 填入输入框并搜索。
 - 输入框为空时不渲染列表；`hidden` 属性控制显隐，**不要**用 `display:none` 内联样式。
 
-### 5.6 `SS.app`（lead）
+### 5.6 `SS.remote`（input-ux，新增模块 `assets/js/remote.js`）
+
+联网联想：把当前输入发给**百度联想**（JSONP，无需 CORS），失败/超时/关闭时静默返回空数组，联想能力始终可用（本地部分不依赖网络）。
+
+```js
+SS.remote = {
+  KEY: 'ss.remote',                 // 'on' | 'off'，缺省 on
+  enabled() -> boolean,
+  setEnabled(bool) -> boolean,      // 写存储并返回新状态
+  // 返回纯字符串数组（已去重、已裁剪），永不 reject；关闭/空词/失败 → []
+  fetch(rawQuery, opts) -> Promise<string[]>,
+  // opts: { timeout?: number（默认 700ms）, limit?: number（默认 5）, signal? }
+  // 内部要求：内存缓存 Map（≤100 条、TTL 10 分钟）、同词并发只发一次、
+  //           新 query 到来时旧请求结果直接丢弃（用序号/AbortController 守卫）
+  provider: {                       // 可插拔，默认百度；将来加别的只改这里
+    id: 'baidu',
+    label: '百度',
+    buildUrl(query, callbackName) -> string,   // JSONP URL
+    parse(text) -> string[],                   // 解析 JSONP 回包里的词
+  },
+}
+```
+
+硬约束：
+- JSONP 只允许 `document.createElement('script')` 注入，回调名唯一（`ss_suggest_<n>`），**用完删除 script 标签和全局回调**，并 `try/catch` 包住；禁止 `eval`。
+- 结果只用 `textContent` 渲染（禁止 `innerHTML`），非字符串/超长（>100 字符）一律过滤。
+- 网络请求只在 `enabled()` 为真且输入非空时发生；关闭后**不得有任何第三方请求**。
+- `file://` 下也必须可用（JSONP 不受 CORS 限制）。
+
+### 5.7 `SS.app`（lead）
 
 `app.js` 负责：DOMContentLoaded 后依次 `SS.theme.init()`、`SS.input.init()`；用事件委托处理 `#buttons-container .button[data-site]` 点击；拦截 `#search-form` submit（空词则聚焦输入框并阻止提交，非空交给原生 GET 提交到 Bing —— 浏览器的表单编码天然正确）；`Ctrl/⌘/Alt + 点击`站点按钮时 `window.open` 新标签页。
 
 ## 6. DOM 契约（模板已按此写好，改文案可以，改 id/class/aria 必须先问 lead）
 
 ```html
-<html lang="zh-CN" data-theme="light" data-theme-default="light">
+<html lang="zh-CN" data-theme="light" data-theme-default="auto">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -208,6 +239,7 @@ SS.input = {
     </nav>
   </main>
   <footer id="site-footer">
+    <button id="suggest-source-toggle" class="footer-button" type="button" aria-pressed="true">联网联想：开</button>
     <button id="theme-toggle" class="footer-button" type="button">夜间模式</button>
     <a class="footer-link" href="https://github.com/breathiness/SimpleSearch">关于</a>
   </footer>
@@ -216,6 +248,7 @@ SS.input = {
   <script defer src="assets/js/suggest.js"></script>
   <script defer src="assets/js/history.js"></script>
   <script defer src="assets/js/theme.js"></script>
+  <script defer src="assets/js/remote.js"></script>
   <script defer src="assets/js/input.js"></script>
   <script defer src="assets/js/app.js"></script>
 </body>
@@ -224,7 +257,7 @@ SS.input = {
 
 补充要求：
 - **`hidden` 属性必须真的能隐藏元素**：`base.css` 里给出 `[hidden] { display: none; }`，并且任何自带 `display` 的组件（如 `.suggest-list`）要用 `.suggest-list:not([hidden]) { display: ... }` 写法，否则会盖掉原生的 `[hidden]` 规则。
-- `assets/js/app.js`、`index.html` 由 lead 直接维护；index.html 允许自带内联 `<style>`（落地页，不进构建流程）。
+- `assets/js/app.js` 由 lead 直接维护；`index.html` 由 `scripts/build.mjs` 从 `templates/page.html` 生成，**不允许手改**（`index.html` 只能通过模板改）。
 - CSS 里**禁止**用 `!important`（除第三方覆盖场景，本项目不需要）。
 - 所有交互控件保留可见 `:focus-visible` 轮廓（≥2px，对比度达标）。
 - 支持 `prefers-reduced-motion: reduce`（关闭过渡）。
@@ -232,15 +265,20 @@ SS.input = {
 
 ## 7. 构建产物（lead）
 
-- 输入：`templates/page.html` + `SS.sites`（通过 `node` 动态 `import` `assets/js/sites.js` 读取）
-- 输出：`SimpleSearch-Light.html`、`SimpleSearch-Dark.html`（占位符：`{{THEME}}`、`{{THEME_DEFAULT}}`、`{{TITLE}}`、`{{DESCRIPTION}}`、`{{THEME_COLOR}}`、`{{THEME_TOGGLE_LABEL}}`、`{{SITE_BUTTONS}}`）
-- `node scripts/build.mjs` 写入；`node scripts/build.mjs --check` 只比对、不写、有差异则退出码 1（CI 用）。
-- 生成文件顶部会带 `<!-- 由 scripts/build.mjs 生成，请勿手改 -->` 注释。
+**v2.1 起只有一个真实页面**（单页主题，见 §12），两个旧 URL 变成重定向壳：
+
+- 输入：`templates/page.html`（真实页）、`templates/redirect.html`（重定向壳）+ `SS.sites`（`node` 动态 `import` `assets/js/sites.js` 读取）
+- 输出三个文件，均由 `scripts/build.mjs` 生成：
+  - `index.html` —— 唯一真实页面，`data-theme-default="auto"`；占位符 `{{THEME_DEFAULT}}`、`{{TITLE}}`、`{{DESCRIPTION}}`、`{{THEME_COLOR}}`、`{{THEME_TOGGLE_LABEL}}`、`{{SITE_BUTTONS}}`
+  - `SimpleSearch-Light.html` —— 0 秒重定向到 `index.html?theme=light`（`<meta http-equiv="refresh">` + `location.replace` + `<link rel="canonical">`，无 JS 也能跳）
+  - `SimpleSearch-Dark.html` —— 同上，指向 `index.html?theme=dark`
+- `node scripts/build.mjs` 写入；`--check` 只比对不写、有差异退出码 1（CI 用）。
+- 生成文件顶部带 `<!-- 由 scripts/build.mjs 生成，请勿手改 -->` 注释。
 
 ## 8. 脚本（`package.json` 预置，勿改）
 
 ```
-npm run build      # 生成两入口页
+npm run build      # 生成 index.html + 两个重定向壳
 npm test           # node --test "tests/**/*.test.mjs"（Node ≥ 21 由 Node 自己展开 glob；不要用 `node --test tests/`）
 npm run validate   # 静态检查 + 生成产物是否最新（--check）
 npm run check      # build && test && validate（CI 只跑这个）
@@ -251,13 +289,14 @@ npm run serve      # 本地静态服务器 http://127.0.0.1:8080
 ## 9. 验收门（qa-test 与 lead 必查）
 
 1. `npm run check` 全绿。
-2. 11 个站点 ×（空词 / 普通词 / 特殊词 `a&b`、`c#d`、`a+b`、`中文 空格`、emoji）× 两主题，URL 与预期表一致。
-3. 生成产物与模板一致（`--check` 通过，无手改漂移）。
-4. 双主题切换、刷新后保持（`ss.theme`）。
+2. 11 个站点 ×（空词 / 普通词 / 特殊词 `a&b`、`c#d`、`a+b`、`中文 空格`、emoji）× 明暗两主题，URL 与预期表一致。
+3. 生成产物与模板一致（`--check` 通过，无手改漂移）；三个产物齐全，两个重定向壳指向正确。
+4. 单页主题：`?theme=` → 存储 → 系统偏好 → 浅色 的解析顺序正确；切换后刷新保持；旧 URL 跳转后主题正确。
 5. 键盘全流程：Tab 可达、`/` 聚焦、↑↓ 选联想、Enter 采用、Esc 关闭、清除按钮可用。
-6. 无外部网络请求即可完成全部核心功能（断网可用）。
-7. `file://` 直接打开可用（无 CORS 报错、无 module 加载失败）。
-8. 单文件页面 + 全部资源体积目标：< 80 KB（gzip 前，MDUI 1 风格下仍远小于引入框架的体积）。
+6. 关闭联网联想（`ss.remote='off'`）时**零第三方网络请求**，全部核心功能离线可用。
+7. 开启联网联想时：请求只发往 provider 域（百度），700ms 超时/失败静默降级为本地联想，永不阻塞键盘。
+8. `file://` 直接打开可用（无 CORS 报错、无 module 加载失败；联网联想在 file:// 下也能工作）。
+9. 单文件页面 + 全部资源体积目标：< 80 KB（gzip 前，MDUI 1 风格下仍远小于引入框架的体积）。
 
 ## 10. 沟通规则
 
@@ -281,9 +320,33 @@ npm run serve      # 本地静态服务器 http://127.0.0.1:8080
 | 正文 / 次要 / 禁用 / 分隔线 | `rgba(0,0,0,.87/.54/.38/.12)` | `rgba(255,255,255,.87/.70/.50/.12)` |
 
 组件规范：
-- **涟漪（ripple）**：MDUI 招牌反馈。CSS 在 `base.css`（`.ripple` + keyframes），JS 注入在 `assets/js/app.js`（点击 `.button`、`#search-submit`、`#theme-toggle`、`.icon-button`、`.suggest-item`）。
+- **涟漪（ripple）**：MDUI 招牌反馈。CSS 在 `base.css`（`.ripple` + keyframes），JS 注入在 `assets/js/app.js`（点击 `.button`、`#search-submit`、`#theme-toggle`、`#suggest-source-toggle`、`.icon-button`、`.suggest-item`）。
 - **按钮**：MD1 raised button —— 36px 高（移动端 ≥44px）、圆角 2px、14px/500、`letter-spacing:.5px`、elevation 2dp，hover 4dp。
 - **输入框**：MD1 textfield —— 48px 高、2px 圆角、表面色底、底部下划线（聚焦 2px 主色并做 scaleX 动画），`cubic-bezier(.4,0,.2,1)` 200ms。
 - **联想下拉**：MD1 menu —— 表面色、2px 圆角、elevation 8dp、项高 44px、hover 8% 遮罩、当前项左侧 3px 主色条。
 - 字体：`Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif`（系统回退，不下载字体）。
 - 圆角统一 2px；阴影只用 2dp/4dp/8dp 三档 elevation；`prefers-reduced-motion: reduce` 下关闭涟漪与过渡。
+
+## 12. v2.1：单页主题 + 联网联想（用户指定）
+
+### 12.1 单页主题（明暗在同一个网页里切换）
+
+v1/v2.0 是两个文件（Light/Dark），v2.1 合并成**一个真实页面 `index.html`**：
+
+- 主题解析优先级（首屏内联脚本与 `SS.theme.resolve()` 必须一致）：
+  1. URL 参数 `?theme=light|dark`（老链接进来时用）
+  2. `localStorage['ss.theme']`（用户上一次显式切换）
+  3. 系统偏好 `prefers-color-scheme`
+  4. 回退 `light`
+- 检测到 `?theme=` 时：应用该主题 → `ss.theme` 持久化 → `history.replaceState` 去掉参数（避免分享出去的地址固定主题）。
+- 两个旧 URL 保留为重定向壳（`SimpleSearch-Light.html` → `index.html?theme=light`，Dark 同理），老书签/老 README 链接不失效。
+- 页脚切换按钮 `#theme-toggle` 不变：点击在 light/dark 间切换并持久化。
+- 系统偏好变化（用户在 OS 里切深浅色）且用户没有显式选择时，应实时跟随（`matchMedia` 监听；用户显式切换过就不再跟随）。
+
+### 12.2 联网联想（百度 JSONP）
+
+- 默认开启（`ss.remote` 缺省 = `on`），页脚 `#suggest-source-toggle` 可关闭；关闭后零第三方请求。
+- 数据源：百度联想 JSONP `https://suggestion.baidu.com/su?wd=<q>&cb=<fn>` → 回包 `fn({q:"...",p:false,s:["词1","词2",...]})`。provider 可插拔（§5.6），将来换/加源只改 `remote.js`。
+- 合并顺序（最多 8 条）：`[用 Bing 搜索：q]` + 站点匹配（本地，≤3） + 联网联想（≤5，sublabel 显示「百度」） + 历史匹配（本地，≤2）。去重按词面（大小写不敏感）。
+- 性能与稳健：输入防抖 140ms 之后才发请求；700ms 超时；同词并发只发一次；缓存 10 分钟、最多 100 条；结果返回时若输入已变化则丢弃；**任何失败都不影响本地联想与搜索**。
+- 隐私：开启时会把输入的关键词发给百度；README 必须明确写清，并说明「关闭后完全离线」。

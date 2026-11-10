@@ -1,20 +1,31 @@
-// 输入体验：清除按钮、搜索按钮可用态、联想列表渲染与键盘/鼠标交互。
-// 契约 §5.5：只读历史（写入由 app.js 负责），默认完全离线，不发任何网络请求。
-// 经典脚本：只注册 SS.input，顶层不碰 DOM；由 app.js 在 DOMContentLoaded 后调用 init()。
+// 输入体验：清除按钮、搜索按钮可用态、联想列表与键盘/鼠标交互。
+// 契约 §5.5/§5.6/§12.2：历史只由 app.js 写；本地联想先渲染，联网结果回来合并；关闭开关零第三方请求。
+// 经典脚本：只注册 SS.input，顶层不碰 DOM，由 app.js 在 DOMContentLoaded 后调用 init()。
 ;(function (root) {
   'use strict'
 
   const SS = (root.SimpleSearch = root.SimpleSearch || {})
 
-  // 输入防抖：≥120ms（契约要求），取 140ms 兼顾手感与性能
+  // 输入防抖 ≥120ms，取 140ms
   const DEBOUNCE_MS = 140
-  // 失焦后延迟关闭：≥100ms，避免点击联想项时先被 blur 关掉
+  // 失焦延迟关闭 ≥100ms，避免点击联想项先被 blur 关掉
   const BLUR_CLOSE_MS = 160
   const OPTION_ID_PREFIX = 'suggest-option-'
   const DEFAULT_ENGINE_SEARCH = 'https://www.bing.com/search?q='
   const KEY_SLASH = '/'
 
-  // 查询词规范化：非字符串按空串；去首尾空白；连续空白折叠为一个空格
+  // 合并上限：[engine] + 站点≤3 + 远程≤5 + 历史≤2，总数 ≤8（契约 §12.2）
+  const SITE_MAX = 3
+  const REMOTE_MAX = 5
+  const HISTORY_MAX = 2
+  const TOTAL_MAX = 8
+  // 向 SS.suggest 要足够多候选，避免其默认 8 条上限把历史项截掉
+  const LOCAL_ITEM_CAP = 24
+  const REMOTE_WORD_MAX_LENGTH = 100
+  const TOGGLE_ON_TEXT = '联网联想：开'
+  const TOGGLE_OFF_TEXT = '联网联想：关闭'
+
+  // 查询词规范化：去首尾空白，连续空白折叠
   function normalize(raw) {
     if (typeof raw !== 'string') return ''
     return raw.trim().replace(/\s+/g, ' ')
@@ -40,6 +51,7 @@
     const clearButton = $('clear-button')
     const submitButton = $('search-submit')
     const list = $('suggest-list')
+    const remoteToggle = $('suggest-source-toggle')
 
     let items = []
     let activeIndex = -1
@@ -47,11 +59,13 @@
     let debounceTimer = 0
     let blurTimer = 0
     let composing = false
+    // 远程请求令牌：新渲染 / 关闭列表都作废旧结果
+    let remoteToken = 0
+    let remoteController = null
 
-    // ---------------------------------------------------------------- 状态同步
+    // ------------------------------------------------------------ 状态同步
 
-    // 清除按钮显隐 + 搜索按钮可用态（aria-disabled 仅表达语义，绝不设 disabled，
-    // 否则表单里唯一的 submit 按钮被禁用后回车提交会失效）
+    // 清除按钮显隐 + 搜索按钮可用态（aria-disabled 只表达语义，绝不设 disabled，否则回车失效）
     function syncFieldState() {
       const value = input.value
       if (clearButton) clearButton.hidden = value.length === 0
@@ -79,18 +93,161 @@
       }
     }
 
-    // ---------------------------------------------------------------- 联想列表
+    // ------------------------------------------------------------ 远程联想
 
-    function computeItems(raw) {
-      if (!SS.suggest || typeof SS.suggest.getItems !== 'function') return []
+    function remoteEnabled() {
+      return Boolean(SS.remote &&
+        typeof SS.remote.enabled === 'function' &&
+        SS.remote.enabled())
+    }
+
+    function createAbortController() {
       try {
-        const result = SS.suggest.getItems(raw)
-        return Array.isArray(result) ? result : []
+        if (typeof root.AbortController === 'function') return new root.AbortController()
       } catch (e) {
-        // 联想失败不影响搜索本身，静默降级为无联想
-        return []
+        /* 老浏览器退化为只用令牌守卫 */
+      }
+      return null
+    }
+
+    // 作废当前远程请求：令牌自增 + abort（可提前删除 JSONP script）
+    function cancelRemote() {
+      remoteToken += 1
+      if (remoteController) {
+        const controller = remoteController
+        remoteController = null
+        try {
+          controller.abort()
+        } catch (e) {
+          /* 忽略 */
+        }
       }
     }
+
+    function syncRemoteToggle() {
+      if (!remoteToggle || !SS.remote) return
+      const on = remoteEnabled()
+      remoteToggle.textContent = on ? TOGGLE_ON_TEXT : TOGGLE_OFF_TEXT
+      remoteToggle.setAttribute('aria-pressed', on ? 'true' : 'false')
+    }
+
+    // ------------------------------------------------------------ 本地 + 合并
+
+    // 取本地项并按契约分组裁剪：engine(1) + 站点(≤3) + 历史(≤2)
+    function collectLocal(raw) {
+      let source = []
+      if (SS.suggest && typeof SS.suggest.getItems === 'function') {
+        try {
+          const result = SS.suggest.getItems(raw, { max: LOCAL_ITEM_CAP })
+          source = Array.isArray(result) ? result : []
+        } catch (e) {
+          source = []
+        }
+      }
+
+      const engine = []
+      const sites = []
+      const history = []
+      for (const item of source) {
+        if (!item || typeof item !== 'object') continue
+        if (item.type === 'engine' && engine.length === 0) engine.push(item)
+        else if (item.type === 'site' && sites.length < SITE_MAX) sites.push(item)
+        else if (item.type === 'history' && history.length < HISTORY_MAX) history.push(item)
+      }
+      return { engine, sites, history }
+    }
+
+    // 按 §12.2 合并：engine + 站点 + 远程 + 历史，总数 ≤8；按词面去重（大小写不敏感）
+    function buildItems(raw, remoteWords) {
+      const local = collectLocal(raw)
+      const seen = new Set()
+      const remember = (value) => {
+        if (typeof value === 'string' && value.trim() !== '') seen.add(value.trim().toLowerCase())
+      }
+      for (const item of local.engine) remember(item.label)
+      for (const item of local.sites) remember(item.label)
+      for (const item of local.history) remember(item.label)
+      // 「用 Bing 搜索：q」已代表当前词，远程原样返回该词只算重复
+      const query = normalize(raw).toLowerCase()
+      if (query !== '') seen.add(query)
+
+      const remoteItems = []
+      const words = Array.isArray(remoteWords) ? remoteWords : []
+      // sublabel 跟随 provider.label，换联想源时无需改这里
+      const providerLabel =
+        SS.remote && SS.remote.provider && typeof SS.remote.provider.label === 'string'
+          ? SS.remote.provider.label
+          : '联网'
+      for (const value of words) {
+        if (typeof value !== 'string') continue
+        const label = value.trim()
+        if (label === '' || label.length > REMOTE_WORD_MAX_LENGTH) continue
+        const dedupeKey = label.toLowerCase()
+        if (seen.has(dedupeKey)) continue
+        seen.add(dedupeKey)
+        remoteItems.push({ type: 'remote', label, sublabel: providerLabel })
+        if (remoteItems.length >= REMOTE_MAX) break
+      }
+
+      // 本地项优先占位；远程插在站点与历史之间，补满总数上限
+      const localCount = local.engine.length + local.sites.length + local.history.length
+      const remoteSlots = Math.max(0, Math.min(REMOTE_MAX, TOTAL_MAX - localCount))
+      return local.engine
+        .concat(local.sites, remoteItems.slice(0, remoteSlots), local.history)
+        .slice(0, TOTAL_MAX)
+    }
+
+    function currentActiveKey() {
+      if (activeIndex < 0) return null
+      const item = items[activeIndex]
+      if (!item) return null
+      return item.type + '|' + String(item.label).toLowerCase()
+    }
+
+    // 发远程联想；结果回来时输入已变 / 列表已关 / 令牌过期则丢弃
+    function requestRemote(raw) {
+      cancelRemote()
+      const query = normalize(raw)
+      if (query === '' || !remoteEnabled()) return
+      if (!list || list.hidden) return
+      if (!SS.remote || typeof SS.remote.fetch !== 'function') return
+
+      const token = remoteToken
+      const controller = createAbortController()
+      remoteController = controller
+      const requestOptions = { limit: REMOTE_MAX }
+      if (controller) requestOptions.signal = controller.signal
+
+      let pending = null
+      try {
+        pending = SS.remote.fetch(raw, requestOptions)
+      } catch (e) {
+        remoteController = null
+        return
+      }
+      if (!pending || typeof pending.then !== 'function') {
+        remoteController = null
+        return
+      }
+
+      pending.then((words) => {
+        if (token !== remoteToken) return
+        if (remoteController === controller) remoteController = null
+        const remoteWords = Array.isArray(words) ? words : []
+        // 输入已变 / 列表已关：不重渲染，避免旧结果或突然弹开
+        if (normalize(input.value) !== query) return
+        if (!list || list.hidden || items.length === 0) return
+        if (remoteWords.length === 0) return
+
+        const preserveKey = currentActiveKey()
+        lastRenderedValue = input.value
+        renderItems(buildItems(input.value, remoteWords), preserveKey)
+      }).catch(() => {
+        /* fetch 永不 reject；再兜一层，绝不影响本地联想 */
+      })
+    }
+
+    // ------------------------------------------------------------ 列表渲染
 
     function clearActive() {
       activeIndex = -1
@@ -105,6 +262,8 @@
     }
 
     function closeList() {
+      // 关闭时中止未完成的联网联想，避免结果回来又弹开
+      cancelRemote()
       clearActive()
       items = []
       lastRenderedValue = null
@@ -114,77 +273,6 @@
       }
       input.setAttribute('aria-expanded', 'false')
       input.removeAttribute('aria-activedescendant')
-    }
-
-    // 渲染：每项 role="option" 且带稳定 id，供 aria-activedescendant 引用
-    function renderItems(nextItems) {
-      if (!list) return
-      items = nextItems
-      activeIndex = -1
-      if (items.length === 0) {
-        closeList()
-        return
-      }
-
-      list.textContent = ''
-      const fragment = doc.createDocumentFragment()
-      items.forEach((item, index) => {
-        const option = doc.createElement('li')
-        // .suggest-item 是 MDUI 1 菜单项基类（app.js 会在它上面注入涟漪）；
-        // 历史项额外带 .suggest-item-history 修饰类，便于样式区分
-        option.className = item.type === 'history' ? 'suggest-item suggest-item-history' : 'suggest-item'
-        option.id = optionId(index)
-        option.dataset.index = String(index)
-        option.dataset.type = item.type
-        if (item.siteId) option.dataset.siteId = item.siteId
-        option.setAttribute('role', 'option')
-        option.setAttribute('aria-selected', 'false')
-
-        const label = doc.createElement('span')
-        label.className = 'suggest-label'
-        label.textContent = item.label
-        option.appendChild(label)
-
-        if (item.sublabel) {
-          const sublabel = doc.createElement('span')
-          sublabel.className = 'suggest-sublabel'
-          sublabel.textContent = item.sublabel
-          option.appendChild(sublabel)
-        }
-        fragment.appendChild(option)
-      })
-      list.appendChild(fragment)
-      list.hidden = false
-      input.setAttribute('aria-expanded', 'true')
-      input.removeAttribute('aria-activedescendant')
-    }
-
-    function renderSuggestions(raw) {
-      lastRenderedValue = raw
-      renderItems(computeItems(raw))
-    }
-
-    // 防抖触发的刷新：值没变且列表已经渲染过时不动，避免把用户刚按方向键选中的高亮重置
-    function updateSuggestions() {
-      const raw = input.value
-      if (normalize(raw) === '') {
-        closeList()
-        return
-      }
-      if (list && !list.hidden && lastRenderedValue === raw && items.length > 0) return
-      renderSuggestions(raw)
-    }
-
-    // 键盘触发时若列表尚未渲染（防抖未到），立即用当前值计算，键盘响应不等计时器
-    function ensureSuggestions() {
-      const raw = input.value
-      if (normalize(raw) === '') {
-        closeList()
-        return false
-      }
-      if (!list) return false
-      if (list.hidden || items.length === 0 || lastRenderedValue !== raw) renderSuggestions(raw)
-      return items.length > 0
     }
 
     function setActive(index) {
@@ -210,13 +298,91 @@
           try {
             activeOption.scrollIntoView({ block: 'nearest' })
           } catch (e) {
-            /* 老浏览器不支持选项对象时忽略：列表仍可用键盘操作 */
+            /* 老浏览器忽略 */
           }
         }
       }
     }
 
-    // ---------------------------------------------------------------- 采用建议项
+    // 每项 role="option" 且带稳定 id；preserveKey 用于远程合并后保留已选中项
+    function renderItems(nextItems, preserveKey) {
+      if (!list) return
+      items = nextItems
+      activeIndex = -1
+      if (items.length === 0) {
+        closeList()
+        return
+      }
+
+      list.textContent = ''
+      const fragment = doc.createDocumentFragment()
+      items.forEach((item, index) => {
+        const option = doc.createElement('li')
+        // .suggest-item 是 MDUI 菜单项基类（app.js 注入涟漪）；历史项加修饰类
+        option.className = item.type === 'history' ? 'suggest-item suggest-item-history' : 'suggest-item'
+        option.id = optionId(index)
+        option.dataset.index = String(index)
+        option.dataset.type = item.type
+        if (item.siteId) option.dataset.siteId = item.siteId
+        option.setAttribute('role', 'option')
+        option.setAttribute('aria-selected', 'false')
+
+        const label = doc.createElement('span')
+        label.className = 'suggest-label'
+        label.textContent = item.label
+        option.appendChild(label)
+
+        if (item.sublabel) {
+          const sublabel = doc.createElement('span')
+          sublabel.className = 'suggest-sublabel'
+          sublabel.textContent = item.sublabel
+          option.appendChild(sublabel)
+        }
+        fragment.appendChild(option)
+      })
+      list.appendChild(fragment)
+      list.hidden = false
+      input.setAttribute('aria-expanded', 'true')
+      input.removeAttribute('aria-activedescendant')
+
+      if (preserveKey) {
+        const index = items.findIndex((item) =>
+          item.type + '|' + String(item.label).toLowerCase() === preserveKey)
+        if (index !== -1) setActive(index)
+      }
+    }
+
+    // 本地先渲染，再异步取联网联想；远程回来后在 requestRemote 里合并重渲染
+    function renderSuggestions(raw) {
+      lastRenderedValue = raw
+      renderItems(buildItems(raw, []))
+      requestRemote(raw)
+    }
+
+    // 防抖刷新：值没变且已渲染过就不动，避免把刚按方向键选中的高亮重置
+    function updateSuggestions() {
+      const raw = input.value
+      if (normalize(raw) === '') {
+        closeList()
+        return
+      }
+      if (list && !list.hidden && lastRenderedValue === raw && items.length > 0) return
+      renderSuggestions(raw)
+    }
+
+    // 键盘触发时若防抖未到，立即计算，键盘响应不等计时器
+    function ensureSuggestions() {
+      const raw = input.value
+      if (normalize(raw) === '') {
+        closeList()
+        return false
+      }
+      if (!list) return false
+      if (list.hidden || items.length === 0 || lastRenderedValue !== raw) renderSuggestions(raw)
+      return items.length > 0
+    }
+
+    // ------------------------------------------------------------ 采用建议项
 
     function navigate(url) {
       if (!url) return
@@ -226,13 +392,12 @@
         try {
           root.location.assign(url)
         } catch (err) {
-          /* 无法跳转时静默，避免控制台报错 */
+          /* 静默 */
         }
       }
     }
 
-    // 用默认搜索引擎搜索当前输入词。优先走表单原生提交：
-    // 这样 app.js 的 submit 处理器仍然负责记录历史（历史写入只由 app.js 做）。
+    // 用默认引擎搜索当前词。走表单原生提交，历史仍由 app.js 写。
     function searchWithDefaultEngine() {
       const query = normalize(input.value)
       if (query === '') {
@@ -245,7 +410,7 @@
           form.requestSubmit()
           return
         } catch (e) {
-          /* 落到下面的 URL 兜底 */
+          /* 落 URL 兜底 */
         }
       }
 
@@ -266,7 +431,6 @@
         navigate(decision.url)
         return
       }
-      // 未知站点/核心模块缺失：保持输入焦点，不跳转
       input.focus()
     }
 
@@ -279,18 +443,17 @@
         adoptSite(item.siteId)
         return
       }
-      if (item.type === 'history') {
-        // 历史项：填入输入框后直接提交 Bing（提交路径与正常回车一致）
+      if (item.type === 'history' || item.type === 'remote') {
+        // 历史项 / 联网联想项：填入输入框后提交 Bing（与正常回车同一路径）
         input.value = item.label
         syncFieldState()
         searchWithDefaultEngine()
         return
       }
-      // engine（以及未来的其它类型）：用默认引擎搜索当前输入词
       searchWithDefaultEngine()
     }
 
-    // ---------------------------------------------------------------- 事件绑定
+    // ------------------------------------------------------------ 事件绑定
 
     input.addEventListener('input', () => {
       syncFieldState()
@@ -329,7 +492,7 @@
     })
 
     input.addEventListener('keydown', (event) => {
-      // 中文输入法组合中（选词/回车上屏）不劫持按键
+      // 中文输入法组合中不劫持按键
       if (event.isComposing || composing) return
 
       const key = event.key
@@ -351,7 +514,7 @@
       }
 
       if (key === 'Enter') {
-        // 只有「列表打开且当前有高亮项」时才由联想接管；否则交给表单原生提交
+        // 只有列表打开且有高亮项时才由联想接管，否则交给表单原生提交
         if (list && !list.hidden && activeIndex >= 0 && items[activeIndex]) {
           event.preventDefault()
           adopt(items[activeIndex])
@@ -368,14 +531,14 @@
       }
 
       if (key === 'Tab') {
-        // 不阻止默认：焦点正常移出，只收起列表
+        // 不阻止默认，只收起列表
         closeList()
       }
     })
 
     if (list) {
-      // 用 mousedown 抢在 blur 之前采用（契约 §5.5）；preventDefault 保持输入框焦点。
-      // 触摸设备上浏览器也会补发 mousedown，这里不监听 touchstart，避免滑动列表时误采用/阻断滚动。
+      // mousedown 抢在 blur 前采用；preventDefault 保持输入框焦点。
+      // 不监听 touchstart：触摸会补发 mousedown，且避免滑动列表时误采用。
       list.addEventListener('mousedown', (event) => {
         const target = event.target
         const option = target && typeof target.closest === 'function'
@@ -390,7 +553,6 @@
     }
 
     if (clearButton) {
-      // mousedown 阻止焦点从输入框移走，点击后直接清空并保持输入状态
       clearButton.addEventListener('mousedown', (event) => {
         event.preventDefault()
       })
@@ -402,7 +564,33 @@
       })
     }
 
-    // 快捷键「/」聚焦搜索框（验收门 §9.5）；在可编辑控件里正常输入斜杠
+    // 联网联想开关：aria-pressed 表示是否开启
+    if (remoteToggle && SS.remote) {
+      remoteToggle.addEventListener('click', () => {
+        const next = !remoteEnabled()
+        if (typeof SS.remote.setEnabled === 'function') SS.remote.setEnabled(next)
+        syncRemoteToggle()
+
+        const raw = input.value
+        const query = normalize(raw)
+        if (next) {
+          // 开启：列表开着就立刻补一次远程请求
+          if (query !== '' && list && !list.hidden) requestRemote(raw)
+          return
+        }
+
+        // 关闭：中止请求并移除已有远程项
+        cancelRemote()
+        if (query !== '' && list && !list.hidden) {
+          const preserveKey = currentActiveKey()
+          lastRenderedValue = raw
+          renderItems(buildItems(raw, []), preserveKey)
+        }
+      })
+      syncRemoteToggle()
+    }
+
+    // 快捷键「/」聚焦搜索框；在可编辑控件里正常输入斜杠
     doc.addEventListener('keydown', (event) => {
       if (event.defaultPrevented) return
       if (event.ctrlKey || event.metaKey || event.altKey) return

@@ -1,7 +1,7 @@
 # 自定义网站
 
 SimpleSearch 的站点按钮来自**唯一的数据源**：`assets/js/sites.js` 里的 `SS.sites` 数组。
-两个入口页（`SimpleSearch-Light.html`、`SimpleSearch-Dark.html`）的按钮都由 `scripts/build.mjs` 从这个数组生成，**不需要、也不应该再去手工改 HTML**。
+`scripts/build.mjs` 会从这份数据生成三个产物：唯一真实页面 `index.html`，以及两个 0 秒跳转的重定向壳 `SimpleSearch-Light.html` / `SimpleSearch-Dark.html`。**不需要、也不应该再去手工改 HTML**。
 
 ## 1. 数据源
 
@@ -68,13 +68,13 @@ SS.sites = [
 新增：
 
 1. 在 `SS.sites` 末尾（或你想让它出现的位置）加一个对象，参考上一节模板。
-2. 运行 `npm run build`，重新生成两个入口页。
+2. 运行 `npm run build`，重新生成三个产物（`index.html` + 两个重定向壳）。
 3. 可选：`npm test` 跑单元测试，`npm run validate` 做静态检查与产物一致性检查。
-4. 本地打开 `SimpleSearch-Light.html` 或 `SimpleSearch-Dark.html` 验证：空输入点按钮应打开 `home`，输入关键词点按钮应跳到站内搜索结果。
+4. 本地打开 `index.html` 验证（或点两个老链接，它们会跳到首页）：空输入点按钮应打开 `home`，输入关键词点按钮应跳到站内搜索结果。
 
 删除：把对应对象从数组里删掉，再 `npm run build`。
 
-> **内置站点与测试**：`tests/sites.test.mjs` 要求内置的 11 个站点都在、且它们之间的相对顺序与契约一致（防止两个主题再漂移），但**允许你随意追加新站点**。所以只加站点的话 `npm test` 不会红；只有删掉内置站点时它才会失败并提示恢复。`npm run validate` 里的「站点渲染与注册表一致」「两页站点列表一致」始终按实际注册表比对，也不受追加影响。
+> **内置站点与测试**：`tests/sites.test.mjs` 要求内置的 11 个站点都在、且它们之间的相对顺序与契约一致（防止再出现不同页面/主题之间的漂移），但**允许你随意追加新站点**。所以只加站点的话 `npm test` 不会红；只有删掉内置站点时它才会失败并提示恢复。`npm run validate` 里的「站点渲染与注册表一致」始终按实际注册表比对，也不受追加影响。
 
 ```js
 // 新增一个示例（顺序即按钮顺序）：
@@ -91,6 +91,6 @@ SS.sites = [
 
 ## 6. 为什么只改一处就够
 
-- 开发时，`scripts/build.mjs` 用 Node 直接 `import` 这个经典脚本，读 `globalThis.SimpleSearch.sites`，按 `templates/page.html` 里的 `{{SITE_BUTTONS}}` 占位符为两个主题各生成一份静态 HTML。
+- 开发时，`scripts/build.mjs` 用 Node 直接 `import` 这个经典脚本，读 `globalThis.SimpleSearch.sites`，按 `templates/page.html` 里的 `{{SITE_BUTTONS}}` 占位符生成唯一真实页面 `index.html`，再由 `templates/redirect.html` 生成两个指向它的重定向壳。
 - 线上仍然是纯静态文件：浏览器只加载已经生成好的 HTML，不需要在运行时读取注册表，也不需要任何构建工具或依赖。
 - 想确认产物和模板/注册表是否一致：运行 `node scripts/build.mjs --check`（`npm run validate` 里也包含这个检查）。

@@ -1,6 +1,6 @@
-// 主题：持久化（localStorage 键 ss.theme）、<html data-theme> 应用、#theme-toggle 交互。
-// 首屏防闪烁由 templates/page.html 的内联脚本负责（样式表加载前就已设置 data-theme）；
-// 本模块不重复那件事，只做交互、持久化与按钮 / meta theme-color 的同步。
+// 主题（单页模式，契约 §12.1）：?theme= → localStorage ss.theme → 系统偏好 → 浅色。
+// 首屏防闪烁由 templates/page.html 的内联脚本负责（同一解析顺序）；本模块只做
+// 交互、持久化、切换按钮 / meta theme-color 同步，以及未显式选择时跟随系统偏好。
 ;(function (root) {
   'use strict'
 
@@ -24,7 +24,7 @@
     return root.document || null
   }
 
-  // 只读存储：隐私模式 / 禁用 localStorage 时静默返回 null，不抛错
+  // 只读存储：隐私模式 / 禁用 localStorage 时静默返回 null
   function get() {
     try {
       const storage = root.localStorage
@@ -35,19 +35,57 @@
     }
   }
 
-  // 存储优先，其次页面默认值；两者都非法时回落到浅色
-  function resolve(pageDefault) {
-    const stored = get()
-    if (stored) return stored
-    return normalize(pageDefault) || LIGHT
-  }
-
   function save(theme) {
     try {
       const storage = root.localStorage
       if (storage) storage.setItem(KEY, theme)
     } catch (error) {
       // 存储失败不影响本次切换
+    }
+  }
+
+  // 与内联脚本同一正则：只认 ?theme=light|dark（其他参数保持原样）
+  function readUrlTheme() {
+    try {
+      const location = root.location
+      if (!location || typeof location.search !== 'string') return null
+      const matched = /[?&]theme=(light|dark)(?:&|$)/.exec(location.search)
+      return matched ? matched[1] : null
+    } catch (error) {
+      return null
+    }
+  }
+
+  // 去掉地址栏的 theme 参数（分享出去的地址不再固定主题）；受限环境失败静默
+  function stripUrlTheme() {
+    try {
+      const location = root.location
+      const history = root.history
+      if (!location || !history || typeof history.replaceState !== 'function') return
+      const search = typeof location.search === 'string' ? location.search : ''
+      if (/[?&]theme=/.test(search) === false) return
+      const params = search
+        .replace(/^\?/, '')
+        .split('&')
+        .filter((pair) => pair && /^theme=(light|dark)$/.test(pair) === false)
+      const query = params.length ? '?' + params.join('&') : ''
+      const pathname = typeof location.pathname === 'string' ? location.pathname : ''
+      const hash = typeof location.hash === 'string' ? location.hash : ''
+      history.replaceState(history.state, '', pathname + query + hash)
+    } catch (error) {
+      // 忽略：清理失败不影响主题
+    }
+  }
+
+  // 系统偏好：无 matchMedia（或调用失败）时返回 null，由浅色兜底
+  function systemTheme() {
+    try {
+      if (typeof root.matchMedia !== 'function') return null
+      const media = root.matchMedia('(prefers-color-scheme: dark)')
+      if (!media) return null
+      return media.matches ? DARK : LIGHT
+    } catch (error) {
+      return null
     }
   }
 
@@ -61,7 +99,7 @@
         if (value && value.trim()) return value.trim()
       }
     } catch (error) {
-      // 忽略：CSS 变量在部分测试环境不可用
+      // 忽略：部分测试环境没有 getComputedStyle
     }
     return THEME_COLORS[theme] || THEME_COLORS[LIGHT]
   }
@@ -94,7 +132,7 @@
     syncThemeColor(doc, next)
   }
 
-  // 当前生效主题：以 <html data-theme> 为准，其次存储 / 默认值
+  // 当前生效主题：以 <html data-theme> 为准，其次按解析顺序兜底
   function currentTheme() {
     const doc = getDoc()
     const el = doc && doc.documentElement
@@ -103,7 +141,18 @@
     return resolve(null)
   }
 
-  // 切换并持久化，返回新主题
+  // 解析：?theme= > 存储 > 旧入口的显式默认值 > 系统偏好 > 浅色
+  function resolve(pageDefault) {
+    const fromUrl = readUrlTheme()
+    if (fromUrl) return fromUrl
+    const stored = get()
+    if (stored) return stored
+    const explicit = normalize(pageDefault)
+    if (explicit) return explicit
+    return systemTheme() || LIGHT
+  }
+
+  // 切换并持久化：一旦用户显式切换过，后续不再跟随系统
   function toggle() {
     const next = currentTheme() === DARK ? LIGHT : DARK
     save(next)
@@ -112,14 +161,47 @@
   }
 
   let bound = false
+  let following = false
 
-  // 由 app.js 在 DOMContentLoaded 后调用：跟随入口页默认主题，绑定切换按钮
+  // 用户没有显式选择（ss.theme 为空）时实时跟随系统；显式选择过就不再覆盖
+  function followSystem() {
+    if (following) return
+    try {
+      if (typeof root.matchMedia !== 'function') return
+      const media = root.matchMedia('(prefers-color-scheme: dark)')
+      if (!media) return
+      const onChange = function () {
+        if (get()) return
+        apply(media.matches ? DARK : LIGHT)
+      }
+      if (typeof media.addEventListener === 'function') media.addEventListener('change', onChange)
+      else if (typeof media.addListener === 'function') media.addListener(onChange)
+      else return
+      following = true
+    } catch (error) {
+      // 环境不支持就静默
+    }
+  }
+
+  // 由 app.js 在 DOMContentLoaded 后调用
   function init() {
     const doc = getDoc()
     const el = doc && doc.documentElement
     if (!el) return
 
-    apply(resolve(el.getAttribute('data-theme-default')))
+    // 1) ?theme= 优先：持久化后从地址栏移除，之后按存储解析
+    const fromUrl = readUrlTheme()
+    if (fromUrl) {
+      save(fromUrl)
+      stripUrlTheme()
+    }
+
+    // 2) 应用：URL 命中时直接用该主题（存储不可用也不丢失）；否则
+    //    存储 > 系统偏好 > 浅色（data-theme-default 为 auto）
+    apply(fromUrl || resolve(el.getAttribute('data-theme-default')))
+
+    // 3) 从未显式选择过时，实时跟随系统深浅色变化
+    if (!get()) followSystem()
 
     // 防止重复 init 时重复绑定
     if (bound) return
@@ -134,5 +216,5 @@
     })
   }
 
-  SS.theme = { KEY, get, resolve, apply, toggle, init }
+  SS.theme = { KEY, get, resolve, apply, toggle, init, readUrlTheme }
 })(typeof globalThis !== 'undefined' ? globalThis : this)

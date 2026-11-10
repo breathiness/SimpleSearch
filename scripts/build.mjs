@@ -1,4 +1,6 @@
-// 由 templates/page.html + assets/js/sites.js 生成两个静态入口页。
+// 由 templates/page.html + templates/redirect.html + assets/js/sites.js 生成静态产物。
+// v2.1：明暗合并为单页 index.html；两个旧入口只做 0 秒重定向，保留老链接。
+//
 // 用法：
 //   node scripts/build.mjs          写入产物
 //   node scripts/build.mjs --check  只比对，不写入；有差异退出码 1（CI 用）
@@ -10,23 +12,25 @@ const HERE = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(HERE, '..')
 const CHECK_ONLY = process.argv.includes('--check')
 
-const PAGES = [
-  {
-    file: 'SimpleSearch-Light.html',
-    theme: 'light',
-    title: '简单搜索 · 浅色',
-    themeColor: '#f5f5f5',
-    toggleLabel: '夜间模式',
-    description: '一款超简单的聚合搜索网站：输入关键词，点击网站即可在该站内搜索；不输入则直接打开网站。',
+const DESCRIPTION =
+  '一款超简单的聚合搜索网站：输入关键词，点击网站即可在该站内搜索；不输入则直接打开网站。自动跟随系统深浅色，也可一键切换。'
+
+// 唯一真实页面
+const PAGE = {
+  template: 'templates/page.html',
+  output: 'index.html',
+  values: {
+    '{{THEME_DEFAULT}}': 'auto',
+    '{{TITLE}}': '简单搜索',
+    '{{DESCRIPTION}}': DESCRIPTION,
+    '{{THEME_COLOR}}': '#f5f5f5',
   },
-  {
-    file: 'SimpleSearch-Dark.html',
-    theme: 'dark',
-    title: '简单搜索 · 夜间',
-    themeColor: '#303030',
-    toggleLabel: '白天模式',
-    description: '一款超简单的聚合搜索网站（夜间模式）：输入关键词，点击网站即可在该站内搜索；不输入则直接打开网站。',
-  },
+}
+
+// 兼容 v1/v2.0 的老链接：0 秒重定向到单页并应用对应主题
+const REDIRECTS = [
+  { output: 'SimpleSearch-Light.html', target: 'index.html?theme=light', title: '简单搜索 · 浅色' },
+  { output: 'SimpleSearch-Dark.html', target: 'index.html?theme=dark', title: '简单搜索 · 夜间' },
 ]
 
 function fail(msg) {
@@ -80,29 +84,25 @@ function renderSiteButtons(sites) {
     .join('\n')
 }
 
-function renderPage(template, page, sites) {
-  const values = {
-    '{{THEME}}': page.theme,
-    '{{THEME_DEFAULT}}': page.theme,
-    '{{TITLE}}': escapeHtml(page.title),
-    '{{DESCRIPTION}}': escapeHtml(page.description),
-    '{{THEME_COLOR}}': page.themeColor,
-    '{{THEME_TOGGLE_LABEL}}': escapeHtml(page.toggleLabel),
-    '{{SITE_BUTTONS}}': renderSiteButtons(sites),
-  }
+function renderTemplate(template, values, outputName) {
   let html = template
   for (const [token, value] of Object.entries(values)) {
     html = html.split(token).join(value)
   }
   const leftover = html.match(/\{\{[A-Z_]+\}\}/g)
-  if (leftover) fail(`模板存在未替换的占位符：${[...new Set(leftover)].join(', ')}`)
+  if (leftover) fail(`${outputName} 存在未替换的占位符：${[...new Set(leftover)].join(', ')}`)
   return html
 }
 
+function readTemplate(relative) {
+  const file = path.join(ROOT, relative)
+  if (!fs.existsSync(file)) fail(`缺少模板 ${relative}`)
+  return fs.readFileSync(file, 'utf8')
+}
+
 async function main() {
-  const templatePath = path.join(ROOT, 'templates', 'page.html')
-  if (!fs.existsSync(templatePath)) fail('缺少 templates/page.html')
-  const template = fs.readFileSync(templatePath, 'utf8')
+  const pageTemplate = readTemplate(PAGE.template)
+  const redirectTemplate = readTemplate('templates/redirect.html')
 
   const SS = await loadRegistry()
   validateSites(SS.sites)
@@ -110,29 +110,52 @@ async function main() {
     console.warn('[build] 警告：SS.engines 缺少默认引擎，页面仍可生成（无 JS 时表单回退 Bing）')
   }
 
+  const outputs = []
+  outputs.push({
+    file: PAGE.output,
+    html: renderTemplate(
+      pageTemplate,
+      { ...PAGE.values, '{{SITE_BUTTONS}}': renderSiteButtons(SS.sites) },
+      PAGE.output
+    ),
+  })
+
+  for (const redirect of REDIRECTS) {
+    outputs.push({
+      file: redirect.output,
+      html: renderTemplate(
+        redirectTemplate,
+        {
+          '{{TITLE}}': escapeHtml(redirect.title),
+          '{{TARGET}}': redirect.target,
+        },
+        redirect.output
+      ),
+    })
+  }
+
   let drift = 0
-  for (const page of PAGES) {
-    const output = renderPage(template, page, SS.sites)
-    const target = path.join(ROOT, page.file)
+  for (const { file, html } of outputs) {
+    const target = path.join(ROOT, file)
     const current = fs.existsSync(target) ? fs.readFileSync(target, 'utf8') : null
 
     if (CHECK_ONLY) {
-      if (current !== output) {
-        console.error(`[build] ${page.file} 与模板/注册表不一致，请运行 npm run build`)
+      if (current !== html) {
+        console.error(`[build] ${file} 与模板/注册表不一致，请运行 npm run build`)
         drift += 1
       }
       continue
     }
 
-    fs.writeFileSync(target, output, 'utf8')
-    console.log(`[build] 写入 ${page.file}（${Buffer.byteLength(output, 'utf8')} 字节，${SS.sites.length} 个站点）`)
+    fs.writeFileSync(target, html, 'utf8')
+    console.log(`[build] 写入 ${file}（${Buffer.byteLength(html, 'utf8')} 字节）`)
   }
 
   if (CHECK_ONLY) {
     if (drift > 0) process.exit(1)
     console.log('[build] 生成产物已是最新')
   } else {
-    console.log('[build] 完成')
+    console.log(`[build] 完成：1 个页面 + ${REDIRECTS.length} 个重定向壳，${SS.sites.length} 个站点`)
   }
 }
 

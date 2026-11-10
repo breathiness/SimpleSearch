@@ -68,7 +68,8 @@
   }
 
   // MDUI 1 风格的涟漪反馈：点击时在宿主元素内插入一个扩散圆
-  const RIPPLE_TARGETS = '.button, #search-submit, #theme-toggle, .icon-button, .suggest-item'
+  const RIPPLE_TARGETS =
+    '.button, #search-submit, #theme-toggle, #suggest-source-toggle, .icon-button, .suggest-item'
 
   function prefersReducedMotion() {
     return Boolean(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)

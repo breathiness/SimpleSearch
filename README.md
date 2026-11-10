@@ -20,15 +20,16 @@
 - 什么都不输入，点下面的按钮：直接打开那个网站。
 - 输入关键词再点按钮：在**那个网站里**搜这个词。
 
-页面本身没有任何框架、没有构建运行时、不请求任何第三方资源，就是一张静态 HTML。双击本地文件就能用，扔到 GitHub Pages 上也能用。
+页面本身没有框架、没有构建运行时，就是一张纯静态 HTML：核心功能全部在本地完成，唯一可能外发的请求是**可以一键关掉的联网联想**（开启时把输入的关键词发给百度）。双击本地文件就能用，扔到 GitHub Pages 上也能用。
 
 ## 在线地址
 
-- [首页（选浅色 / 夜间）](https://breathiness.github.io/SimpleSearch/)
-- [白天模式](https://breathiness.github.io/SimpleSearch/SimpleSearch-Light.html)
-- [夜间模式](https://breathiness.github.io/SimpleSearch/SimpleSearch-Dark.html)
+- [https://breathiness.github.io/SimpleSearch/](https://breathiness.github.io/SimpleSearch/) —— 现在只有这一个页面。打开后会自动跟随系统的深浅色偏好，页脚也可以手动切换。
 
-v1 的两个老地址原样保留，以前收藏的链接不会失效；首页是 v2 新加的落地页，用来选主题。
+v1 的两个老地址保留，但现在是 **0 秒立即跳转**的壳：`<meta http-equiv="refresh" content="0; url=index.html?theme=light">` + `location.replace`，跳到首页并应用对应主题（老书签不会失效）。落地后主题已经存进 `localStorage`，地址栏里的 `?theme=` 会被 `history.replaceState` 清掉，所以你看到的是一条干净地址。
+
+- [白天模式（跳转到首页）](https://breathiness.github.io/SimpleSearch/SimpleSearch-Light.html)
+- [夜间模式（跳转到首页）](https://breathiness.github.io/SimpleSearch/SimpleSearch-Dark.html)
 
 ## 使用说明
 
@@ -42,10 +43,12 @@ v1 的两个老地址原样保留，以前收藏的链接不会失效；首页�
 
 - **清除按钮**：输入框里有内容时右侧出现 `✕`，点一下清空并保持输入状态（不用全选删除）。
 - **搜索按钮**：除了回车，也可以直接点「搜索」。输入为空时不会提交一个空查询。
-- **关键词联想**：输入时下方出现建议列表，最多 8 条，包含「用 Bing 搜索：xxx」、匹配到的站点（按站点名、id、关键词匹配，相关度高的排前面），以及以前搜过的词。**全部是本地数据，不发网络请求**，断网也能用。
+- **关键词联想**：输入时下方出现建议列表，最多 8 条。本地部分（「用 Bing 搜索：xxx」、匹配到的站点、以前搜过的词）永远可用，断网也在；开启联网联想后，百度返回的词会排在本地站点匹配之后，并在右侧标注「百度」。
+- **联网联想（默认开启）**：输入时会把关键词发给百度联想接口（`suggestion.baidu.com`，JSONP），700ms 超时或请求失败会自动退回本地联想，不影响搜索，也不会阻塞键盘操作。页脚的「联网联想」按钮（开启时显示「联网联想：开」，关闭后显示「联网联想：关闭」）可以随时关闭，**关闭后不再有任何第三方请求，完全离线**。点击一条百度建议会用它再搜一次。
 - **搜索历史**：最近 10 条搜索词，新的在前、自动去重。历史不会单独展示，而是作为联想项出现；联想列表里点历史项会用 Bing 再搜一次。
-- **明暗模式切换**：页面底部可以一键切换浅色/夜间模式。你的选择会被记住，刷新、重新打开都保持；两个入口页各自有一个默认主题，但切过一次之后以你的选择为准。首屏不会闪白/闪黑。
+- **明暗模式切换**：现在在同一个页面里切换，不用换链接。打开时按「`?theme=` 参数 → 上次的选择 → 系统深色偏好 → 浅色」决定主题；页脚点一下即可切换并记住。没有手动选过时，系统深浅色变化会实时跟随；手动切过之后以你的选择为准。首屏不会闪白/闪黑。
 - **可访问性**：联想列表有 `listbox`/`option` 语义，支持 `aria-activedescendant`；键盘可以走完整个流程；按 `Tab` 第一个能拿到「跳到搜索框」的 skip link（获得焦点时才出现在页面顶部）；焦点轮廓和 `prefers-reduced-motion` 都处理了。
+- **页脚**：从左到右是「联网联想：开 / 关闭」「夜间模式 / 白天模式」「关于」三个控件，390px 窄屏下也在同一行、不溢出。
 
 ### 键盘操作
 
@@ -64,11 +67,11 @@ v1 的两个老地址原样保留，以前收藏的链接不会失效；首页�
 
 2023 年在原项目上测过：使用 GitHub Pages 的在线版测试的加载完成时间是 **656 毫秒**；本地版（直接双击打开文件）的加载时间更是只要 **3 毫秒**。
 
-v2 重构之后仍然是**纯静态 + 零依赖**：没有新增任何外部请求，没有引入框架、字体或统计脚本；单页要加载的 HTML/CSS/JS 加起来大约 57 KB（未压缩），本地打开依旧是「点一下就到」的 3 毫秒级体验。需要说明的是，v2 没有在相同网络条件下重新做一次 656ms/3ms 的计时，所以这里不编新数字——在线时间主要取决于你的网络和 GitHub Pages，本地时间基本只看磁盘。
+v2 / v2.1 之后仍然是**纯静态 + 零依赖**：核心页面与功能不依赖任何第三方资源，没有框架、网络字体或统计脚本；单页静态资源合计大约 77 KB（未压缩），**gzip 传输后约 29 KB**——GitHub Pages 默认走 gzip，所以真实下载量接近后者。本地打开依旧是「点一下就到」的 3 毫秒级体验。（如果开着联网联想，输入关键词会额外发一次百度请求，但那发生在页面加载之后，不影响首屏。）需要说明的是，v2 没有在相同网络条件下重新做一次 656ms/3ms 的计时，所以这里不编新数字——在线时间主要取决于你的网络和 GitHub Pages，本地时间基本只看磁盘。
 
 ## 自定义网站
 
-v2 把站点列表收拢到了**一处**：`assets/js/sites.js` 里的 `SS.sites` 数组。两个入口页的按钮都由 `npm run build` 从这一份数据生成，**不用再去 HTML 里手改，也不存在「三个地方都要填一遍」的问题**。
+v2 把站点列表收拢到了**一处**：`assets/js/sites.js` 里的 `SS.sites` 数组。`npm run build` 会从这一份数据生成三个产物：唯一真实页面 `index.html`，以及两个 0 秒跳转的重定向壳 `SimpleSearch-Light.html` / `SimpleSearch-Dark.html`。**不用再去 HTML 里手改，也不存在「三个地方都要填一遍」的问题**。
 
 ### 新增一个网站
 
@@ -100,7 +103,7 @@ v2 把站点列表收拢到了**一处**：`assets/js/sites.js` 里的 `SS.sites
    ]
    ```
 
-2. 重新生成两个页面：
+2. 重新生成三个产物（`index.html` + 两个重定向壳）：
 
    ```bash
    npm run build
@@ -113,7 +116,7 @@ v2 把站点列表收拢到了**一处**：`assets/js/sites.js` 里的 `SS.sites
    npm run validate   # 静态检查 + 生成产物是否最新
    ```
 
-4. 打开 `SimpleSearch-Light.html` 或 `SimpleSearch-Dark.html` 验证效果：留空点按钮应该打开 `home`，输入关键词点按钮应该跳到站内搜索结果。
+4. 打开 `index.html` 验证效果（也可以点那两个老链接，它们会跳到首页）：留空点按钮应该打开 `home`，输入关键词点按钮应该跳到站内搜索结果。
 
 ### 删除网站
 
@@ -134,33 +137,35 @@ SimpleSearch/
 ├─ assets/
 │  ├─ css/                  # tokens.css（配色变量）/ base.css（页面骨架）/ input.css（输入区）
 │  ├─ img/                  # favicon.svg
-│  └─ js/                   # 7 个经典脚本：sites / search / suggest / history / theme / input / app
+│  └─ js/                   # 8 个经典脚本：sites / search / suggest / history / theme / remote / input / app
 ├─ docs/
-│  ├─ contract.md           # v2 接口契约（开发前先读）
+│  ├─ contract.md           # 接口契约（开发前先读）
 │  ├─ custom-sites.md       # 自定义网站完整说明
 │  └─ CHANGELOG.md          # 更新日志
 ├─ scripts/
-│  ├─ build.mjs             # 由模板 + SS.sites 生成两个入口页
+│  ├─ build.mjs             # 由模板 + SS.sites 生成 index.html 与两个重定向壳
 │  ├─ validate.mjs          # 静态校验 + 产物一致性检查
 │  ├─ serve.mjs             # 零依赖本地静态服务器
 │  └─ e2e.mjs               # 可选的真实浏览器端到端检查
-├─ templates/               # page.html：两个入口页的模板
+├─ templates/
+│  ├─ page.html             # 唯一真实页面的模板
+│  └─ redirect.html         # 两个重定向壳的模板
 ├─ tests/                   # node:test 单元测试
 ├─ .github/workflows/ci.yml # GitHub Actions
-├─ index.html               # 主题选择落地页（手写，不进构建）
-├─ SimpleSearch-Light.html  # ↓ 两个入口页由 npm run build 生成，请勿手改
-├─ SimpleSearch-Dark.html
+├─ index.html               # 唯一真实页面，由 npm run build 生成，请勿手改
+├─ SimpleSearch-Light.html  # ↓ 两个 0 秒重定向壳，由 npm run build 生成，请勿手改
+├─ SimpleSearch-Dark.html   #   Light → index.html?theme=light，Dark → index.html?theme=dark
 ├─ package.json
-├─ README.md / CONTRIBUTING.md / LICENSE / .nojekyll / .gitignore
+├─ README.md / CONTRIBUTING.md / LICENSE / .nojekyll / .gitignore / .gitattributes
 ```
 
 ## 本地开发
 
-需要 Node.js 18+（开发和 CI 实际用的是 22）。**不需要 `npm install`**——`package.json` 里没有任何依赖，克隆下来直接跑。
+需要 Node.js 21+（开发和 CI 实际用的是 22；`npm test` 的 glob 参数需要 Node ≥ 21）。**不需要 `npm install`**——`package.json` 里没有任何依赖，克隆下来直接跑。
 
 | 命令 | 作用 |
 |---|---|
-| `npm run build` | 由 `templates/page.html` + `assets/js/sites.js` 生成两个入口页 |
+| `npm run build` | 由模板 + `assets/js/sites.js` 生成 `index.html` 与两个重定向壳（**改完站点或模板后必须跑**） |
 | `npm test` | 跑全部单元测试（Node 内置 `node:test`） |
 | `npm run validate` | 静态检查 + 生成产物是否最新 |
 | `npm run check` | 构建 + 测试 + 校验，提交前/CI 都用这个 |
@@ -169,24 +174,42 @@ SimpleSearch/
 
 ```bash
 npm run serve
-# 打开 http://127.0.0.1:8080/SimpleSearch-Light.html
+# 打开 http://127.0.0.1:8080/
 ```
+
+当前测试基线：`npm test` **117 例**、`npm run validate` **11 项**、`npm run e2e` **63 项**全绿。`e2e` 是可选的真实浏览器检查（本机 Edge/Chrome，CI 不跑），覆盖单页主题解析、旧链接 0 秒跳转、联网联想开关与真实百度联调、移动端布局和 `file://` 打开。
 
 ## 技术说明
 
-- **线上零构建、零运行时依赖**：开发时 `scripts/build.mjs` 在本地生成两个静态 HTML 并提交入库；部署后浏览器拿到的就是纯 HTML/CSS/JS，没有框架、没有包管理器、没有构建步骤。
+- **线上零构建、零运行时依赖**：开发时 `scripts/build.mjs` 在本地生成三个静态 HTML 并提交入库；部署后浏览器拿到的就是纯 HTML/CSS/JS，没有框架、没有包管理器、没有构建步骤。
 - **经典脚本（classic script，无模块化）**：`assets/js/*.js` 全部是 IIFE + `globalThis` 的普通脚本（ES2015+ 语法，不用 `import` / `export`、不用 `type="module"`），不需要打包。所以既能被浏览器直接加载，也能被 Node 直接 `import()` 做单元测试。
-- **`file://` 双击可用**：下载仓库后直接双击 `SimpleSearch-Light.html` 就能用，不需要起服务器（这也是本地 3 毫秒的来源）。
-- **单一数据源**：站点只写在 `assets/js/sites.js` 一处，两个主题共用；v2 起不会再出现「浅色页有 Unsplash、夜间页没有」这种漂移。
-- **不请求第三方资源**：字体用系统字体栈，没有 CDN、没有统计、没有追踪、没有网络字体。关键词联想和历史都是本地数据，断网可用。
-- **状态只存本地**：`localStorage` 里只有 `ss.theme`（主题选择）和 `ss.history`（最近 10 条搜索词）；隐私模式/禁用存储时会自动降级，不报错、不影响核心功能。
-- **体积**：单页加载体积约 57 KB（未压缩，其中 CSS/JS/图标合计约 53 KB）。
+- **单页主题**：`index.html` 的 `<html data-theme-default="auto">`，首屏内联脚本按 `?theme=` → `localStorage['ss.theme']` → `prefers-color-scheme` → 浅色 决定主题，避免闪烁；`?theme=` 会被持久化并用 `history.replaceState` 从地址栏去掉，分享出去的链接不会固定死主题。
+- **`file://` 双击可用**：下载仓库后直接双击 `index.html` 就能用，不需要起服务器（这也是本地 3 毫秒的来源）；两个老 HTML 文件也能双击，会跳到 `index.html`。
+- **单一数据源**：站点只写在 `assets/js/sites.js` 一处；页面只有一份（`index.html`），明暗两套只是 `assets/css/tokens.css` 里的两套 CSS 变量，不会再出现「浅色页有、夜间页没有」的漂移。
+- **第三方请求**：核心页面与核心功能零第三方资源——字体用系统字体栈，没有 CDN、没有统计、没有追踪、没有网络字体。唯一的例外是默认开启的**联网联想**：输入关键词时会向 `suggestion.baidu.com` 发一次 JSONP 请求；页脚关掉后**零第三方请求**，联想只剩本地数据，完全离线可用。目前只接了百度一个源；`SS.remote.provider` 是可插拔的，但实测 Google / DuckDuckGo 的联想接口不一定可达、Bing 的 `osjson` 没有 CORS 头，所以没有接更多源（想接的话见 [CONTRIBUTING.md](CONTRIBUTING.md)）。
+- **状态只存本地**：`localStorage` 里只有 `ss.theme`（明暗选择）、`ss.history`（最近 10 条搜索词）、`ss.remote`（联网联想开关）三个键；隐私模式/禁用存储时会自动降级，不报错、不影响核心功能。
+- **体积**：单页静态资源合计约 77 KB（未压缩；**gzip 后约 29 KB**），其中 `remote.js` 约 10 KB，是这轮体积增长的主因。所有资源都是仓库里的本地文件，没有第三方运行时、没有框架。
 
 ### 设计风格
 
 界面观感参考 **MDUI 1 / Material Design 1**：indigo 主色（`#3f51b5`）、2px 圆角、2/4/8dp 三档 elevation 阴影、点击涟漪反馈、下划线输入框、主色 raised 搜索按钮、MD1 菜单式联想下拉。深浅两套配色都按 MD1 的文本不透明度体系单独调过。
 
 这些**全部是自研手写 CSS**（变量集中在 `assets/css/tokens.css`）：项目没有引入 MDUI 库，也没有 CDN、网络字体或任何第三方资源。说「MDUI 1 风格」指的是视觉语言，不是依赖。
+
+## 隐私
+
+- 不接入任何统计、追踪、广告或指纹脚本。
+- **联网联想默认开启**：输入时会把关键词发给百度（`suggestion.baidu.com` 的 JSONP 联想接口）。不需要的话点页脚「联网联想：开」把它关掉，之后**不会发出任何第三方请求**，完全离线可用。
+- 浏览器本地只存三个键，且不会上传、不含账号或身份信息：
+
+  | 键 | 内容 |
+  |---|---|
+  | `ss.theme` | 明暗主题选择（`light` / `dark`） |
+  | `ss.history` | 最近 10 条搜索词 |
+  | `ss.remote` | 联网联想开关（`on` / `off`） |
+
+  清理站点数据即可全部删除。
+- 搜索本身是浏览器原生表单提交到 Bing 或目标站点，不经过任何中间服务器。
 
 ## 路线图
 
@@ -197,11 +220,17 @@ v1 里一直想加但没做的 4 个功能，v2 都做掉了：
 - [x] 搜索按钮
 - [x] 黑夜/白天模式切换
 
-v2 之后还可以做（**以下都还没实现**）：
+v2.1 又补上的：
+
+- [x] 明暗合并到单页（两个老链接自动跳转到首页并应用对应主题）
+- [x] 联网联想（百度 JSONP，可一键关闭、失败自动降级）
+
+还可以做（**以下都还没实现**）：
 
 - [ ] PWA / Service Worker，支持离线安装
 - [ ] 站点列表的可视化编辑，不用直接改 JS
 - [ ] 多搜索引擎切换（现在固定 Bing）
+- [ ] 自选/自建更多联想源（现在只接了百度）
 - [ ] 联想列表里的单条历史删除、导入/导出站点配置
 
 ## 灵感来源
@@ -212,7 +241,7 @@ v2 之后还可以做（**以下都还没实现**）：
 
 我其实一直都很想要一个能满足上面提到的功能，并且速度足够快的聚合搜索网站。估计是我这个需求太过小众且简单，在网络上一直没有找到有其他类似的网站。刚好最近想测试一下 Bing 的能力如何。于是将我的需求描述了一下，然后就有了现在这个项目。
 
-v2 重构把站点收拢到一处、补上了当年想加的几个小功能，但上面这些初衷没变。
+v2 重构把站点收拢到一处、补上了当年想加的几个小功能，v2.1 又把明暗切换合进单页、加了可关闭的联网联想，但上面这些初衷没变。
 
 ## License
 

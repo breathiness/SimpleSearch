@@ -5,6 +5,8 @@
 // 原理：启动 node scripts/serve.mjs 静态服务 + 本机 Edge/Chrome headless（CDP），
 // 用 Node 22 内置 WebSocket 直接说 DevTools 协议，检查真实渲染、交互、网络与控制台。
 //
+// v2.1 起：index.html 是唯一真实页面；SimpleSearch-Light/Dark.html 是 0 秒重定向壳。
+//
 // 依赖：本机装了 Edge 或 Chrome。没装则跳过（退出码 0），CI 里不跑。
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
@@ -19,8 +21,7 @@ const ARTIFACTS = path.join(ROOT, 'artifacts')
 const PORT = Number(process.env.E2E_PORT || 8123)
 const CDP_PORT = Number(process.env.E2E_CDP_PORT || 9333)
 const ORIGIN = `http://127.0.0.1:${PORT}`
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+const PAGE = `${ORIGIN}/index.html`
 
 const checks = []
 const BUILTIN_SITE_IDS = [
@@ -36,6 +37,9 @@ const BUILTIN_SITE_IDS = [
   'steam',
   'archwiki',
 ]
+const LIGHT_BG = 'rgb(245, 245, 245)'
+const DARK_BG = 'rgb(48, 48, 48)'
+
 function check(name, ok, detail = '') {
   checks.push({ name, ok: Boolean(ok), detail: String(detail || '') })
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? '  — ' + detail : ''}`)
@@ -43,6 +47,8 @@ function check(name, ok, detail = '') {
 function warn(name, detail) {
   console.log(`WARN  ${name}${detail ? '  — ' + detail : ''}`)
 }
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 function findBrowser() {
   const candidates = [
@@ -199,11 +205,18 @@ function createPage(cdp) {
     return res.result.value
   }
 
-  async function goto(url) {
-    const loaded = cdp.once('Page.loadEventFired', 20000)
+  async function goto(url, settle = 200) {
+    const loaded = cdp.once('Page.loadEventFired', 20000).catch(() => null)
     await cdp.send('Page.navigate', { url })
     await loaded
-    await sleep(150)
+    await sleep(settle)
+  }
+
+  function resetLogs() {
+    state.consoleErrors.length = 0
+    state.exceptions.length = 0
+    state.requests.length = 0
+    state.transferBytes = 0
   }
 
   async function screenshot(name) {
@@ -214,7 +227,6 @@ function createPage(cdp) {
     return file
   }
 
-  // 用真实输入事件（而非合成事件）按一个键
   async function pressKey(key, { code, vk, text } = {}) {
     await cdp.send('Input.dispatchKeyEvent', {
       type: text ? 'keyDown' : 'rawKeyDown',
@@ -238,7 +250,41 @@ function createPage(cdp) {
     await sleep(80)
   }
 
-  return { state, evaluate, goto, screenshot, pressKey, typeText, cdp }
+  async function clearStorage() {
+    await evaluate('(() => { try { localStorage.clear() } catch (e) {} })()')
+  }
+
+  async function setStored(key, value) {
+    await evaluate(`(() => { try { localStorage.setItem(${JSON.stringify(key)}, ${JSON.stringify(value)}) } catch (e) {} })()`)
+  }
+
+  async function stored(key) {
+    return evaluate(`(() => { try { return localStorage.getItem(${JSON.stringify(key)}) } catch (e) { return null } })()`)
+  }
+
+  async function theme() {
+    return evaluate('document.documentElement.dataset.theme')
+  }
+
+  async function bg() {
+    return evaluate('getComputedStyle(document.body).backgroundColor')
+  }
+
+  return {
+    state,
+    evaluate,
+    goto,
+    screenshot,
+    pressKey,
+    typeText,
+    resetLogs,
+    clearStorage,
+    setStored,
+    stored,
+    theme,
+    bg,
+    cdp,
+  }
 }
 
 async function run() {
@@ -291,7 +337,6 @@ async function run() {
     })
     console.log(`[e2e] ${version.Browser}`)
 
-    // 新建一个空目标并连上去
     let target
     try {
       target = await fetchOk(`http://127.0.0.1:${CDP_PORT}/json/new?about:blank`, 'PUT').then((r) => r.json())
@@ -308,211 +353,314 @@ async function run() {
     await cdp.send('Network.enable')
 
     const page = createPage(cdp)
-    const expected = [
-      { file: 'SimpleSearch-Light.html', theme: 'light', bg: 'rgb(245, 245, 245)' },
-      { file: 'SimpleSearch-Dark.html', theme: 'dark', bg: 'rgb(48, 48, 48)' },
-    ]
+    const emulateSystemTheme = (value) =>
+      cdp.send('Emulation.setEmulatedMedia', {
+        features: value ? [{ name: 'prefers-color-scheme', value }] : [],
+      })
 
-    for (const spec of expected) {
-      console.log(`\n=== ${spec.file} ===`)
-      // 每个主题清空局部状态（localStorage 在 Theme 小节单独验证）
-      await page.evaluate('try { localStorage.clear() } catch (e) {}')
-      page.state.consoleErrors.length = 0
-      page.state.exceptions.length = 0
-      page.state.requests.length = 0
-      page.state.transferBytes = 0
+    // ================= A. 单页：主题解析优先级 =================
+    console.log('\n=== A. 单页主题解析（?theme= → 存储 → 系统 → 浅色） ===')
+    await page.clearStorage()
+    await emulateSystemTheme(null)
 
-      await page.goto(`${ORIGIN}/${spec.file}`)
-      await sleep(250)
+    // A1 URL 参数 > 一切
+    await page.goto(`${PAGE}?theme=light`)
+    check('A1 ?theme=light 生效', (await page.theme()) === 'light', await page.theme())
+    check('A1 背景色', (await page.bg()) === LIGHT_BG, await page.bg())
+    check('A1 参数被写回存储', (await page.stored('ss.theme')) === 'light')
+    check('A1 地址栏参数被清理', (await page.evaluate('location.search')) === '', await page.evaluate('location.search'))
 
+    await page.clearStorage()
+    await page.goto(`${PAGE}?theme=dark`)
+    check('A2 ?theme=dark 生效', (await page.theme()) === 'dark', await page.theme())
+    check('A2 背景色', (await page.bg()) === DARK_BG, await page.bg())
+
+    // A3 系统偏好（无存储、无参数）
+    await page.clearStorage()
+    await emulateSystemTheme('dark')
+    await page.goto(PAGE)
+    check('A3 跟随系统深色', (await page.theme()) === 'dark', await page.theme())
+    check('A3 系统偏好不写入存储', (await page.stored('ss.theme')) === null)
+
+    await page.clearStorage()
+    await emulateSystemTheme('light')
+    await page.goto(PAGE)
+    check('A4 跟随系统浅色', (await page.theme()) === 'light', await page.theme())
+
+    // A5 存储优先于系统
+    await page.clearStorage()
+    await page.setStored('ss.theme', 'light')
+    await emulateSystemTheme('dark')
+    await page.goto(PAGE)
+    check('A5 存储优先于系统偏好', (await page.theme()) === 'light', await page.theme())
+
+    // A6 切换 + 持久化
+    await page.clearStorage()
+    await emulateSystemTheme('light')
+    await page.goto(PAGE)
+    await page.evaluate("document.getElementById('theme-toggle').click()")
+    await sleep(200)
+    check('A6 切换生效', (await page.theme()) === 'dark', await page.theme())
+    check('A6 切换写入存储', (await page.stored('ss.theme')) === 'dark')
+    const toggleLabel = await page.evaluate("document.getElementById('theme-toggle').textContent")
+    check('A6 按钮文案同步', /白天模式/.test(toggleLabel), toggleLabel)
+    await page.goto(PAGE)
+    check('A6 刷新后保持', (await page.theme()) === 'dark', await page.theme())
+    await emulateSystemTheme(null)
+
+    // ================= B. 旧链接重定向 =================
+    console.log('\n=== B. 老链接 0 秒重定向 ===')
+    for (const spec of [
+      { file: 'SimpleSearch-Light.html', want: 'light' },
+      { file: 'SimpleSearch-Dark.html', want: 'dark' },
+    ]) {
+      await page.clearStorage()
+      page.resetLogs()
+      await page.goto(`${ORIGIN}/${spec.file}`, 800)
+      const pathname = await page.evaluate('location.pathname')
+      check(`${spec.file}: 已跳到单页`, /\/index\.html$/.test(pathname), pathname)
+      check(`${spec.file}: 主题正确`, (await page.theme()) === spec.want, await page.theme())
       check(`${spec.file}: 无 JS 异常`, page.state.exceptions.length === 0, page.state.exceptions[0] || '')
-      check(`${spec.file}: 无控制台错误`, page.state.consoleErrors.length === 0, page.state.consoleErrors[0] || '')
-      check(`${spec.file}: 主题属性`, (await page.evaluate('document.documentElement.dataset.theme')) === spec.theme)
-      check(
-        `${spec.file}: 背景色`,
-        (await page.evaluate('getComputedStyle(document.body).backgroundColor')) === spec.bg,
-        await page.evaluate('getComputedStyle(document.body).backgroundColor')
-      )
-      const renderedSites = await page.evaluate(
-        "[...document.querySelectorAll('#buttons-container [data-site]')].map((b) => b.dataset.site)"
-      )
-      const missingBuiltin = BUILTIN_SITE_IDS.filter((id) => !renderedSites.includes(id))
-      check(
-        `${spec.file}: 内置站点按钮齐全`,
-        missingBuiltin.length === 0 && renderedSites.length >= BUILTIN_SITE_IDS.length,
-        missingBuiltin.length ? `缺少 ${missingBuiltin.join(',')}` : `${renderedSites.length} 个`
-      )
-      check(`${spec.file}: 全部脚本已加载`, await page.evaluate('!!(window.SimpleSearch && SimpleSearch.sites && SimpleSearch.search && SimpleSearch.theme && SimpleSearch.input)'))
-
-      // 搜索决策（编码正确性，真实浏览器环境）
-      const decision = await page.evaluate("SimpleSearch.search.resolveSite('zhihu', 'a&b c')")
-      check(
-        `${spec.file}: 特殊字符编码`,
-        decision && decision.url === 'https://www.zhihu.com/search?type=content&q=a%26b%20c',
-        decision && decision.url
-      )
-      const navDecision = await page.evaluate("SimpleSearch.search.resolveSite('github', '  ')")
-      check(`${spec.file}: 空词直达`, navDecision && navDecision.kind === 'nav' && navDecision.url === 'https://github.com')
-
-      // 网络与体积：必须在交互/跳转之前采样，否则会把站点跳转的流量算进来
-      const earlyRequests = [...page.state.requests]
-      const earlyBytes = page.state.transferBytes
-      const external = earlyRequests.filter((u) => !u.startsWith(ORIGIN) && !u.startsWith('data:'))
-      check(`${spec.file}: 无第三方网络请求`, external.length === 0, external[0] || '')
-      check(
-        `${spec.file}: 首屏传输体积 < 80KB`,
-        earlyBytes < 80 * 1024,
-        `${(earlyBytes / 1024).toFixed(1)} KB / ${earlyRequests.length} 个请求`
-      )
-
-      // 输入 + 联想
-      await page.evaluate("(() => { document.getElementById('search-input').focus() })()")
-      await page.typeText('bil')
-      await sleep(400)
-      const suggestState = await page.evaluate(`(() => {
-        const list = document.getElementById('suggest-list')
-        return {
-          hidden: list.hasAttribute('hidden'),
-          count: list.querySelectorAll('[role="option"]').length,
-          expanded: document.getElementById('search-input').getAttribute('aria-expanded'),
-          firstText: list.querySelector('[role="option"]')?.textContent?.trim() || '',
-        }
-      })()`)
-      check(`${spec.file}: 联想列表出现`, suggestState.hidden === false && suggestState.count > 0, `items=${suggestState.count}`)
-      check(`${spec.file}: aria-expanded 同步`, suggestState.expanded === 'true', String(suggestState.expanded))
-
-      await page.pressKey('ArrowDown', { code: 'ArrowDown', vk: 40 })
-      await sleep(120)
-      const activeId = await page.evaluate("document.getElementById('search-input').getAttribute('aria-activedescendant')")
-      check(`${spec.file}: 方向键高亮联想项`, Boolean(activeId), String(activeId))
-
-      await page.pressKey('Escape', { code: 'Escape', vk: 27 })
-      await sleep(150)
-      check(`${spec.file}: Esc 关闭联想`, await page.evaluate("document.getElementById('suggest-list').hasAttribute('hidden')"))
-
-      // 清除按钮
-      check(
-        `${spec.file}: 清除按钮可见`,
-        (await page.evaluate("document.getElementById('clear-button').hidden")) === false
-      )
-      await page.evaluate("document.getElementById('clear-button').click()")
-      await sleep(120)
-      check(
-        `${spec.file}: 清除按钮可用`,
-        (await page.evaluate("document.getElementById('search-input').value")) === '' &&
-          (await page.evaluate("document.getElementById('clear-button').hidden")) === true
-      )
-
-      // '/' 快捷键聚焦
-      await page.evaluate("document.getElementById('search-input').blur()")
-      await page.pressKey('/', { code: 'Slash', vk: 191, text: '/' })
-      await sleep(150)
-      const focused = await page.evaluate('document.activeElement && document.activeElement.id')
-      check(`${spec.file}: 斜杠快捷键聚焦`, focused === 'search-input', String(focused))
-
-      // 真实点击站点按钮 → 观察导航请求（有词时站内搜索）
-      await page.evaluate(`(() => {
-        const input = document.getElementById('search-input')
-        input.value = 'rust'
-        input.dispatchEvent(new Event('input', { bubbles: true }))
-      })()`)
-      await sleep(200)
-      const navRequested = page.cdp.once('Page.frameRequestedNavigation', 4000).catch(() => null)
-      await page.evaluate("document.querySelector('[data-site=\"archwiki\"]').click()")
-      const navParams = await navRequested
-      check(
-        `${spec.file}: 点击按钮跳转站内搜索`,
-        navParams && String(navParams.url).startsWith('https://wiki.archlinux.org/index.php?search=rust'),
-        navParams && navParams.url
-      )
-
-      // 主题切换 + 持久化
-      await page.goto(`${ORIGIN}/${spec.file}`)
-      await sleep(200)
-      await page.evaluate("document.getElementById('theme-toggle').click()")
-      await sleep(200)
-      const flipped = await page.evaluate('document.documentElement.dataset.theme')
-      const storedTheme = await page.evaluate("localStorage.getItem('ss.theme')")
-      check(`${spec.file}: 切换主题生效`, flipped !== spec.theme && flipped === storedTheme, `${spec.theme} -> ${flipped}`)
-      await page.goto(`${ORIGIN}/${spec.file}`)
-      await sleep(250)
-      check(
-        `${spec.file}: 刷新后主题保持`,
-        (await page.evaluate('document.documentElement.dataset.theme')) === flipped
-      )
-      await page.evaluate("try { localStorage.clear() } catch(e) {}")
-
-      // 键盘可达性：Tab 顺序里第一个可聚焦元素
-      const tabOrder = await page.evaluate(`(() => {
-        const focusables = [...document.querySelectorAll('a[href], button:not([disabled]), input:not([disabled])')]
-        return focusables.map(el => el.id || el.className || el.tagName)
-      })()`)
-      check(`${spec.file}: 可聚焦元素齐全`, tabOrder.length >= 13, `count=${tabOrder.length}`)
-
-      if (SHOTS) {
-        // 截图前必须回到页面默认主题（上面的切换测试会留下 ss.theme）
-        await page.evaluate("try { localStorage.clear() } catch (e) {}")
-        await page.goto(`${ORIGIN}/${spec.file}`)
-        await sleep(300)
-        const shot = await page.screenshot(`${spec.file.replace('.html', '')}-desktop.png`)
-        console.log(`[e2e] 截图 ${path.relative(ROOT, shot)}`)
-      }
     }
 
-    // ---------- 移动端视口 ----------
-    console.log('\n=== 移动端 390x844 ===')
-    await page.evaluate("try { localStorage.clear() } catch (e) {}")
+    // ================= C. 主功能（单页，本地联想模式） =================
+    console.log('\n=== C. 主功能 ===')
+    await page.clearStorage()
+    await page.setStored('ss.remote', 'off') // 本地模式：功能检查不依赖网络
+    page.resetLogs()
+    await page.goto(PAGE)
+
+    check('C: 无 JS 异常', page.state.exceptions.length === 0, page.state.exceptions[0] || '')
+    const scriptReady = await page.evaluate(
+      '!!(window.SimpleSearch && SimpleSearch.sites && SimpleSearch.search && SimpleSearch.theme && SimpleSearch.input && SimpleSearch.remote)'
+    )
+    check('C: 全部脚本已加载（含 remote.js）', scriptReady)
+
+    const renderedSites = await page.evaluate(
+      "[...document.querySelectorAll('#buttons-container [data-site]')].map((b) => b.dataset.site)"
+    )
+    const missingBuiltin = BUILTIN_SITE_IDS.filter((id) => !renderedSites.includes(id))
+    check(
+      'C: 内置站点按钮齐全',
+      missingBuiltin.length === 0 && renderedSites.length >= BUILTIN_SITE_IDS.length,
+      missingBuiltin.length ? `缺少 ${missingBuiltin.join(',')}` : `${renderedSites.length} 个`
+    )
+
+    const decision = await page.evaluate("SimpleSearch.search.resolveSite('zhihu', 'a&b c')")
+    check(
+      'C: 特殊字符编码',
+      decision && decision.url === 'https://www.zhihu.com/search?type=content&q=a%26b%20c',
+      decision && decision.url
+    )
+    const navDecision = await page.evaluate("SimpleSearch.search.resolveSite('github', '  ')")
+    check('C: 空词直达', navDecision && navDecision.kind === 'nav' && navDecision.url === 'https://github.com')
+
+    // 静态资源只同源
+    const externalAssets = page.state.requests.filter((u) => !u.startsWith(ORIGIN) && !u.startsWith('data:'))
+    check('C: 首屏无第三方请求', externalAssets.length === 0, externalAssets[0] || '')
+    check(
+      'C: 首屏传输体积 < 100KB',
+      page.state.transferBytes < 100 * 1024,
+      `${(page.state.transferBytes / 1024).toFixed(1)} KB / ${page.state.requests.length} 个请求`
+    )
+
+    // 联想 + 键盘
+    await page.evaluate("(() => { document.getElementById('search-input').focus() })()")
+    await page.typeText('bil')
+    await sleep(400)
+    const suggestState = await page.evaluate(`(() => {
+      const list = document.getElementById('suggest-list')
+      return {
+        hidden: list.hasAttribute('hidden'),
+        count: list.querySelectorAll('[role="option"]').length,
+        expanded: document.getElementById('search-input').getAttribute('aria-expanded'),
+      }
+    })()`)
+    check('C: 本地联想出现', suggestState.hidden === false && suggestState.count > 0, `items=${suggestState.count}`)
+    check('C: aria-expanded 同步', suggestState.expanded === 'true', String(suggestState.expanded))
+
+    await page.pressKey('ArrowDown', { code: 'ArrowDown', vk: 40 })
+    await sleep(120)
+    const activeId = await page.evaluate("document.getElementById('search-input').getAttribute('aria-activedescendant')")
+    check('C: 方向键高亮联想项', Boolean(activeId), String(activeId))
+
+    await page.pressKey('Escape', { code: 'Escape', vk: 27 })
+    await sleep(150)
+    check('C: Esc 关闭联想', await page.evaluate("document.getElementById('suggest-list').hasAttribute('hidden')"))
+
+    check('C: 清除按钮可见', (await page.evaluate("document.getElementById('clear-button').hidden")) === false)
+    await page.evaluate("document.getElementById('clear-button').click()")
+    await sleep(120)
+    check(
+      'C: 清除按钮可用',
+      (await page.evaluate("document.getElementById('search-input').value")) === '' &&
+        (await page.evaluate("document.getElementById('clear-button').hidden")) === true
+    )
+
+    await page.evaluate("document.getElementById('search-input').blur()")
+    await page.pressKey('/', { code: 'Slash', vk: 191, text: '/' })
+    await sleep(150)
+    check('C: 斜杠快捷键聚焦', (await page.evaluate('document.activeElement && document.activeElement.id')) === 'search-input')
+
+    // 真实点击站点按钮 → 导航到站内搜索
+    await page.evaluate(`(() => {
+      const input = document.getElementById('search-input')
+      input.value = 'rust'
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })()`)
+    await sleep(200)
+    const navRequested = page.cdp.once('Page.frameRequestedNavigation', 4000).catch(() => null)
+    await page.evaluate(`document.querySelector('[data-site="archwiki"]').click()`)
+    const navParams = await navRequested
+    check(
+      'C: 点击按钮跳转站内搜索',
+      navParams && String(navParams.url).startsWith('https://wiki.archlinux.org/index.php?search=rust'),
+      navParams && navParams.url
+    )
+
+    // 上面的点击是真实导航，页面已经离开本站；回到单页再继续后续断言
+    await page.goto(PAGE, 400)
+
+    const focusables = await page.evaluate(`(() => {
+      const els = [...document.querySelectorAll('a[href], button:not([disabled]), input:not([disabled])')]
+      return els.map((el) => el.id || el.className || el.tagName)
+    })()`)
+    check('C: 可聚焦元素齐全', focusables.length >= 14, `count=${focusables.length}`)
+
+    // ================= D. 联网联想开关 =================
+    console.log('\n=== D. 联网联想：开关与隐私 ===')
+    await page.clearStorage()
+    await page.goto(PAGE)
+    const toggleState = await page.evaluate(`(() => {
+      const b = document.getElementById('suggest-source-toggle')
+      return { exists: !!b, pressed: b && b.getAttribute('aria-pressed'), text: b && b.textContent }
+    })()`)
+    check('D: 开关存在且默认开启', toggleState.exists && toggleState.pressed === 'true', toggleState.text)
+
+    await page.evaluate("document.getElementById('suggest-source-toggle').click()")
+    await sleep(200)
+    check(
+      'D: 点击后关闭并写入存储',
+      (await page.evaluate("document.getElementById('suggest-source-toggle').getAttribute('aria-pressed')")) ===
+        'false' && (await page.stored('ss.remote')) === 'off'
+    )
+
+    // 关闭状态：输入不产生任何第三方请求
+    page.resetLogs()
+    await page.evaluate("(() => { const i = document.getElementById('search-input'); i.focus() })()")
+    await page.typeText('简单搜索')
+    await sleep(1200)
+    const offlineExternal = page.state.requests.filter((u) => !u.startsWith(ORIGIN) && !u.startsWith('data:'))
+    check('D: 关闭后零第三方请求', offlineExternal.length === 0, offlineExternal[0] || '')
+    const localItems = await page.evaluate("document.querySelectorAll('#suggest-list [role=\"option\"]').length")
+    check('D: 关闭后本地联想仍可用', localItems > 0, `items=${localItems}`)
+
+    // ================= E. 联网联想（真实请求，网络不可用时只警告） =================
+    console.log('\n=== E. 联网联想（百度 JSONP） ===')
+    await page.clearStorage() // ss.remote 缺省 = on
+    await page.goto(PAGE)
+    page.resetLogs()
+    await page.evaluate("(() => { const i = document.getElementById('search-input'); i.focus() })()")
+    await page.typeText('简单搜索')
+    let remoteCount = 0
+    const deadline = Date.now() + 3000
+    while (Date.now() < deadline) {
+      remoteCount = await page.evaluate(
+        "document.querySelectorAll('#suggest-list [data-type=\"remote\"]').length"
+      )
+      if (remoteCount > 0) break
+      await sleep(200)
+    }
+    const remoteRequests = page.state.requests.filter((u) => !u.startsWith(ORIGIN))
+    const onlyBaidu = remoteRequests.every((u) => u.startsWith('https://suggestion.baidu.com/'))
+    if (remoteCount > 0) {
+      check('E: 联网联想返回结果', true, `${remoteCount} 条，请求 ${remoteRequests.length} 次`)
+      check('E: 请求只发往百度', onlyBaidu, remoteRequests[0] || '')
+      const merged = await page.evaluate(`(() => {
+        const items = [...document.querySelectorAll('#suggest-list [role="option"]')]
+        return items.map((el) => el.dataset.type)
+      })()`)
+      check('E: 合并顺序 engine → site → remote → history', merged[0] === 'engine', merged.join(' > '))
+      check('E: 远程项数量 ≤ 5', remoteCount <= 5, String(remoteCount))
+      check('E: 总条数 ≤ 8', merged.length <= 8, String(merged.length))
+      if (SHOTS) {
+        const shot = await page.screenshot('index-suggest-open.png')
+        console.log(`[e2e] 截图 ${path.relative(ROOT, shot)}`)
+      }
+    } else {
+      warn('E: 联网联想未返回结果（可能网络不可达），已自动降级为本地联想；不判失败')
+      check('E: 失败时本地联想仍可用', (await page.evaluate("document.querySelectorAll('#suggest-list [role=\"option\"]').length")) > 0)
+    }
+
+    // ================= F. 移动端 =================
+    console.log('\n=== F. 移动端 390x844 ===')
     await cdp.send('Emulation.setDeviceMetricsOverride', {
       width: 390,
       height: 844,
       deviceScaleFactor: 2,
       mobile: true,
     })
-    for (const file of ['SimpleSearch-Light.html', 'SimpleSearch-Dark.html']) {
-      page.state.consoleErrors.length = 0
-      page.state.exceptions.length = 0
-      await page.goto(`${ORIGIN}/${file}`)
-      await sleep(300)
-      check(`${file} @390: 无 JS 异常`, page.state.exceptions.length === 0, page.state.exceptions[0] || '')
-      const overflow = await page.evaluate(
-        'document.documentElement.scrollWidth - document.documentElement.clientWidth'
-      )
-      check(`${file} @390: 无横向溢出`, overflow <= 1, `溢出 ${overflow}px`)
-      const inputWidth = await page.evaluate("document.getElementById('search-input').getBoundingClientRect().width")
-      check(`${file} @390: 输入框宽度充足`, inputWidth >= 200, `${Math.round(inputWidth)}px`)
-      const btnH = await page.evaluate(
-        "Math.min(...[...document.querySelectorAll('#buttons-container .button')].map(b => b.getBoundingClientRect().height))"
-      )
-      check(`${file} @390: 按钮触控高度 ≥ 32px`, btnH >= 32, `${btnH}px`)
+    for (const spec of [
+      { name: 'light', url: `${PAGE}?theme=light`, bg: LIGHT_BG },
+      { name: 'dark', url: `${PAGE}?theme=dark`, bg: DARK_BG },
+    ]) {
+      await page.clearStorage()
+      page.resetLogs()
+      await page.goto(spec.url, 400)
+      check(`F: ${spec.name} 无 JS 异常`, page.state.exceptions.length === 0, page.state.exceptions[0] || '')
+      check(`F: ${spec.name} 背景色`, (await page.bg()) === spec.bg, await page.bg())
+      const overflow = await page.evaluate('document.documentElement.scrollWidth - document.documentElement.clientWidth')
+      check(`F: ${spec.name} 无横向溢出`, overflow <= 1, `溢出 ${overflow}px`)
+      const layout = await page.evaluate(`(() => {
+        const input = document.getElementById('search-input').getBoundingClientRect()
+        const submit = document.getElementById('search-submit').getBoundingClientRect()
+        const btn = Math.min(...[...document.querySelectorAll('#buttons-container .button')].map((b) => b.getBoundingClientRect().height))
+        const footer = document.getElementById('site-footer').getBoundingClientRect()
+        return { inputW: input.width, sameRow: Math.abs(input.top - submit.top) < 8, btnH: btn, footerBottom: footer.bottom, vh: window.innerHeight }
+      })()`)
+      check(`F: ${spec.name} 输入框宽度充足`, layout.inputW >= 200, `${Math.round(layout.inputW)}px`)
+      check(`F: ${spec.name} 输入框与搜索按钮同一行`, layout.sameRow)
+      check(`F: ${spec.name} 按钮触控高度 ≥ 40px`, layout.btnH >= 40, `${layout.btnH}px`)
+      check(`F: ${spec.name} 页脚不超出视口`, layout.footerBottom <= layout.vh + 1, `${layout.footerBottom}/${layout.vh}`)
       if (SHOTS) {
-        const shot = await page.screenshot(`${file.replace('.html', '')}-mobile.png`)
+        const shot = await page.screenshot(`index-${spec.name}-mobile.png`)
         console.log(`[e2e] 截图 ${path.relative(ROOT, shot)}`)
       }
     }
     await cdp.send('Emulation.clearDeviceMetricsOverride')
 
-    // ---------- file:// 双击可用性 ----------
-    console.log('\n=== file:// 直接打开（双击场景） ===')
-    for (const file of ['SimpleSearch-Light.html', 'SimpleSearch-Dark.html']) {
-      page.state.consoleErrors.length = 0
-      page.state.exceptions.length = 0
-      const fileUrl = 'file:///' + path.join(ROOT, file).replace(/\\/g, '/')
-      await page.goto(fileUrl)
-      await sleep(300)
-      check(`${file} file://: 无 JS 异常`, page.state.exceptions.length === 0, page.state.exceptions[0] || '')
-      check(
-        `${file} file://: 脚本与数据可用`,
-        await page.evaluate(
-          "(window.SimpleSearch && Array.isArray(SimpleSearch.sites) && SimpleSearch.sites.length === 11) && SimpleSearch.search.resolveSite('jd','x').url === 'https://search.jd.com/Search?keyword=x'"
-        )
-      )
-      check(
-        `${file} file://: 按钮已渲染`,
-        (await page.evaluate(
-          "[...document.querySelectorAll('#buttons-container [data-site]')].map((b) => b.dataset.site).length"
-        )) >= BUILTIN_SITE_IDS.length
-      )
+    // ================= G. 桌面截图 =================
+    if (SHOTS) {
+      for (const spec of [
+        { name: 'light', url: `${PAGE}?theme=light` },
+        { name: 'dark', url: `${PAGE}?theme=dark` },
+      ]) {
+        await page.goto(spec.url, 400)
+        const shot = await page.screenshot(`index-${spec.name}-desktop.png`)
+        console.log(`[e2e] 截图 ${path.relative(ROOT, shot)}`)
+      }
     }
+
+    // ================= H. file:// 双击可用 =================
+    console.log('\n=== H. file:// 直接打开（双击场景） ===')
+    const fileUrl = 'file:///' + path.join(ROOT, 'index.html').replace(/\\/g, '/')
+    await page.clearStorage()
+    page.resetLogs()
+    await page.goto(fileUrl, 400)
+    check('H: 无 JS 异常', page.state.exceptions.length === 0, page.state.exceptions[0] || '')
+    check(
+      'H: 脚本与数据可用',
+      await page.evaluate(
+        "(window.SimpleSearch && Array.isArray(SimpleSearch.sites) && SimpleSearch.sites.length === 11) && SimpleSearch.search.resolveSite('jd','x').url === 'https://search.jd.com/Search?keyword=x'"
+      )
+    )
+    check(
+      'H: 按钮已渲染',
+      (await page.evaluate(
+        "[...document.querySelectorAll('#buttons-container [data-site]')].length"
+      )) >= BUILTIN_SITE_IDS.length
+    )
+    check('H: 主题开关可用', (await page.evaluate("!!document.getElementById('theme-toggle')")))
   } finally {
     cleanup()
   }

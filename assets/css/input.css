@@ -1,9 +1,7 @@
-/* input.css — MDUI 1（Material Design 1 自研复刻）风格搜索输入区
- *
- * 四块：MD1 filled textfield（输入框 + 下划线聚焦动画）、MD1 icon button（清除）、
- * MD1 raised button（搜索）、MD1 menu（联想下拉）。
- * 页面骨架 / 涟漪 / 焦点兜底在 base.css；配色与尺寸一律用 tokens.css 变量，不使用强制覆盖写法。
- * 显隐只靠 hidden 属性，自带 display 的控件写成 `.x:not([hidden])`。
+/* input.css — MDUI 1（Material Design 1 自研复刻）风格搜索输入区：
+ * filled textfield + 下划线动画、icon button（清除）、raised button（搜索）、menu（联想下拉）。
+ * 配色/尺寸用 tokens.css 变量；骨架与涟漪宿主在 base.css；不使用强制覆盖写法；
+ * 显隐只用 hidden，自带 display 的控件写成 `.x:not([hidden])`。
  */
 
 /* ------------------------------------------------ 输入框：MD1 filled textfield */
@@ -211,6 +209,12 @@
   font-size: 12px;
   line-height: var(--line-height-tight);
   white-space: nowrap;
+}
+
+/* 联网联想项（type=remote）：sublabel 标注来源「百度」，用次要色 12px 区分即可 */
+.suggest-item[data-type='remote'] .suggest-sublabel {
+  color: var(--text-secondary);
+  font-size: 12px;
 }
 
 /* 历史项修饰类（.suggest-item-history）：不引图标字体，用次要色竖线区分类型 */

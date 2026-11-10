@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- 由 scripts/build.mjs 从 templates/page.html 生成，请勿手改 -->
-<html lang="zh-CN" data-theme="{{THEME}}" data-theme-default="{{THEME}}">
+<html lang="zh-CN" data-theme="light" data-theme-default="{{THEME_DEFAULT}}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -12,15 +12,27 @@
   <meta property="og:type" content="website">
   <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
   <script>
-    // 防闪烁：在样式表生效前确定主题。存储值优先，其次当前入口页默认主题。
+    // 防闪烁：样式表生效前确定主题。优先级与 theme.js 一致：
+    // ?theme= 参数 → localStorage ss.theme → 系统深色偏好 → 浅色
     (function () {
       var el = document.documentElement
-      var stored = null
-      try { stored = localStorage.getItem('ss.theme') } catch (e) {}
-      if (stored !== 'light' && stored !== 'dark') {
-        stored = el.getAttribute('data-theme-default') || 'light'
+      var theme = null
+      try {
+        var matched = /[?&]theme=(light|dark)(?:&|$)/.exec(location.search || '')
+        if (matched) theme = matched[1]
+      } catch (e) {}
+      if (!theme) {
+        try {
+          var stored = localStorage.getItem('ss.theme')
+          if (stored === 'light' || stored === 'dark') theme = stored
+        } catch (e) {}
       }
-      el.setAttribute('data-theme', stored)
+      if (!theme) {
+        try {
+          if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) theme = 'dark'
+        } catch (e) {}
+      }
+      el.setAttribute('data-theme', theme || 'light')
     })()
   </script>
   <link rel="stylesheet" href="assets/css/tokens.css">
@@ -52,7 +64,8 @@
   </main>
 
   <footer id="site-footer">
-    <button id="theme-toggle" class="footer-button" type="button">{{THEME_TOGGLE_LABEL}}</button>
+    <button id="suggest-source-toggle" class="footer-button" type="button" aria-pressed="true">联网联想：开</button>
+    <button id="theme-toggle" class="footer-button" type="button" aria-pressed="false">夜间模式</button>
     <a class="footer-link" href="https://github.com/breathiness/SimpleSearch">关于</a>
   </footer>
 
@@ -61,6 +74,7 @@
   <script defer src="assets/js/suggest.js"></script>
   <script defer src="assets/js/history.js"></script>
   <script defer src="assets/js/theme.js"></script>
+  <script defer src="assets/js/remote.js"></script>
   <script defer src="assets/js/input.js"></script>
   <script defer src="assets/js/app.js"></script>
 </body>

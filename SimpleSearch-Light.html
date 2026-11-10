@@ -1,77 +1,16 @@
 <!DOCTYPE html>
-<!-- 由 scripts/build.mjs 从 templates/page.html 生成，请勿手改 -->
-<html lang="zh-CN" data-theme="light" data-theme-default="light">
+<!-- 由 scripts/build.mjs 生成，请勿手改：v2.1 起明暗合并为单页 index.html，本文件只为兼容老链接做 0 秒重定向 -->
+<html lang="zh-CN">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>简单搜索 · 浅色</title>
-  <meta name="description" content="一款超简单的聚合搜索网站：输入关键词，点击网站即可在该站内搜索；不输入则直接打开网站。">
-  <meta name="theme-color" content="#f5f5f5">
-  <meta property="og:title" content="简单搜索 · 浅色">
-  <meta property="og:description" content="一款超简单的聚合搜索网站：输入关键词，点击网站即可在该站内搜索；不输入则直接打开网站。">
-  <meta property="og:type" content="website">
-  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
-  <script>
-    // 防闪烁：在样式表生效前确定主题。存储值优先，其次当前入口页默认主题。
-    (function () {
-      var el = document.documentElement
-      var stored = null
-      try { stored = localStorage.getItem('ss.theme') } catch (e) {}
-      if (stored !== 'light' && stored !== 'dark') {
-        stored = el.getAttribute('data-theme-default') || 'light'
-      }
-      el.setAttribute('data-theme', stored)
-    })()
-  </script>
-  <link rel="stylesheet" href="assets/css/tokens.css">
-  <link rel="stylesheet" href="assets/css/base.css">
-  <link rel="stylesheet" href="assets/css/input.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>简单搜索 · 浅色</title>
+<meta name="robots" content="noindex">
+<link rel="canonical" href="index.html?theme=light">
+<meta http-equiv="refresh" content="0; url=index.html?theme=light">
+<script>location.replace('index.html?theme=light')</script>
 </head>
 <body>
-  <a class="skip-link" href="#search-input">跳到搜索框</a>
-
-  <main id="search-container">
-    <form id="search-form" role="search" action="https://www.bing.com/search" method="get" autocomplete="off">
-      <div class="search-field">
-        <input id="search-input" name="q" type="text" placeholder="搜索…" aria-label="搜索关键词"
-               aria-autocomplete="list" aria-controls="suggest-list" aria-expanded="false"
-               enterkeyhint="search" autocomplete="off" spellcheck="false" maxlength="512">
-        <button id="clear-button" class="icon-button" type="button" aria-label="清除输入内容" hidden>✕</button>
-        <ul id="suggest-list" class="suggest-list" role="listbox" aria-label="搜索建议" hidden></ul>
-      </div>
-      <button id="search-submit" class="submit-button" type="submit">搜索</button>
-    </form>
-
-    <nav id="buttons-container" aria-label="常用网站">
-      <button class="button" type="button" data-site="github" data-keywords="gh git 代码 开源">GitHub</button>
-      <button class="button" type="button" data-site="unsplash" data-keywords="图片 壁纸 摄影 photo wallpaper">Unsplash</button>
-      <button class="button" type="button" data-site="bilibili" data-keywords="b站 哔哩 视频 弹幕 bilibili">哔哩哔哩</button>
-      <button class="button" type="button" data-site="sspai" data-keywords="少数派 效率 数码 sspai">少数派</button>
-      <button class="button" type="button" data-site="moegirl" data-keywords="萌娘 百科 二次元 moe acg">萌娘百科</button>
-      <button class="button" type="button" data-site="zhihu" data-keywords="知乎 问答 zhihu qa">知乎</button>
-      <button class="button" type="button" data-site="tieba" data-keywords="贴吧 百度 tieba forum">百度贴吧</button>
-      <button class="button" type="button" data-site="taobao" data-keywords="淘宝 购物 taobao shop">淘宝</button>
-      <button class="button" type="button" data-site="jd" data-keywords="京东 购物 jd jd.com">京东</button>
-      <button class="button" type="button" data-site="steam" data-keywords="steam 蒸汽 游戏 game">Steam</button>
-      <button class="button" type="button" data-site="archwiki" data-keywords="arch linux wiki 文档">ArchWiki</button>
-    </nav>
-
-    <noscript>
-      <p class="noscript-hint">JavaScript 未启用：直接在输入框回车仍可用 Bing 搜索。</p>
-    </noscript>
-  </main>
-
-  <footer id="site-footer">
-    <button id="theme-toggle" class="footer-button" type="button">夜间模式</button>
-    <a class="footer-link" href="https://github.com/breathiness/SimpleSearch">关于</a>
-  </footer>
-
-  <script defer src="assets/js/sites.js"></script>
-  <script defer src="assets/js/search.js"></script>
-  <script defer src="assets/js/suggest.js"></script>
-  <script defer src="assets/js/history.js"></script>
-  <script defer src="assets/js/theme.js"></script>
-  <script defer src="assets/js/input.js"></script>
-  <script defer src="assets/js/app.js"></script>
+<p><a href="index.html?theme=light">正在跳转到简单搜索…</a></p>
 </body>
 </html>
