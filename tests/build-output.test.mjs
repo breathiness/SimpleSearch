@@ -1,6 +1,8 @@
-// v2.7 产物静态校验：PWA / 搜索引擎分段 / 快捷键对话框 / 33 站点图标（契约 §13-§18）。
+// v2.8 产物静态校验：常用（featured）视图 / PWA / 搜索引擎分段 / 快捷键对话框 / 33 站点图标（契约 §13-§19）。
 //
 // 直接对生成的 index.html / tokens.css / manifest.webmanifest / sw.js 做静态解析（不跑浏览器）：
+//   - 常用视图：11 个 featured 按钮 data-featured="true" 无 hidden、22 个非 featured 带 hidden；
+//     导航首项文案「常用」；.card-title 初始「常用网站」（可见性/切换由 app.js + e2e 覆盖）
 //   - PWA：<link rel="manifest"> + manifest JSON（name/start_url/scope/display/icons）+ 192/512 图标文件存在
 //   - service worker：sw.js 生成物含版本号与 precache（首页 + 全部 CSS/JS/图标/manifest），经典脚本无 import/export
 //   - 搜索引擎：#engine-mode 4 个 .segmented-item[data-engine]，初始只有 bing 选中
@@ -488,7 +490,7 @@ testOutput('顶栏与面板图标引用正确：#nav-toggle→i-menu、#settings
   }
 })
 
-testOutput('「全部」视图：33 个 data-site 按钮齐全、data-group 与注册表一致，每个都有 .button-icon', () => {
+testOutput('v2.8 常用视图（静态 DOM）：33 个按钮齐全，11 featured 可见、22 非 featured 带 hidden', () => {
   const clean = stripHtmlComments(html)
   const sprite = extractSprite(clean)
   assert.ok(sprite, '缺少 icon-sprite')
@@ -500,9 +502,32 @@ testOutput('「全部」视图：33 个 data-site 按钮齐全、data-group 与�
 
   const buttonIds = buttons.map((button) => button.id)
   assert.equal(new Set(buttonIds).size, buttonIds.length, `data-site 按钮重复：${JSON.stringify(buttonIds)}`)
+
+  // v2.8 §19.1：11 个 featured 可见（无 hidden），22 个非 featured 直接带 hidden（无 JS 兜底）
+  const featured = buttons.filter((button) => getAttr(button.openTag, 'data-featured') === 'true')
+  const nonFeatured = buttons.filter((button) => getAttr(button.openTag, 'data-featured') === null)
+  assert.equal(featured.length, BUILTIN_IDS.length, `featured 按钮应为 ${BUILTIN_IDS.length} 个，实际 ${featured.length}`)
+  assert.equal(
+    nonFeatured.length,
+    SS.sites.length - BUILTIN_IDS.length,
+    `非 featured 按钮应为 ${SS.sites.length - BUILTIN_IDS.length} 个，实际 ${nonFeatured.length}`,
+  )
+  assert.deepEqual(
+    [...featured.map((button) => button.id)].sort(),
+    [...BUILTIN_IDS].sort(),
+    'data-featured="true" 的按钮应恰好是内置 11 站',
+  )
+  for (const button of featured) {
+    assert.ok(!hasHiddenAttr(button.openTag), `featured 按钮 ${button.id} 初始不应带 hidden（默认可见）`)
+  }
+  for (const button of nonFeatured) {
+    assert.ok(hasHiddenAttr(button.openTag), `v2.8 §19.1：非 featured 按钮 ${button.id} 必须带 hidden`)
+  }
+
+  // DOM 里 33 个按钮齐全（可见性由 app.js 的 applyGroupFilter 控制），data-group / 图标逐个校验
   const byId = new Map(buttons.map((button) => [button.id, button]))
   for (const site of SS.sites) {
-    assert.ok(buttonIds.includes(site.id), `「全部」视图缺少站点按钮 data-site="${site.id}"`)
+    assert.ok(buttonIds.includes(site.id), `常用视图 DOM 缺少站点按钮 data-site="${site.id}"`)
     const button = byId.get(site.id)
     assert.equal(button.group, site.group, `站点 ${site.id} 的 data-group 应与注册表一致`)
 
@@ -548,6 +573,15 @@ testOutput('骨架：.appbar/.appbar-title + .shell + #main-content + 两张 .ca
   assert.ok(findAllTags(clean).some((tag) => hasClass(tag, 'card-title')), '缺少 h2.card-title（内容卡片标题）')
 })
 
+testOutput('v2.8 默认（常用）视图：.card-title 初始文案为「常用网站」', () => {
+  const clean = stripHtmlComments(html)
+  const title = findTagWithClass(clean, 'card-title')
+  assert.ok(title, '缺少 .card-title')
+  const tagName = (title.match(/^<([a-zA-Z][\w:-]*)/) || [])[1]
+  const text = textOf(innerOfTag(clean, title, tagName))
+  assert.equal(text, '常用网站', `.card-title 初始文案应为「常用网站」，实际 ${JSON.stringify(text)}`)
+})
+
 testOutput('#site-nav 存在；#group-chips.nav-list 内 .nav-item 数量 = 分组数 + 1、顺序与 data-group 合法', () => {
   const clean = stripHtmlComments(html)
   assert.ok(findTagById(clean, 'site-nav'), '缺少 aside#site-nav（左侧分类导航）')
@@ -564,12 +598,12 @@ testOutput('#site-nav 存在；#group-chips.nav-list 内 .nav-item 数量 = 分�
   assert.equal(
     nav.items.length,
     expectedGroups.length,
-    `nav-item 数量应为 ${expectedGroups.length}（全部 + ${groupIds.length} 类），实际 ${nav.items.length}`,
+    `nav-item 数量应为 ${expectedGroups.length}（常用 + ${groupIds.length} 类），实际 ${nav.items.length}`,
   )
   assert.deepEqual(
     nav.items.map((item) => item.group),
     expectedGroups,
-    `nav-item 顺序应为「全部 + 分组表顺序」：${expectedGroups.join(', ')}`,
+    `nav-item 顺序应为「常用 + 分组表顺序」：${expectedGroups.join(', ')}`,
   )
   for (const item of nav.items) {
     assert.ok(item.label.length > 0, `nav-item data-group=${item.group} 文案为空`)
@@ -583,7 +617,7 @@ testOutput('#site-nav 存在；#group-chips.nav-list 内 .nav-item 数量 = 分�
 testOutput('每个 .nav-item 有 .nav-icon（use #i-cat-<group>）与 .nav-label，label 与分组表一致', () => {
   const clean = stripHtmlComments(html)
   assert.ok(Array.isArray(SS.siteGroups), '缺少 SS.siteGroups')
-  const groupLabels = new Map([['all', '全部']])
+  const groupLabels = new Map([['all', '常用']])
   for (const group of SS.siteGroups) groupLabels.set(group.id, group.label)
 
   const nav = extractGroupNav(clean)
@@ -602,12 +636,13 @@ testOutput('每个 .nav-item 有 .nav-icon（use #i-cat-<group>）与 .nav-label
   }
 })
 
-testOutput('nav-item 的 aria-current：初始只有「全部」为 true，同一时刻只有一个 true', () => {
+testOutput('nav-item 的 aria-current：初始只有「常用」为 true，同一时刻只有一个 true', () => {
   const nav = extractGroupNav(stripHtmlComments(html))
   assert.ok(nav, '缺少 nav#group-chips')
   const current = nav.items.filter((item) => item.current === 'true')
   assert.equal(current.length, 1, `初始应只有一个 nav-item aria-current="true"，实际 ${current.length} 个`)
-  assert.equal(current[0].group, 'all', '初始选中的必须是「全部」分类')
+  assert.equal(current[0].group, 'all', '初始选中的必须是「常用」(data-group="all")')
+  assert.equal(current[0].label, '常用', `v2.8 §19.2：导航首项文案应为「常用」，实际 ${JSON.stringify(current[0].label)}`)
 })
 
 // ---------------------------------------------------------------- 设置面板（v2.5：主题三态 / 历史行 / 版本号）

@@ -618,3 +618,27 @@ SS.siteGroups = [
 - 站点总数 11 → 33；「全部」视图按注册表顺序显示全部站点（内置 11 个在前，新站点在后），分类视图只显示该组站点。
 - **图标**：`sites.js` 站点可新增可选字段 `icon`，值为已在 sprite 里的 symbol 名（如 `cat-tech`）。build 解析顺序：`SITE_ICONS[site.id]` → `site.icon` 指向的 symbol（必须存在于 `SITE_ICONS`/`UI_ICONS`） → 首字符 monogram。lead 会为 11 个新站点画专属图标，其余用 `cat-<group>` 复用分类图标；sprite 体积红线 8 KB → **12 KB**，全站预算 136 KB 不变。
 - 门禁增补：断言每个分组站点数 ≥ 3、新站点 group/keywords 合法、总站点数 ≥ 30、每个按钮都有图标（专属 icon 或 `cat-*` 复用或 monogram）。
+
+## 19. v2.8：常用站与分类展开（用户要求）
+
+### 19.1 数据：`featured` 标记
+
+- `assets/js/sites.js` 中原来 11 个内置站点新增 `featured: true`；新增的 22 个站点**不带**该字段（视为非 featured）。
+- `build` 为 feature 站点渲染 `data-featured="true"`；非 featured 站点不带该属性。
+- **无 JS 兜底**：build 直接给非 featured 按钮加 `hidden` 属性（初始只显示 11 个常用站），JS 在分类视图里再取消隐藏。
+
+### 19.2 视图规则
+
+- `data-group="all"`（导航首项，**文案从「全部」改为「常用」**）→ 只显示 `featured` 的 11 个站点。
+- 选择某分类 → 显示该分类**全部**站点（featured + 新增）。
+- `applyGroupFilter(group)` 同步：
+  - 导航项 `aria-current`；
+  - 站点按钮 `hidden`（all → 非 featured 隐藏；分类 → 不匹配的隐藏）；
+  - **卡片标题**：all → 「常用网站」；分类 → 该分类 label（如「技术开发」）。
+- 深链 `?cat=<group>` 仍然生效（`all` 表示常用视图，地址栏不带 cat 参数）。
+- 启动时（含无深链的默认访问）都必须执行一次 `applyGroupFilter('all')`，保证 33 个按钮里只有 11 个可见。
+
+### 19.3 门禁增补
+
+- E2E：默认视图可见按钮 = 11 且全部 `data-featured="true"`；点「技术开发」→ 可见 7 个且卡片标题「技术开发」；点「常用」→ 回到 11 个、标题「常用网站」；`?cat=shopping` 深链 → 6 个且标题「购物」；单文件版同样断言。
+- 导航首项文案断言改为「常用」。

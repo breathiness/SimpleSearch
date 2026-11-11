@@ -92,7 +92,7 @@ SimpleSearch/
 - 不引入 `!important`；保留可见的 `:focus-visible` 焦点轮廓；动画要尊重 `prefers-reduced-motion: reduce`。
 - **不新增第三方依赖、CDN、字体或追踪脚本**；所有核心功能必须断网可用。唯一的网络请求是**可关闭**的联网联想（见下）。
 - 读写 `localStorage`、`window.open` 等可能失败的调用要放在 `try/catch` 或做能力判断里（隐私模式不能报错）。
-- DOM 契约（`#search-input`、`#suggest-list`、`#nav-toggle`、`#site-nav`、`#settings-toggle`、`#settings-panel`、`#theme-mode`、`#engine-mode`、`.segmented-item`、`#shortcuts-dialog`、`#shortcuts-open`、`#shortcuts-close`、`#history-count`、`#history-clear`、`.panel-version`、`.suggest-delete`、`#suggest-source-toggle`、`#color-swatches`、`.swatch`、`#scrim`、`.nav-item`、`.nav-icon`、`.appbar-logo`、`#buttons-container .button[data-site]` 等 id/class）由 `docs/contract.md` 规定，改动前先确认没有别的模块依赖。
+- DOM 契约（`#search-input`、`#suggest-list`、`#nav-toggle`、`#site-nav`、`#settings-toggle`、`#settings-panel`、`#theme-mode`、`#engine-mode`、`.segmented-item`、`#shortcuts-dialog`、`#shortcuts-open`、`#shortcuts-close`、`#history-count`、`#history-clear`、`.panel-version`、`.suggest-delete`、`#suggest-source-toggle`、`#color-swatches`、`.swatch`、`#scrim`、`.nav-item`、`.nav-icon`、`.appbar-logo`、`.card-title`、`[data-site][data-featured]`、`#buttons-container .button[data-site]` 等 id/class）由 `docs/contract.md` 规定，改动前先确认没有别的模块依赖。
 
 ## 扩展联网联想数据源
 
@@ -136,7 +136,7 @@ SS.remote.provider = {
 - `SS.siteGroups` 数组定义**左侧分类导航条目**的顺序，例如 `[{ id: 'tech', label: '技术开发' }, ...]`；
 - 每个站点必须带 `group`，且取值必须存在于 `SS.siteGroups`，否则 `npm run build` 会失败；分组暂时没有站点时 build 只给警告（建议别留空分组）；
 - 加新分类：往 `SS.siteGroups` 追加 `{ id, label }`，把相关站点的 `group` 指过去，再 `npm run build`；导航条目顺序跟着数组顺序；
-- 交互约定：`scripts/build.mjs` 从 `SS.siteGroups` 生成 `.nav-item`（`全部` + 各分组，放在 `#group-chips.nav-list` 里），`app.js` 点击时按 `data-group` 隐藏其它站点按钮，并同步 `aria-current`（导航项语义，**不是** `aria-pressed`）；<960px 时选中分类后自动收起左侧抽屉。**不写 URL、不持久化**，刷新回「全部」。无 JS 时筛选不可用，但所有站点按钮仍然显示。
+- 交互约定：`scripts/build.mjs` 从 `SS.siteGroups` 生成 `.nav-item`（首项「常用」`data-group="all"` + 各分组，放在 `#group-chips.nav-list` 里）；点「常用」只显示 `featured: true` 的站点，点分类显示该分类全部站点。`app.js` 的 `applyGroupFilter(group)` 统一更新 `aria-current`、按钮 `hidden` 和 `.card-title` 文案（常用 →「常用网站」，分类 → 分类 label）；点分类时地址栏用 `replaceState` 同步 `?cat=`（`all` 时去掉），<960px 时选中后自动收起左侧抽屉。**不持久化**，刷新以 URL 为准。无 JS 时 build 已给非 featured 按钮加 `hidden`，默认只显示 11 个常用站。
 
 ## 主题色（ss.color）
 
@@ -153,7 +153,7 @@ SS.remote.provider = {
 
 三组参数只做「预填 / 预选」，**不自动提交、不自动跳转**，逻辑主要在 `app.js` 的启动流程里：
 
-- `?cat=<groupId>`：选中对应分类，等价点击 `.nav-item`（同步 `aria-current`，非法 id 忽略）；点分类时用 `history.replaceState` 把地址栏同步为 `?cat=<id>`，`all` 时删掉参数。
+- `?cat=<groupId>`：选中对应分类，等价点击 `.nav-item`（同步 `aria-current`，非法 id 忽略）；点分类时用 `history.replaceState` 把地址栏同步为 `?cat=<id>`，`all`（或用「常用」）时删掉参数。`?cat=all` / 默认访问 = 常用视图（只显示 featured 站点）。
 - `?q=<term>`：填入 `#search-input` 并聚焦，**不触发提交**。
 - `?site=<siteId>`：选中该站点所属分类，并把焦点移到对应站点按钮，**不跳转**；非法 id 忽略。
 - 组合时执行顺序固定 **cat → site → q**（q 最后，保证焦点落在输入框）。
@@ -219,7 +219,7 @@ SS.remote.provider = {
 
 - 由 `scripts/build.mjs` 的 `renderSingleFile()` 从 `index.html` 生成：把 3 个 `<style>`、8 个经典脚本、防闪烁脚本全部内联，favicon 转成 data URI，并删掉 `<link rel="manifest">` 与 `apple-touch-icon`；HTML 里加 `window.__SS_SINGLE_FILE = true` 标记。
 - `app.js` 看到 `__SS_SINGLE_FILE` 就不再注册 Service Worker（SW 必须是独立文件），所以单文件版**没有 PWA 安装 / 离线缓存**；它零外部请求、双击即用，但改一个字整页都要重新下载。要 PWA 用 `index.html` 多文件版。
-- 版本口径：当前 **2.7.0**（停在 2.x，不跳 3.x）；`sw.js` 的缓存名与设置面板版本号都跟随 `package.json`。
+- 版本口径：当前 **2.8.0**（停在 2.x）；`sw.js` 的缓存名与设置面板版本号都跟随 `package.json`。
 - 改任何 CSS / JS / 模板后都要 `npm run build` 重新生成它；CI 的产物漂移检查包含 `SimpleSearch.html`，测试 / validate 也有「CSS/JS 全内联、无 `assets/`、无 manifest/apple-touch 引用」的断言。
 
 ## 新增或删除网站
@@ -235,12 +235,14 @@ SS.remote.provider = {
   keywords: ['示例', 'demo'],
   group: 'tech',
   icon: 'cat-tech',
+  featured: true,
 },
 ```
 
 - `id` 只能是小写字母/数字/连字符且全表唯一；`home`、`search` 必须是 `https://`；`search` 必须含 `{q}`。
 - `group` **必填**，取值见 `SS.siteGroups`（目前 `tech` / `community` / `media` / `shopping` / `content`）；新分类要先登记到 `SS.siteGroups`。
 - 图标可选：不配就自动 monogram；想复用分类图标写 `icon: 'cat-<group>'`；配专属图标只改 `scripts/icons.mjs`，不要引外部图标库或 CDN。
+- **`featured` 可选**：`true` 才进默认的「常用」视图；不加则只在对应分类里出现。build 会给 featured 站点写 `data-featured="true"`、给非 featured 站点按钮加 `hidden` 兜底；内置的 11 个站点都带 `featured: true`。
 - 新站点的 `id` / `keywords` 会自动成为 `!bang` token，不需要额外注册。
 - **不要自己编码关键词**（不要手写 `%20`），`{q}` 交给代码替换。
 - 新增站点不会影响 `npm test`；如果删掉了默认内置的站点，测试会失败并提示恢复（内置站点是契约的一部分）。
@@ -251,7 +253,7 @@ SS.remote.provider = {
 - 单元测试用 Node 内置的 `node:test`，放在 `tests/`，文件名以 `.test.mjs` 结尾，`npm test` 用 `node --test "tests/**/*.test.mjs"` 的 glob 自动发现，不用额外登记。
 - `tests/sites.test.mjs` 要求默认内置的站点都存在、且相对顺序一致（站点库现为 33 个）；**新增站点不会让测试变红**，删除内置站点才会失败并提示恢复。
 - 提交/开 PR 前必须本地跑通 `npm run check`（构建 + 测试 + 静态校验/产物一致性）。
-- 当前测试基线：`npm test` **174 例**、`npm run validate` **26 项**、`npm run e2e` **153 项**全绿；覆盖率基线约 96.04% 行 / 80.3% 分支 / 87.17% 函数（阈值 90 / 75 / 80）。
+- 当前测试基线：`npm test` **176 例**、`npm run validate` **27 项**、`npm run e2e` **155 项**全绿；覆盖率基线约 96.04% 行 / 80.3% 分支 / 87.17% 函数（阈值 90 / 75 / 80）。
 - `npm run coverage` 可选、不进 CI 必跑；`npm run check:sites` 同样可选、需要网络。
 - `npm run e2e` 用本机 Edge/Chrome（CDP）跑真实浏览器检查：单页主题解析、主题三态与主题色切换与持久化、深链 `?cat=` / `?q=` / `?site=`、`!bang` 直达、搜索引擎切换（表单 action/name/存储）、快捷键对话框（`?` 打开、Esc 关闭归还焦点）、PWA 注册与断网刷新、两个旧链接的 0 秒跳转与地址栏清理、联网联想开关 / 超时降级 / 真实百度联调、分类导航筛选与左侧抽屉开合、设置面板、搜索历史计数 / 清空 / 单条删除、设置里的版本号、图标 sprite（无额外图片请求）、960px 断点与 390px 移动端布局、`file://` 打开。CI 不跑它（需要浏览器）。
 - GitHub Actions（`.github/workflows/ci.yml`）在 `push` 和 `pull_request` 时用 Node 22 跑 `npm run check`，并检查五个生成产物（`index.html`、`SimpleSearch.html`、两个重定向壳、`sw.js`）是否与 `sites.js` / 模板漂移。
@@ -266,7 +268,7 @@ SS.remote.provider = {
 - [ ] 新增/修改的功能在浅色与夜间两套主题下都正常，键盘可操作
 - [ ] 单页主题解析正确：`?theme=` → 上次选择 → 系统偏好 → 浅色；两个老 URL 能跳到首页并应用对应主题
 - [ ] 关闭「联网联想」后无第三方请求、断网可用；开启时请求失败/超时不阻塞搜索
-- [ ] 新增站点带了 `group`；左侧分类导航能正确筛选、`aria-current` 只有一个、刷新回「全部」
+- [ ] 新增站点带了 `group`；左侧分类导航能正确筛选、`aria-current` 只有一个、刷新回「常用」；新增站点默认只在分类里，`featured: true` 才进常用视图
 - [ ] 桌面 ≥960px 侧栏常驻、<960px 变抽屉且汉堡可开合（点遮罩 / Esc / 选中分类后收起）；没有 `#site-footer`
 - [ ] 设置面板可从右上角打开；联网联想开关文案固定、状态只看 `aria-pressed`；主题模式是「跟随系统 / 浅色 / 深色」三段控件；关闭后焦点回到设置按钮
 - [ ] 19 个主题色色块可切换、刷新后保持、首屏不闪错色；切换不产生任何网络请求
@@ -280,7 +282,7 @@ SS.remote.provider = {
 - [ ] 搜索引擎四选一可切换、`ss.engine` 持久化、表单 action/name 与联想首项文案同步
 - [ ] 快捷键对话框：`?` 打开、9 条快捷键、Esc / 关闭按钮 / 遮罩关闭并归还焦点
 - [ ] `npm run coverage` 通过阈值（90 / 75 / 80）
-- [ ] 单文件便携版 `SimpleSearch.html` 已随源码 build：CSS/JS 全内联、无 `assets/` / manifest / apple-touch-icon 引用、零外部请求（约 146.7 KB / gzip 36.5 KB）
+- [ ] 单文件便携版 `SimpleSearch.html` 已随源码 build：CSS/JS 全内联、无 `assets/` / manifest / apple-touch-icon 引用、零外部请求（约 148.1 KB / gzip 36.9 KB）
 - [ ] 站点图标来自内联 sprite（没有新增图片请求）；没配图标的站点显示 monogram；新增站点可用 `icon: 'cat-<group>'` 复用分类图标，sprite 增量 ≤12 KB
 - [ ] 直接双击 `index.html`（`file://`）无报错
 - [ ] `README.md` / `docs/custom-sites.md` / `docs/CHANGELOG.md` 等受影响的文档已同步

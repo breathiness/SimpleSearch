@@ -1,4 +1,4 @@
-// SimpleSearch v2.7 静态校验与产物一致性门禁。
+// SimpleSearch v2.8 静态校验与产物一致性门禁。
 // 用法：node scripts/validate.mjs（npm run validate）
 //
 // 产物模型（docs/contract.md §7、§12-§17）：npm run build 生成 5 个产物
@@ -41,7 +41,8 @@
 //      sw.js / manifest / PWA 图标不计入首屏）
 //  24. 单文件便携版 SimpleSearch.html：build 生成 + CSS/JS 全内联 + 零 assets/manifest/apple-touch-icon 引用
 //  25. 单文件体积 ≤ 200KB（提示项）
-//  26. v2.7 站点库规模：总站点数 ≥30、每分组 ≥3、「全部」视图 DOM 含全部 data-site 按钮
+//  26. v2.7 站点库规模：总站点数 ≥30、每分组 ≥3、DOM 含全部 data-site 按钮（可见性由 JS 控制）
+//  27. v2.8 featured 视图：11 个 featured 可见、22 个非 featured 带 hidden、.card-title「常用网站」、导航首项「常用」
 // 任一失败 → 退出码 1，并打印失败详情。
 import fs from 'node:fs'
 import path from 'node:path'
@@ -307,6 +308,7 @@ function extractSiteButtons(html) {
       id: decodeHtmlEntities(id),
       label: extractButtonLabel(inner),
       group: getAttr(buttonHtml, 'data-group'),
+      openTag: buttonHtml.slice(0, buttonHtml.indexOf('>') + 1),
       inner,
     })
   }
@@ -1061,7 +1063,7 @@ check('v2.3 左侧分类导航：#site-nav + #group-chips.nav-list，.nav-item �
   }
 
   const allowed = new Set(expectedGroups)
-  const expectedLabels = new Map([['all', '全部']])
+  const expectedLabels = new Map([['all', '常用']])
   for (const group of siteGroups) expectedLabels.set(group.id, group.label)
 
   const sprite = extractSprite(clean)
@@ -1095,7 +1097,9 @@ check('v2.3 左侧分类导航：#site-nav + #group-chips.nav-list，.nav-item �
   if (current.length !== 1) {
     problems.push(`初始应只有一个 nav-item aria-current="true"，实际 ${current.length} 个`)
   } else if (current[0].group !== 'all') {
-    problems.push('初始选中的 nav-item 应是「全部」(data-group="all")')
+    problems.push('初始选中的 nav-item 应是「常用」(data-group="all")')
+  } else if (current[0].label !== '常用') {
+    problems.push(`v2.8 §19.2：导航首项文案应为「常用」，实际 ${JSON.stringify(current[0].label)}`)
   }
 
   return problems
@@ -1841,7 +1845,7 @@ check('v2.6 单文件体积（≤ 200KB，提示项不阻断）', () => {
 
 // ---------------------------------------------------------------- 26. v2.7 站点库规模（§18）
 
-check('v2.7 站点库：总站点数 ≥30、每个分组 ≥3 个站点，「全部」视图 DOM 含全部 data-site 按钮', () => {
+check('v2.7 站点库：总站点数 ≥30、每个分组 ≥3 个站点，常用视图 DOM 仍含全部 data-site 按钮（可见性由 JS 控制）', () => {
   if (!sites) return [registry.problem || '无法读取 SS.sites']
   if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
 
@@ -1871,7 +1875,67 @@ check('v2.7 站点库：总站点数 ≥30、每个分组 ≥3 个站点，「�
 
   return {
     problems,
-    notes: [`站点 ${sites.length} 个 / 分组 ${siteGroups ? siteGroups.length : '?'} 个 / 「全部」视图按钮 ${buttons.length} 个`],
+    notes: [`站点 ${sites.length} 个 / 分组 ${siteGroups ? siteGroups.length : '?'} 个 / DOM 按钮 ${buttons.length} 个（可见性由 JS 控制）`],
+  }
+})
+
+// ---------------------------------------------------------------- 27. v2.8 featured 视图（§19）
+
+check('v2.8 默认常用视图（静态）：11 个 featured（data-featured="true"）可见、22 个非 featured 带 hidden、.card-title「常用网站」', () => {
+  if (!sites) return [registry.problem || '无法读取 SS.sites']
+  if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
+  const clean = stripHtmlComments(realPage.html)
+  const problems = []
+
+  const buttons = extractSiteButtons(clean)
+  if (buttons.length !== sites.length) {
+    problems.push(`DOM 按钮数 ${buttons.length} 应等于站点数 ${sites.length}`)
+  }
+
+  const featured = buttons.filter((button) => getAttr(button.openTag, 'data-featured') === 'true')
+  const nonFeatured = buttons.filter((button) => getAttr(button.openTag, 'data-featured') === null)
+  const expectedFeatured = sites.filter((site) => site.featured === true).map((site) => site.id).sort()
+  const expectedNonFeatured = sites.filter((site) => site.featured !== true).map((site) => site.id)
+
+  if (featured.map((button) => button.id).sort().join(',') !== expectedFeatured.join(',')) {
+    problems.push(`data-featured="true" 的按钮应与注册表 featured 站点一致：期望 ${expectedFeatured.join(', ')}`)
+  }
+  if (nonFeatured.length !== expectedNonFeatured.length) {
+    problems.push(`非 featured 按钮应为 ${expectedNonFeatured.length} 个，实际 ${nonFeatured.length}`)
+  }
+  for (const button of featured) {
+    if (hasHiddenAttr(button.openTag)) problems.push(`featured 按钮 ${button.id} 不应带 hidden（初始可见）`)
+  }
+  for (const button of nonFeatured) {
+    if (!hasHiddenAttr(button.openTag)) {
+      problems.push(`v2.8 §19.1：非 featured 按钮 ${button.id} 必须带 hidden（无 JS 兜底）`)
+    }
+  }
+
+  // 卡片标题：默认（常用）视图为「常用网站」
+  const title = findTagWithClass(clean, 'card-title')
+  if (!title) {
+    problems.push(`${REAL_PAGE} 缺少 .card-title`)
+  } else {
+    const titleTagName = (title.match(/^<([a-zA-Z][\w:-]*)/) || [])[1]
+    const text = textOfInner(innerOfTag(clean, title, titleTagName))
+    if (text !== '常用网站') {
+      problems.push(`.card-title 初始（默认常用视图）应为「常用网站」，实际 ${JSON.stringify(text)}`)
+    }
+  }
+
+  // 导航首项文案「常用」（data-group="all" 不变）
+  const nav = extractGroupNav(clean)
+  const first = nav && nav.items.find((item) => item.group === 'all')
+  if (!first) {
+    problems.push('缺少 data-group="all" 的导航首项')
+  } else if (first.label !== '常用') {
+    problems.push(`导航首项文案应为「常用」，实际 ${JSON.stringify(first.label)}`)
+  }
+
+  return {
+    problems,
+    notes: [`featured ${featured.length} 个（无 hidden）/ 非 featured ${nonFeatured.length} 个（带 hidden）/ .card-title「常用网站」`],
   }
 })
 
@@ -1881,7 +1945,7 @@ function printReport() {
   const failed = checks.filter((item) => item.problems.length > 0)
   const passed = checks.length - failed.length
 
-  console.log('SimpleSearch v2.7 静态校验（validate）')
+  console.log('SimpleSearch v2.8 静态校验（validate）')
   console.log(`仓库：${ROOT}`)
   console.log(`产物：${REAL_PAGE}（真实页）+ ${SHELLS.map((shell) => shell.file).join(' + ')}（重定向壳）`)
   console.log('')

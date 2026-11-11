@@ -89,11 +89,15 @@ function renderSiteButtons(sites, icons) {
         ? ` data-keywords="${escapeHtml(site.keywords.join(' '))}"`
         : ''
       const group = site.group ? ` data-group="${escapeHtml(site.group)}"` : ' data-group=""'
+      const featured = site.featured === true
+      const featuredAttr = featured ? ' data-featured="true"' : ''
+      // 非 featured 站点默认 hidden：无 JS 时只显示常用站点，分类视图由 app.js 展开
+      const hiddenAttr = featured ? '' : ' hidden'
       const iconId = resolveSiteIconId(site, icons)
       const icon = iconId
         ? `<svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-${escapeHtml(iconId)}"></use></svg>`
         : `<span class="button-icon button-icon-text" aria-hidden="true">${escapeHtml(monogram(site.label))}</span>`
-      return `      <button class="button" type="button" data-site="${escapeHtml(site.id)}"${group}${keywords}>${icon}<span class="button-label">${escapeHtml(site.label)}</span></button>`
+      return `      <button class="button" type="button" data-site="${escapeHtml(site.id)}"${group}${keywords}${featuredAttr}${hiddenAttr}>${icon}<span class="button-label">${escapeHtml(site.label)}</span></button>`
     })
     .join('\n')
 }
@@ -140,7 +144,7 @@ function renderNavItem(group, label, current) {
 }
 
 function renderGroupNav(groups) {
-  const all = renderNavItem('all', '全部', true)
+  const all = renderNavItem('all', '常用', true)
   const rest = groups.map((group) => renderNavItem(group.id, group.label, false))
   return [all, ...rest].join('\n')
 }

@@ -93,6 +93,26 @@ testIt('内置 11 站仍排在最前，v2.7 新增 22 站按契约 §18 顺序�
   )
 })
 
+testIt('v2.8 featured 标记：内置 11 站 featured===true，新增 22 站不带 featured', () => {
+  const featured = SS.sites.filter((site) => site.featured === true)
+  assert.equal(featured.length, BUILTIN_IDS.length, `featured 站点应恰好 ${BUILTIN_IDS.length} 个，实际 ${featured.length}`)
+  assert.deepEqual(
+    featured.map((site) => site.id).sort(),
+    [...BUILTIN_IDS].sort(),
+    'featured 站点应恰好是内置 11 站',
+  )
+  for (const site of SS.sites) {
+    if (BUILTIN_IDS.includes(site.id)) {
+      assert.equal(site.featured, true, `内置站点 ${site.id} 的 featured 应为 true`)
+    } else {
+      assert.ok(
+        !Object.hasOwn(site, 'featured'),
+        `v2.8 §19.1：新增站点 ${site.id} 不应带 featured 字段`,
+      )
+    }
+  }
+})
+
 testIt('内置站点全部存在，且相对顺序与契约 §4.1 一致（允许追加新站点）', () => {
   const ids = SS.sites.map((site) => site.id)
   const missing = BUILTIN_IDS.filter((id) => !ids.includes(id))

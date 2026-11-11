@@ -12,6 +12,7 @@
     {
       id: 'github',
       group: 'tech',
+      featured: true,
       label: 'GitHub',
       home: 'https://github.com',
       search: 'https://github.com/search?q={q}',
@@ -20,6 +21,7 @@
     {
       id: 'unsplash',
       group: 'content',
+      featured: true,
       label: 'Unsplash',
       home: 'https://unsplash.com/',
       // 原 search?q= 已失效，v2 改用 /s/photos/ 路径
@@ -29,6 +31,7 @@
     {
       id: 'bilibili',
       group: 'media',
+      featured: true,
       label: '哔哩哔哩',
       home: 'https://www.bilibili.com',
       search: 'https://search.bilibili.com/all?keyword={q}',
@@ -37,6 +40,7 @@
     {
       id: 'sspai',
       group: 'content',
+      featured: true,
       label: '少数派',
       home: 'https://sspai.com',
       search: 'https://sspai.com/search/post/{q}',
@@ -45,6 +49,7 @@
     {
       id: 'moegirl',
       group: 'media',
+      featured: true,
       label: '萌娘百科',
       home: 'https://zh.moegirl.org.cn',
       search: 'https://zh.moegirl.org.cn/index.php?search={q}',
@@ -53,6 +58,7 @@
     {
       id: 'zhihu',
       group: 'community',
+      featured: true,
       label: '知乎',
       home: 'https://www.zhihu.com',
       search: 'https://www.zhihu.com/search?type=content&q={q}',
@@ -61,6 +67,7 @@
     {
       id: 'tieba',
       group: 'community',
+      featured: true,
       label: '百度贴吧',
       home: 'https://tieba.baidu.com',
       search: 'https://tieba.baidu.com/f/search/res?qw={q}',
@@ -69,6 +76,7 @@
     {
       id: 'taobao',
       group: 'shopping',
+      featured: true,
       label: '淘宝',
       home: 'https://www.taobao.com',
       search: 'https://s.taobao.com/search?q={q}',
@@ -77,6 +85,7 @@
     {
       id: 'jd',
       group: 'shopping',
+      featured: true,
       label: '京东',
       home: 'https://www.jd.com',
       search: 'https://search.jd.com/Search?keyword={q}',
@@ -85,6 +94,7 @@
     {
       id: 'steam',
       group: 'media',
+      featured: true,
       label: 'Steam',
       home: 'https://store.steampowered.com',
       search: 'https://store.steampowered.com/search/?term={q}',
@@ -93,6 +103,7 @@
     {
       id: 'archwiki',
       group: 'tech',
+      featured: true,
       label: 'ArchWiki',
       home: 'https://wiki.archlinux.org',
       search: 'https://wiki.archlinux.org/index.php?search={q}',

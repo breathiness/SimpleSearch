@@ -530,14 +530,14 @@ async function run() {
     })()`)
     check('C: 顶栏存在且标题正确', shell.appbar && shell.title === '简单搜索', shell.title)
     check('C: 左侧分类导航存在', shell.hasNav && shell.itemCount >= 2, `${shell.itemCount} 项`)
-    check('C: 默认只有「全部」被选中', shell.current.length === 1 && shell.current[0] === 'all', shell.current.join(','))
+    check('C: 默认只有「常用」被选中', shell.current.length === 1 && shell.current[0] === 'all', shell.current.join(','))
     check('C: 桌面端不显示汉堡', shell.navToggleDisplayed === false, String(shell.navToggleDisplayed))
     check('C: 页脚已移除', shell.hasFooter === false)
     check('C: 设置面板默认隐藏且遮罩隐藏', shell.hasSettingsToggle && shell.panelHidden && shell.scrimHidden)
     check('C: 顶栏 logo 存在', shell.logo === '#i-logo', String(shell.logo))
     check(
       'C: 分类导航有图标与文字',
-      shell.navIcons.length === shell.itemCount && shell.navLabels.length === shell.itemCount && shell.navLabels[0] === '全部',
+      shell.navIcons.length === shell.itemCount && shell.navLabels.length === shell.itemCount && shell.navLabels[0] === '常用',
       `${shell.navIcons.length} 图标 / ${shell.navLabels.join('·')}`
     )
 
@@ -563,18 +563,34 @@ async function run() {
       `${filtered.visible.join(',')}（共 ${filtered.total}）`
     )
     check('C: aria-current 同步', filtered.current.length === 1 && filtered.current[0] === 'shopping', filtered.current.join(','))
+    const categoryTitle = await page.evaluate("(document.querySelector('.card-title') || {}).textContent")
+    check('C: 分类视图卡片标题跟随', categoryTitle && categoryTitle.trim() === '购物', String(categoryTitle).trim())
     check(
       'C: 分类筛选在渲染层真的生效（hidden 必须 display:none）',
       filtered.hiddenRendered === 0 && filtered.renderedVisible === filtered.visible.length,
       `渲染可见=${filtered.renderedVisible}，期望=${filtered.visible.length}，隐藏但仍在渲染=${filtered.hiddenRendered}`
     )
 
+    const featuredCount = await page.evaluate(
+      "document.querySelectorAll('#buttons-container [data-site][data-featured=\"true\"]').length"
+    )
     await page.evaluate(`document.querySelector('#group-chips [data-group="all"]').click()`)
     await sleep(200)
-    const restored = await page.evaluate(
-      "[...document.querySelectorAll('#buttons-container [data-site]')].filter((b) => !b.hidden).length"
+    const restored = await page.evaluate(`(() => {
+      const buttons = [...document.querySelectorAll('#buttons-container [data-site]')]
+      return {
+        visible: buttons.filter((b) => !b.hidden).length,
+        rendered: buttons.filter((b) => getComputedStyle(b).display !== 'none').length,
+        title: (document.querySelector('.card-title') || {}).textContent,
+        allFeatured: buttons.filter((b) => !b.hidden).every((b) => b.getAttribute('data-featured') === 'true'),
+      }
+    })()`)
+    check(
+      'C: 常用视图只显示 featured（11 个）',
+      restored.visible === featuredCount && restored.rendered === featuredCount && restored.allFeatured,
+      `可见 ${restored.visible}/${featuredCount}，渲染 ${restored.rendered}`
     )
-    check('C: 点「全部」恢复全量', restored === renderedSites.length, `${restored}/${renderedSites.length}`)
+    check('C: 常用视图卡片标题', restored.title && restored.title.trim() === '常用网站', String(restored.title).trim())
 
     // ---- 设置抽屉 ----
     await page.evaluate("document.getElementById('settings-toggle').click()")
@@ -947,7 +963,10 @@ async function run() {
       const layout = await page.evaluate(`(() => {
         const input = document.getElementById('search-input').getBoundingClientRect()
         const submit = document.getElementById('search-submit').getBoundingClientRect()
-        const buttons = [...document.querySelectorAll('#buttons-container .button')]
+        // 只量可见按钮（常用视图下其余 22 个是 hidden，高度为 0 会把 min 拖成 0）
+        const buttons = [...document.querySelectorAll('#buttons-container .button')].filter(
+          (b) => getComputedStyle(b).display !== 'none'
+        )
         const btn = Math.min(...buttons.map((b) => b.getBoundingClientRect().height))
         const appbar = document.querySelector('.appbar').getBoundingClientRect()
         const navToggle = document.getElementById('nav-toggle')
@@ -1013,7 +1032,9 @@ async function run() {
     const small = await page.evaluate(`(() => {
       const overflow = document.documentElement.scrollWidth - document.documentElement.clientWidth
       const input = document.getElementById('search-input').getBoundingClientRect()
-      const buttons = [...document.querySelectorAll('#buttons-container .button')]
+      const buttons = [...document.querySelectorAll('#buttons-container .button')].filter(
+        (b) => getComputedStyle(b).display !== 'none'
+      )
       const btnH = Math.min(...buttons.map((b) => b.getBoundingClientRect().height))
       const navToggle = document.getElementById('nav-toggle')
       return {

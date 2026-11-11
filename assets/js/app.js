@@ -105,16 +105,29 @@
 
   function applyGroupFilter(group) {
     const nav = $('group-chips')
+    const isAll = group === 'all'
+    let label = ''
     if (nav) {
       for (const item of nav.querySelectorAll('[data-group]')) {
-        item.setAttribute('aria-current', item.getAttribute('data-group') === group ? 'true' : 'false')
+        const active = item.getAttribute('data-group') === group
+        item.setAttribute('aria-current', active ? 'true' : 'false')
+        if (active) {
+          const text = item.querySelector('.nav-label')
+          label = text ? text.textContent.trim() : item.textContent.trim()
+        }
       }
     }
     const buttons = document.querySelectorAll('#buttons-container [data-site]')
     for (const button of buttons) {
-      const match = group === 'all' || button.getAttribute('data-group') === group
+      // 常用视图只显示 featured；分类视图显示该分类全部站点
+      const match = isAll
+        ? button.getAttribute('data-featured') === 'true'
+        : button.getAttribute('data-group') === group
       button.hidden = !match
     }
+    // 卡片标题跟随当前视图
+    const title = document.querySelector('.card-title')
+    if (title) title.textContent = isAll ? '常用网站' : label || '常用网站'
     syncCategoryUrl(group)
   }
 
@@ -411,9 +424,10 @@
     try {
       params = new URLSearchParams(window.location.search)
     } catch (error) {
-      return
+      return null
     }
-    if (!params.toString()) return
+    if (!params.toString()) return null
+    let appliedGroup = null
 
     const nav = $('group-chips')
     const knownGroups = new Set(
@@ -421,13 +435,17 @@
     )
 
     const cat = params.get('cat')
-    if (cat && knownGroups.has(cat)) applyGroupFilter(cat)
+    if (cat && knownGroups.has(cat)) {
+      applyGroupFilter(cat)
+      appliedGroup = cat
+    }
 
     const siteId = params.get('site')
     if (siteId && Array.isArray(SS.sites)) {
       const site = SS.sites.find((item) => item && item.id === siteId)
       if (site && site.group && knownGroups.has(site.group)) {
         applyGroupFilter(site.group)
+        appliedGroup = site.group
         const button = document.querySelector(`#buttons-container [data-site="${siteId}"]`)
         if (button && typeof button.focus === 'function') button.focus()
       }
@@ -446,6 +464,8 @@
       // 让清除按钮/联想等监听 input 的逻辑同步状态
       input.dispatchEvent(new Event('input', { bubbles: true }))
     }
+
+    return appliedGroup
   }
 
   function boot() {
@@ -457,7 +477,9 @@
     bindDrawers()
     bindRipple()
     bindEngines()
-    applyDeepLinks()
+    // 深链优先（?cat= / ?site=），否则默认「常用」视图；两种情况下都要跑一次过滤
+    const deepGroup = applyDeepLinks()
+    applyGroupFilter(deepGroup || 'all')
     registerServiceWorker()
     // 供 E2E/调试判断"装配完成"（脚本 defer 执行完 ≠ 已绑定事件）
     document.documentElement.setAttribute('data-app-ready', '1')
