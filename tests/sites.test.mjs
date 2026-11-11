@@ -194,14 +194,31 @@ testIt('keywords 若存在必须是字符串数组（允许空数组）', () => 
   }
 })
 
-testIt('SS.engines.bing 定义完整且默认引擎为 bing', () => {
+testIt('SS.engines：4 个搜索引擎（bing/google/ddg/baidu），每个含 id/label/search/search.param', () => {
   assert.equal(typeof SS.engines, 'object')
-  assert.ok(SS.engines && SS.engines.bing, '缺少 SS.engines.bing')
-  const bing = SS.engines.bing
-  assert.equal(bing.id, 'bing')
-  assert.ok(typeof bing.label === 'string' && bing.label.trim().length > 0)
-  assert.match(bing.search, /^https:\/\//, 'Bing search 必须 https')
-  assert.ok(bing.search.includes('{q}'), 'Bing search 必须含 {q}')
+  const expectedIds = ['bing', 'google', 'ddg', 'baidu']
+  assert.deepEqual(
+    Object.keys(SS.engines).sort(),
+    [...expectedIds].sort(),
+    `搜索引擎应为 ${expectedIds.join(', ')}`,
+  )
+
+  for (const id of expectedIds) {
+    const engine = SS.engines[id]
+    assert.ok(engine && typeof engine === 'object', `缺少引擎 ${id}`)
+    assert.equal(engine.id, id, `引擎 ${id} 的 id 字段不匹配`)
+    assert.equal(typeof engine.label, 'string', `引擎 ${id} 的 label 必须是字符串`)
+    assert.ok(engine.label.trim().length > 0, `引擎 ${id} 的 label 不能为空`)
+    assert.match(engine.search, /^https:\/\//, `引擎 ${id} 的 search 必须 https`)
+    assert.ok(engine.search.includes('{q}'), `引擎 ${id} 的 search 必须含 {q}`)
+    assert.equal(typeof engine.param, 'string', `引擎 ${id} 缺少 param（表单查询参数名）`)
+    assert.match(engine.param, /^[a-z][a-z0-9_]*$/i, `引擎 ${id} 的 param 非法：${engine.param}`)
+  }
+
+  assert.equal(SS.engines.bing.param, 'q', 'bing 的 param 应为 q')
+  assert.equal(SS.engines.google.param, 'q', 'google 的 param 应为 q')
+  assert.equal(SS.engines.ddg.param, 'q', 'ddg 的 param 应为 q')
+  assert.equal(SS.engines.baidu.param, 'wd', 'baidu 的 param 应为 wd')
   assert.equal(SS.defaultEngine, 'bing', 'SS.defaultEngine 必须是 bing')
 })
 

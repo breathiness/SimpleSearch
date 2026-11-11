@@ -50,20 +50,25 @@
     return []
   }
 
-  // 默认引擎展示名：容器优先、Bing 兜底；引擎表被替换时取第一个可用引擎
-  function resolveEngineLabel(opts) {
+  // 当前默认引擎（id + 展示名）：优先 opts，其次 SS.defaultEngine / SS.engines，缺失回退 Bing
+  function resolveEngine(opts) {
+    const fallback = { id: DEFAULT_ENGINE, label: FALLBACK_ENGINE_LABEL }
     const engines = opts.engines && typeof opts.engines === 'object' ? opts.engines : SS.engines
-    if (!engines || typeof engines !== 'object') return FALLBACK_ENGINE_LABEL
+    if (!engines || typeof engines !== 'object') return fallback
 
     const preferred = typeof opts.defaultEngine === 'string'
       ? opts.defaultEngine
       : (typeof SS.defaultEngine === 'string' ? SS.defaultEngine : DEFAULT_ENGINE)
-    const engine = engines[preferred] || engines[DEFAULT_ENGINE] ||
-      Object.keys(engines).map((key) => engines[key]).find(Boolean)
-    if (engine && typeof engine.label === 'string' && engine.label.trim() !== '') {
-      return engine.label.trim()
+    const ids = [preferred, DEFAULT_ENGINE].concat(Object.keys(engines))
+    for (const id of ids) {
+      const engine = engines[id]
+      if (!engine || typeof engine.label !== 'string' || engine.label.trim() === '') continue
+      return {
+        id: typeof engine.id === 'string' && engine.id !== '' ? engine.id : id,
+        label: engine.label.trim(),
+      }
     }
-    return FALLBACK_ENGINE_LABEL
+    return fallback
   }
 
   // 去重器：同一个 siteId 或同一个 label（不区分大小写）只保留第一条
@@ -143,7 +148,13 @@
       if (keep(item)) items.push(item)
     }
 
-    push({ type: 'engine', label: '用 ' + resolveEngineLabel(opts) + ' 搜索：' + query, sublabel: '搜索引擎' })
+    const engine = resolveEngine(opts)
+    push({
+      type: 'engine',
+      label: '用 ' + engine.label + ' 搜索：' + query,
+      sublabel: '搜索引擎',
+      engineId: engine.id,
+    })
 
     // 站点命中：相关度高的在前，同相关度保持注册表顺序
     const matched = []

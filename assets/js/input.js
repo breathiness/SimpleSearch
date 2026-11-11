@@ -104,17 +104,41 @@
       return null
     }
 
-    function cancelRemote() {
+    // 作废当前远程请求的「采用权」：令牌自增，但不 abort 在途 JSONP。
+    // 让脚本自然执行完回调再清理，避免回调已删除却仍有脚本迟到执行（ReferenceError）。
+    function invalidateRemote() {
       remoteToken += 1
-      if (remoteController) {
-        const controller = remoteController
-        remoteController = null
+      remoteController = null
+    }
+
+    // 明确中止在途请求（只在关闭联网联想开关时使用，契约要求立即 abort）
+    function abortRemote() {
+      const controller = remoteController
+      remoteToken += 1
+      remoteController = null
+      if (controller) {
         try {
           controller.abort()
         } catch (e) {
           /* 忽略 */
         }
       }
+    }
+
+    // 关闭列表时作废远程请求：立即失效令牌（结果一定被丢弃），
+    // 并把 abort 推迟到下一个任务——让已加载的 JSONP 脚本先执行完自己的回调，
+    // 避免「回调已删除、脚本迟到执行」产生 ss_suggest_N is not defined。
+    function settleRemoteOnClose() {
+      const controller = remoteController
+      invalidateRemote()
+      if (!controller) return
+      root.setTimeout(() => {
+        try {
+          controller.abort()
+        } catch (e) {
+          /* 忽略 */
+        }
+      }, 0)
     }
 
     function syncRemoteToggle() {
@@ -193,12 +217,75 @@
       return { engine, sites, history }
     }
 
+    // ------------------------------------------------------------ !bang 站内搜索
+
+    // 解析「!token [词]」：返回 { token, term }；不是合法 bang 语法时返回 null
+    function bangToken(raw) {
+      const match = normalize(raw).match(/^!([a-z0-9][a-z0-9-]*)(?:\s+([\s\S]*))?$/)
+      if (!match) return null
+      return { token: match[1], term: normalize(match[2] || '') }
+    }
+
+    function siteLabelById(siteId) {
+      if (Array.isArray(SS.sites)) {
+        for (const site of SS.sites) {
+          if (site && site.id === siteId) {
+            return typeof site.label === 'string' && site.label !== '' ? site.label : siteId
+          }
+        }
+      }
+      return siteId || ''
+    }
+
+    // 合法 !bang 且 SS.search.resolveBang 命中时返回首项；未落地/未命中返回 null（行为不变）
+    function buildBangItem(raw) {
+      const parsed = bangToken(raw)
+      if (!parsed) return null
+      if (!SS.search || typeof SS.search.resolveBang !== 'function') return null
+
+      let decision = null
+      try {
+        decision = SS.search.resolveBang(raw)
+      } catch (e) {
+        decision = null
+      }
+      if (!decision || typeof decision.url !== 'string' || decision.url === '') return null
+
+      const siteLabel = siteLabelById(decision.siteId)
+      const term = typeof decision.term === 'string' && decision.term !== '' ? decision.term : parsed.term
+      return {
+        type: 'bang',
+        label: term === '' ? '打开 ' + siteLabel : '在 ' + siteLabel + ' 搜索：' + term,
+        sublabel: '!' + parsed.token,
+        siteId: decision.siteId,
+        url: decision.url,
+        kind: decision.kind,
+      }
+    }
+
+    // 采用 !bang 项：直接跳转，不记历史、不走表单提交
+    function adoptBang(item) {
+      let decision = null
+      try {
+        decision = SS.search && typeof SS.search.resolveBang === 'function'
+          ? SS.search.resolveBang(normalize(input.value))
+          : null
+      } catch (e) {
+        decision = null
+      }
+      const url = decision && decision.url ? decision.url : item.url
+      if (url) navigate(url)
+      else input.focus()
+    }
+
     function buildItems(raw, remoteWords) {
+      const bangItem = buildBangItem(raw)
       const local = collectLocal(raw)
       const seen = new Set()
       const remember = (value) => {
         if (typeof value === 'string' && value.trim() !== '') seen.add(value.trim().toLowerCase())
       }
+      if (bangItem) remember(bangItem.label)
       for (const item of local.engine) remember(item.label)
       for (const item of local.sites) remember(item.label)
       for (const item of local.history) remember(item.label)
@@ -223,9 +310,11 @@
       }
 
       const localCount = local.engine.length + local.sites.length + local.history.length
-      const remoteSlots = Math.max(0, Math.min(REMOTE_MAX, TOTAL_MAX - localCount))
-      return local.engine
-        .concat(local.sites, remoteItems.slice(0, remoteSlots), local.history)
+      const bangCount = bangItem ? 1 : 0
+      const remoteSlots = Math.max(0, Math.min(REMOTE_MAX, TOTAL_MAX - localCount - bangCount))
+      const head = bangItem ? [bangItem] : []
+      return head
+        .concat(local.engine, local.sites, remoteItems.slice(0, remoteSlots), local.history)
         .slice(0, TOTAL_MAX)
     }
 
@@ -237,9 +326,11 @@
     }
 
     function requestRemote(raw) {
-      cancelRemote()
+      invalidateRemote()
       const query = normalize(raw)
       if (query === '' || !remoteEnabled()) return
+      // !bang 是本地站内快捷搜索，不需要联网联想
+      if (bangToken(raw)) return
       if (!list || list.hidden) return
       if (!SS.remote || typeof SS.remote.fetch !== 'function') return
 
@@ -266,7 +357,9 @@
         if (remoteController === controller) remoteController = null
         const remoteWords = Array.isArray(words) ? words : []
         if (normalize(input.value) !== query) return
+        // 列表必须仍处于打开状态，否则丢弃结果（不重渲染、也不自动打开）
         if (!list || list.hidden || items.length === 0) return
+        if (input.getAttribute('aria-expanded') !== 'true') return
         if (remoteWords.length === 0) return
 
         const preserveKey = currentActiveKey()
@@ -293,7 +386,12 @@
     }
 
     function closeList() {
-      cancelRemote()
+      // 取消待触发的防抖：否则「输入后立刻 Esc」会让防抖晚到，重新渲染并弹回列表
+      if (debounceTimer) {
+        root.clearTimeout(debounceTimer)
+        debounceTimer = 0
+      }
+      settleRemoteOnClose()
       clearActive()
       items = []
       lastRenderedValue = null
@@ -476,6 +574,10 @@
       cancelBlurClose()
       closeList()
 
+      if (item.type === 'bang') {
+        adoptBang(item)
+        return
+      }
       if (item.type === 'site') {
         adoptSite(item.siteId)
         return
@@ -521,6 +623,11 @@
 
     input.addEventListener('blur', () => {
       cancelBlurClose()
+      // 失焦后不再补渲染：立即取消待触发的防抖，避免关闭后又被防抖弹回
+      if (debounceTimer) {
+        root.clearTimeout(debounceTimer)
+        debounceTimer = 0
+      }
       blurTimer = root.setTimeout(() => {
         blurTimer = 0
         closeList()
@@ -566,10 +673,10 @@
       }
 
       if (key === 'Escape' || key === 'Esc') {
-        if (list && !list.hidden) {
-          event.preventDefault()
-          closeList()
-        }
+        // 列表已打开时接管 Esc（阻止默认）；但无论是否已渲染，都要走关闭清理：
+        // 输入后防抖未触发时按 Esc，也必须取消待触发的联想/远程，否则稍后列表会自己弹出来。
+        if (list && !list.hidden) event.preventDefault()
+        closeList()
         return
       }
 
@@ -639,7 +746,8 @@
           return
         }
 
-        cancelRemote()
+        // 关闭：中止在途请求并移除已有远程项
+        abortRemote()
         if (query !== '' && list && !list.hidden) {
           const preserveKey = currentActiveKey()
           lastRenderedValue = raw
@@ -668,6 +776,21 @@
       rerenderForHistory()
     })
     root.addEventListener('focus', refreshHistoryCount)
+
+    // 引擎切换（设置面板）后刷新已打开的联想列表，让首项「用 <引擎> 搜索」文案立即跟随；
+    // 切换本身由 app.js 负责，这里只同步已渲染列表。
+    doc.addEventListener('click', (event) => {
+      const target = event.target
+      const engineButton = target && typeof target.closest === 'function'
+        ? target.closest('#engine-mode [data-engine]')
+        : null
+      if (!engineButton) return
+      const raw = input.value
+      if (normalize(raw) === '' || !list || list.hidden || items.length === 0) return
+      const preserveKey = currentActiveKey()
+      lastRenderedValue = raw
+      renderItems(buildItems(raw, lastRemoteWords), preserveKey)
+    })
 
     doc.addEventListener('keydown', (event) => {
       if (event.defaultPrevented) return

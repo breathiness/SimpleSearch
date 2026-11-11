@@ -1,20 +1,23 @@
-// SimpleSearch v2.5 静态校验与产物一致性门禁。
+// SimpleSearch v2.6 静态校验与产物一致性门禁。
 // 用法：node scripts/validate.mjs（npm run validate）
 //
-// 产物模型（docs/contract.md §7、§12、§13、§14、§15、§16）：
-//   index.html                唯一真实页面（MDUI 文档站骨架 + 19 色主题 + 主题三态 + 历史行 + 版本号 + 内联 sprite）
+// 产物模型（docs/contract.md §7、§12-§17）：npm run build 生成 5 个产物
+//   index.html                唯一真实页面（多文件版：文档站骨架 + 主题三态/19 色 + 历史行 + 引擎切换 + 快捷键 + PWA + 内联 sprite）
+//   SimpleSearch.html         单文件便携版（CSS/JS/图标全部内联、零外部请求；无 manifest/apple-touch-icon）
 //   SimpleSearch-Light.html   0 秒重定向壳 → index.html?theme=light
 //   SimpleSearch-Dark.html    0 秒重定向壳 → index.html?theme=dark
+//   manifest.webmanifest      静态 PWA manifest；sw.js 由 build 从 templates/sw.js 生成（sw/manifest/PWA 图标不计入首屏）
 //
 // 检查内容：
 //   1. 生成产物与模板/注册表一致（spawnSync 调 `node scripts/build.mjs --check`，退出码透传为失败）
-//   2. 三个产物齐全、均由 build.mjs 生成（带构建标记）
+//   2. 主产物（index.html + 两个重定向壳）齐全、均由 build.mjs 生成（带构建标记）；
+//      sw.js / manifest / SimpleSearch.html 由各自的专项检查覆盖
 //   3. index.html head：charset / lang / viewport / theme-color / favicon / data-theme / data-theme-default=auto
 //   4. index.html 硬约束：无 type="module"、无内联 on* 事件、无未替换 {{...}}、无重复 id、DOM 契约 id 齐全
 //   5. index.html 引用的所有本地 resources 真实存在
 //   6. index.html 按契约顺序引用 8 个经典脚本（remote.js 在 input.js 之前）
 //   7. index.html 的 data-site 与 SS.sites 一一对应（顺序/label/数量/data-group）
-//   8. 文档站骨架：.appbar（含 .appbar-logo→#i-logo）/.shell/#main-content/.card 卡片、
+//   8. 文档站骨架：.appbar（含 .appbar-logo→#i-logo）/.shell/#main-content/.card、
 //      设置面板（dialog/hidden/#theme-mode 三段式/唯一 .switch-row/.settings-row+空 #color-swatches）、
 //      无页脚、无 #theme-toggle、#scrim[hidden]
 //   9. 左侧分类导航：#site-nav + nav#group-chips.nav-list 内 .nav-item（数量/顺序/data-group/aria-current），
@@ -22,18 +25,25 @@
 //  10. 主题色：<html data-color="indigo">；tokens.css 19 组 :root[data-color]（每组 4 个 --c-*）+ 语义变量
 //  11. 搜索历史行：.settings-row-inline +「搜索历史」+ #history-count「0 条」+ #history-clear[disabled]
 //  12. 版本号：.panel-version 文案为「简单搜索 v<semver>」（build 从 package.json 注入）
-//  13. 图标：sprite = 11 站点 + 3 UI(menu/settings/close) + 1 logo + 6 分类 = 21 个 symbol；
-//      每个按钮 .button-icon，所有 <use> 目标都能在 sprite 命中
-//  14. sprite 内联体积 ≤ 8KB（未压缩，契约 §15.3）
-//  15. 图标零图片请求：无 .png/.jpg/.webp/.gif/.ico 引用、无外链 favicon 服务
-//  16. 两个重定向壳：meta refresh 0 秒 + canonical + location.replace 均指向 index.html?theme=X；
+//  13. PWA：<link rel="manifest"> + manifest.webmanifest（name/start_url/scope/display/icons 192+512 文件存在）
+//  14. sw.js：build 生成物含版本号 + precache 覆盖首页/CSS/JS/图标/manifest，经典脚本无 import/export
+//  15. 搜索引擎：#engine-mode 4 个 .segmented-item（bing/google/ddg/baidu），初始只有 bing 选中
+//  16. 快捷键对话框：#shortcuts-dialog[role=dialog][hidden] + ≥8 个 <kbd> + 设置面板 #shortcuts-open
+//  17. 图标：sprite = 11 站点 + 3 UI + 1 logo + 6 分类 = 21 个 symbol；所有 <use> 目标命中
+//  18. sprite 内联体积 ≤ 8KB（未压缩，契约 §15.3）
+//  19. 图标零图片请求：无 <img>、无外链 favicon 服务；UI 图标必须内联（仅本地 PWA apple-touch-icon/manifest 图标允许 png）
+//  20. 两个重定向壳：meta refresh 0 秒 + canonical + location.replace 均指向 index.html?theme=X；
 //      壳不得包含真实页内容（#buttons-container / data-site / assets/js bundle），体积 < 1KB
-//  17. 唯一性：只有 index.html 是真实页
-//  18. CSS 不含 !important（契约 §6）
-//  19. 体积信息：index.html 单页加载资源合计 < 128KB（仅提示，契约 §9.9，gzip 为真实成本口径）
+//  21. 唯一性：只有 index.html 是真实页
+//  22. CSS 不含 !important（契约 §6）
+//  23. 体积信息：index.html 单页加载资源合计 < 136KB（仅提示，契约 §9.9，gzip 为真实成本口径；
+//      sw.js / manifest / PWA 图标不计入首屏）
+//  24. 单文件便携版 SimpleSearch.html：build 生成 + CSS/JS 全内联 + 零 assets/manifest/apple-touch-icon 引用
+//  25. 单文件体积 ≤ 200KB（提示项）
 // 任一失败 → 退出码 1，并打印失败详情。
 import fs from 'node:fs'
 import path from 'node:path'
+import vm from 'node:vm'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
@@ -79,6 +89,11 @@ const REQUIRED_IDS = [
   'color-swatches',
   'history-count',
   'history-clear',
+  'engine-mode',
+  'shortcuts-open',
+  'shortcuts-dialog',
+  'shortcuts-title',
+  'shortcuts-close',
   'scrim',
 ]
 
@@ -137,8 +152,11 @@ const BUILTIN_IDS = [
 ]
 
 const BUILD_MARKER = /<!--\s*由 scripts\/build\.mjs/
-// 体积预算口径（lead 2026-11-11 v2.5）：单页加载 < 128 KB（gzip 前；契约 §9.9 以 gzip 为真实成本口径）
-const BUDGET_KB = 128
+// v2.6 PWA 唯一允许被引用的图片（apple-touch-icon / manifest icons / sw precache）
+const PWA_ICON_PATHS = ['assets/img/icon-192.png', 'assets/img/icon-512.png']
+// 体积预算口径（lead 2026-11-11 v2.6）：单页加载 < 136 KB（gzip 前；契约 §9.9 以 gzip 为真实成本口径；
+// sw.js / manifest / PWA 图标不计入首屏）
+const BUDGET_KB = 136
 const SHELL_MAX_BYTES = 1024
 
 // ---------------------------------------------------------------- 通用工具
@@ -464,6 +482,33 @@ function hasDisabledAttr(openTag) {
   return /\sdisabled(?:\s|=|>|\/)/i.test(openTag)
 }
 
+/** v2.6 §17.3：通用分段控件解析（#engine-mode 等），items 用指定 data-* 属性作 key。 */
+function extractSegmentedBy(html, containerId, keyAttr) {
+  const clean = stripHtmlComments(html)
+  const container = findTagById(clean, containerId)
+  if (!container) return null
+  const tagName = (container.match(/^<([a-zA-Z][\w:-]*)/) || [])[1]
+  const inner = innerOfTag(clean, container, tagName) || ''
+  const items = []
+  for (const match of findAll(inner, /<button\b[^>]*>[\s\S]*?<\/button>/gi)) {
+    const tag = match[0]
+    const openTag = tag.slice(0, tag.indexOf('>') + 1)
+    if (!hasClass(openTag, 'segmented-item')) continue
+    items.push({
+      key: getAttr(openTag, keyAttr),
+      pressed: getAttr(openTag, 'aria-pressed'),
+      text: textOfInner(tag.slice(tag.indexOf('>') + 1, tag.lastIndexOf('</button>'))),
+    })
+  }
+  return {
+    container,
+    role: getAttr(container, 'role'),
+    label: getAttr(container, 'aria-label'),
+    hasSegmentedClass: hasClass(container, 'segmented'),
+    items,
+  }
+}
+
 /** 页面里所有 <use href="#..."> 的目标 symbol id。 */
 function extractUseTargets(html) {
   const targets = []
@@ -619,7 +664,7 @@ check('产物一致性：node scripts/build.mjs --check', () => {
 
 // ---------------------------------------------------------------- 2. 三产物齐全
 
-check('三个产物齐全且均由 templates + build.mjs 生成（带构建标记）', () => {
+check('主产物（index.html + 两个重定向壳）齐全且均由 templates + build.mjs 生成（带构建标记）', () => {
   const problems = []
   const outputs = [realPage, ...shells]
   for (const output of outputs) {
@@ -1169,7 +1214,189 @@ check('v2.5 版本号：.panel-version 文案为「简单搜索 v<semver>」', (
   return { problems: [], notes: [text] }
 })
 
-// ---------------------------------------------------------------- 13. v2.3 图标 sprite / 按钮图标
+// ---------------------------------------------------------------- 13. v2.6 PWA manifest（§17.1）
+
+check('v2.6 PWA：<link rel="manifest"> + manifest.webmanifest（name/start_url/scope/display/icons 192+512 文件存在）', () => {
+  if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
+  const clean = stripHtmlComments(realPage.html)
+  const problems = []
+
+  const manifestHrefs = []
+  for (const match of findAll(clean, /<link\b[^>]*>/gi)) {
+    const tag = match[0]
+    const rel = (getAttr(tag, 'rel') || '').toLowerCase()
+    if (!rel.split(/\s+/).includes('manifest')) continue
+    manifestHrefs.push(getAttr(tag, 'href') || '')
+  }
+  if (manifestHrefs.length === 0) {
+    problems.push(`${REAL_PAGE} 缺少 <link rel="manifest">`)
+  } else if (!manifestHrefs.some((href) => /manifest\.webmanifest/.test(href))) {
+    problems.push(`manifest 链接目标不对：${JSON.stringify(manifestHrefs)}`)
+  }
+
+  const manifestPath = path.join(ROOT, 'manifest.webmanifest')
+  if (!fs.existsSync(manifestPath)) return [...problems, '缺少 manifest.webmanifest']
+
+  let manifest = null
+  try {
+    manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+  } catch (error) {
+    problems.push(`manifest.webmanifest 不是合法 JSON：${error.message}`)
+  }
+
+  if (manifest) {
+    if (manifest.name !== '简单搜索') problems.push(`manifest.name 应为「简单搜索」，实际 ${JSON.stringify(manifest.name)}`)
+    if (manifest.short_name !== '简单搜索') {
+      problems.push(`manifest.short_name 应为「简单搜索」，实际 ${JSON.stringify(manifest.short_name)}`)
+    }
+    if (manifest.start_url !== './index.html') {
+      problems.push(`manifest.start_url 应为 "./index.html"，实际 ${JSON.stringify(manifest.start_url)}`)
+    }
+    if (manifest.scope !== './') problems.push(`manifest.scope 应为 "./"，实际 ${JSON.stringify(manifest.scope)}`)
+    if (manifest.display !== 'standalone') {
+      problems.push(`manifest.display 应为 "standalone"，实际 ${JSON.stringify(manifest.display)}`)
+    }
+    if (!Array.isArray(manifest.icons)) {
+      problems.push('manifest.icons 必须是数组')
+    } else {
+      const sizes = manifest.icons.map((icon) => String(icon.sizes || ''))
+      if (!sizes.includes('192x192')) problems.push(`manifest.icons 缺少 192x192：${sizes.join(', ')}`)
+      if (!sizes.includes('512x512')) problems.push(`manifest.icons 缺少 512x512：${sizes.join(', ')}`)
+      for (const icon of manifest.icons) {
+        const src = String(icon.src || '')
+        if (!/\.png$/i.test(src)) problems.push(`manifest icon 应为 png：${src}`)
+        const normalized = src.replace(/^\.\//, '').replace(/^\//, '')
+        if (!PWA_ICON_PATHS.includes(normalized)) {
+          problems.push(`manifest icon 只允许 ${PWA_ICON_PATHS.join(' / ')}，实际 ${src}`)
+        }
+        const iconPath = path.join(ROOT, normalized)
+        if (!fs.existsSync(iconPath)) problems.push(`manifest icon 文件不存在：${src}`)
+      }
+    }
+  }
+
+  return problems
+})
+
+// ---------------------------------------------------------------- 14. v2.6 service worker（§17.1）
+
+check('v2.6 sw.js：build 生成物含版本号 + precache 覆盖首页/CSS/JS/图标/manifest，经典脚本无 import/export', () => {
+  if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
+  const swPath = path.join(ROOT, 'sw.js')
+  if (!fs.existsSync(swPath)) return ['缺少 sw.js（应由 build 从 templates/sw.js 生成）']
+
+  const sw = fs.readFileSync(swPath, 'utf8')
+  const problems = []
+
+  let pkgVersion = null
+  try {
+    pkgVersion = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version
+  } catch {
+    // 下面统一报错
+  }
+  if (!pkgVersion) problems.push('无法读取 package.json 的 version')
+  else if (!sw.includes(pkgVersion)) problems.push(`sw.js 未包含 package.json 版本号 ${pkgVersion}`)
+
+  for (const token of ['index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png']) {
+    if (!sw.includes(token)) problems.push(`sw.js 的 precache 应包含 ${token}`)
+  }
+
+  for (const ref of extractResourceRefs(realPage.html)) {
+    if (!ref.url || isExternalUrl(ref.url) || ref.url.startsWith('#')) continue
+    const pathOnly = ref.url.split('?')[0].split('#')[0]
+    if (!/\.(css|js|png|svg)$/i.test(pathOnly)) continue
+    if (!sw.includes(pathOnly)) problems.push(`sw.js 的 precache 缺少 index.html 引用的资源：${pathOnly}`)
+  }
+
+  try {
+    new vm.Script(sw, { filename: 'sw.js' })
+  } catch (error) {
+    problems.push(`sw.js 不是合法经典脚本（含 import/export 等 ESM 语法）：${error.message}`)
+  }
+
+  if (/<script\b[^>]*\bsrc\s*=\s*["'][^"']*sw\.js/i.test(stripHtmlComments(realPage.html))) {
+    problems.push(`${REAL_PAGE} 不应直接 <script src="sw.js">（只由 app.js 注册）`)
+  }
+
+  return problems
+})
+
+// ---------------------------------------------------------------- 15. v2.6 搜索引擎切换（§17.3）
+
+check('v2.6 搜索引擎：#engine-mode 4 个 .segmented-item（bing/google/ddg/baidu），初始只有 bing 选中', () => {
+  if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
+  const segmented = extractSegmentedBy(realPage.html, 'engine-mode', 'data-engine')
+  if (!segmented) return [`${REAL_PAGE} 缺少 #engine-mode 分段控件（搜索引擎切换）`]
+
+  const problems = []
+  if (!segmented.hasSegmentedClass) problems.push('#engine-mode 应带 .segmented 类')
+  if ((segmented.role || '').toLowerCase() !== 'group') {
+    problems.push(`#engine-mode 的 role 应为 group，实际 ${JSON.stringify(segmented.role)}`)
+  }
+  if (segmented.label !== '搜索引擎') {
+    problems.push(`#engine-mode 的 aria-label 应为「搜索引擎」，实际 ${JSON.stringify(segmented.label)}`)
+  }
+
+  const expectedKeys = ['bing', 'google', 'ddg', 'baidu']
+  if (segmented.items.length !== 4) {
+    problems.push(`#engine-mode 内应有 4 个 .segmented-item，实际 ${segmented.items.length}`)
+  }
+  const actualKeys = segmented.items.map((item) => item.key)
+  if (actualKeys.join(',') !== expectedKeys.join(',')) {
+    problems.push(`引擎 data-engine 顺序应为 ${expectedKeys.join(', ')}，实际 ${actualKeys.join(', ') || '（无）'}`)
+  }
+  const expectedLabels = ['Bing', 'Google', 'DDG', '百度']
+  const actualLabels = segmented.items.map((item) => item.text)
+  if (actualLabels.join(',') !== expectedLabels.join(',')) {
+    problems.push(`引擎文案应为 ${expectedLabels.join(' / ')}，实际 ${actualLabels.join(' / ')}`)
+  }
+
+  for (const item of segmented.items) {
+    if (item.pressed !== 'true' && item.pressed !== 'false') {
+      problems.push(`引擎 ${JSON.stringify(item.key)} 的 aria-pressed 缺失或非法：${JSON.stringify(item.pressed)}`)
+    }
+  }
+  const pressed = segmented.items.filter((item) => item.pressed === 'true')
+  if (pressed.length !== 1) problems.push(`初始应只有一个引擎 aria-pressed="true"，实际 ${pressed.length} 个`)
+  else if (pressed[0].key !== 'bing') problems.push(`初始选中的引擎应为 bing，实际 ${JSON.stringify(pressed[0].key)}`)
+
+  return problems
+})
+
+// ---------------------------------------------------------------- 16. v2.6 快捷键对话框（§17.4）
+
+check('v2.6 快捷键对话框：#shortcuts-dialog[role=dialog][hidden] + ≥8 个 <kbd> + 设置面板 #shortcuts-open', () => {
+  if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
+  const clean = stripHtmlComments(realPage.html)
+  const problems = []
+
+  const dialog = findTagById(clean, 'shortcuts-dialog')
+  if (!dialog) {
+    problems.push(`${REAL_PAGE} 缺少 #shortcuts-dialog`)
+  } else {
+    if (!hasClass(dialog, 'dialog')) problems.push('#shortcuts-dialog 应带 .dialog 类')
+    if ((getAttr(dialog, 'role') || '').toLowerCase() !== 'dialog') {
+      problems.push(`#shortcuts-dialog 的 role 应为 dialog，实际 ${JSON.stringify(getAttr(dialog, 'role'))}`)
+    }
+    if (getAttr(dialog, 'aria-modal') !== 'true') problems.push('#shortcuts-dialog 的 aria-modal 应为 true')
+    if (!hasHiddenAttr(dialog)) problems.push('#shortcuts-dialog 初始应带 hidden（关闭状态）')
+
+    if (!findTagById(clean, 'shortcuts-title')) problems.push(`${REAL_PAGE} 缺少 #shortcuts-title`)
+    if (!findTagById(clean, 'shortcuts-close')) problems.push(`${REAL_PAGE} 缺少 #shortcuts-close`)
+    if (!findTagWithClass(clean, 'shortcut-list')) problems.push(`${REAL_PAGE} 缺少 .shortcut-list`)
+
+    const kbdCount = (clean.match(/<kbd\b/gi) || []).length
+    if (kbdCount < 8) problems.push(`快捷键列表至少应有 8 行，实际 <kbd> 数量 ${kbdCount}`)
+  }
+
+  if (!findTagById(clean, 'shortcuts-open')) {
+    problems.push(`${REAL_PAGE} 设置面板缺少 #shortcuts-open（快捷键按钮）`)
+  }
+
+  return problems
+})
+
+// ---------------------------------------------------------------- 17. v2.3 图标 sprite / 按钮图标
 
 check('v2.4 图标：sprite = 11 站点 + 3 UI + 1 logo + 6 分类（共 21 个 symbol）；每个 data-site 按钮有 .button-icon；所有 use 目标命中', () => {
   if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
@@ -1301,7 +1528,7 @@ check('v2.4 图标：sprite = 11 站点 + 3 UI + 1 logo + 6 分类（共 21 个 
   }
 })
 
-// ---------------------------------------------------------------- 14. sprite 体积
+// ---------------------------------------------------------------- 18. sprite 体积
 
 check('sprite 内联体积 ≤ 8KB（未压缩，契约 §15.3）', () => {
   if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
@@ -1312,21 +1539,32 @@ check('sprite 内联体积 ≤ 8KB（未压缩，契约 §15.3）', () => {
   return { problems: [], notes: [`sprite ${(bytes / 1024).toFixed(2)} KB`] }
 })
 
-// ---------------------------------------------------------------- 15. 零额外图片请求
+// ---------------------------------------------------------------- 19. 零额外图片请求
 
 check('图标零图片请求：无 .png/.jpg/.webp/.gif/.ico 引用、无外链 favicon 服务', () => {
   if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
   const clean = stripHtmlComments(realPage.html)
   const problems = []
   const imagePattern = /\.(png|jpe?g|webp|gif|ico)(?:["'?)#\s]|$)/i
+  const ALLOWED_PWA_ICONS = new Set(PWA_ICON_PATHS)
 
   for (const match of findAll(clean, /<(link|script|img|source|iframe|embed|object)\b[^>]*>/gi)) {
     const tag = match[0]
+    const tagName = match[1].toLowerCase()
+    const rel = (getAttr(tag, 'rel') || '').toLowerCase()
+    const isIconLink = tagName === 'link' && /\b(apple-touch-icon|icon|mask-icon)\b/.test(rel)
     for (const attr of ['src', 'href', 'data', 'poster']) {
       const url = getAttr(tag, attr)
       if (!url) continue
       if (/^(https?:)?\/\//i.test(url)) problems.push(`出现外部资源引用：<${match[1]}> ${attr}=${url}`)
-      if (imagePattern.test(url)) problems.push(`出现图片资源引用：<${match[1]}> ${attr}=${url}（v2.2 图标必须内联）`)
+      if (!imagePattern.test(url)) continue
+      const normalized = url.split('?')[0].split('#')[0].replace(/^\.\//, '').replace(/^\//, '')
+      const isAllowedPwaIcon = isIconLink && ALLOWED_PWA_ICONS.has(normalized)
+      if (!isAllowedPwaIcon) {
+        problems.push(
+          `出现图片资源引用：<${match[1]}> ${attr}=${url}（UI 图标必须内联；仅 ${[...ALLOWED_PWA_ICONS].join(' / ')} 允许被引用）`,
+        )
+      }
     }
   }
   if (/<img\b/i.test(clean)) problems.push(`${REAL_PAGE} 出现 <img>，v2.2 图标必须内联 SVG`)
@@ -1348,7 +1586,7 @@ check('图标零图片请求：无 .png/.jpg/.webp/.gif/.ico 引用、无外链 
   return problems
 })
 
-// ---------------------------------------------------------------- 16. 重定向壳
+// ---------------------------------------------------------------- 20. 重定向壳
 
 check('两个重定向壳：meta refresh(0s) + canonical + location.replace 指向 index.html?theme=X，且不含真实页内容', () => {
   const problems = []
@@ -1419,7 +1657,7 @@ check('两个重定向壳：meta refresh(0s) + canonical + location.replace 指�
   return problems
 })
 
-// ---------------------------------------------------------------- 17. 唯一性
+// ---------------------------------------------------------------- 21. 唯一性
 
 check('唯一性：只有 index.html 是真实页（两个壳不得含真实页 DOM）', () => {
   const problems = []
@@ -1446,7 +1684,7 @@ check('唯一性：只有 index.html 是真实页（两个壳不得含真实页 
   return problems
 })
 
-// ---------------------------------------------------------------- 18. CSS 禁 !important
+// ---------------------------------------------------------------- 22. CSS 禁 !important
 
 check('CSS 不含 !important（契约 §6）', () => {
   const cssDir = path.join(ROOT, 'assets', 'css')
@@ -1467,9 +1705,9 @@ check('CSS 不含 !important（契约 §6）', () => {
   return problems
 })
 
-// ---------------------------------------------------------------- 19. 体积信息
+// ---------------------------------------------------------------- 23. 体积信息
 
-check('体积信息（index.html 单页加载预算 < 128 KB，仅供参考不阻断）', () => {
+check('体积信息（index.html 单页加载预算 < 136 KB，仅供参考不阻断）', () => {
   if (!realPage.exists) return { problems: [], notes: [`${REAL_PAGE} 不存在，跳过体积统计`] }
 
   const notes = []
@@ -1493,16 +1731,99 @@ check('体积信息（index.html 单页加载预算 < 128 KB，仅供参考不�
 
   const htmlBytes = Buffer.byteLength(realPage.html, 'utf8')
   let loaded = htmlBytes
+  let excluded = 0
   for (const ref of extractResourceRefs(realPage.html)) {
     if (!ref.url || isExternalUrl(ref.url) || ref.url.startsWith('#')) continue
     const cleanUrl = ref.url.split('?')[0].split('#')[0].replace(/\\/g, '/')
+    // v2.6 §17.6：sw.js / manifest / 两个 PWA 图标不计入首屏预算
+    if (PWA_ICON_PATHS.includes(cleanUrl)) {
+      if (assetBytes.has(cleanUrl)) excluded += assetBytes.get(cleanUrl)
+      continue
+    }
     if (assetBytes.has(cleanUrl)) loaded += assetBytes.get(cleanUrl)
   }
   const verdict = loaded < BUDGET_KB * 1024 ? '达标' : '超出'
   notes.push(`${REAL_PAGE}：${(htmlBytes / 1024).toFixed(1)} KB`)
-  notes.push(`${REAL_PAGE} 单页加载体积：${(loaded / 1024).toFixed(1)} KB（${verdict} < ${BUDGET_KB} KB 预算）`)
+  notes.push(
+    `${REAL_PAGE} 单页加载体积：${(loaded / 1024).toFixed(1)} KB（${verdict} < ${BUDGET_KB} KB 预算；` +
+      `sw.js/manifest/PWA 图标不计入${excluded > 0 ? `，已排除 PWA 图标 ${(excluded / 1024).toFixed(1)} KB` : ''}）`,
+  )
   notes.push(`全部资源合计：${(assetTotal / 1024).toFixed(1)} KB`)
   return { problems: [], notes }
+})
+
+// ---------------------------------------------------------------- 24. v2.6 单文件便携版
+
+const SINGLE_FILE = 'SimpleSearch.html'
+const SINGLE_FILE_MAX_KB = 200
+
+check('v2.6 单文件便携版 SimpleSearch.html：build 生成 + CSS/JS 全内联 + 零 assets/manifest/apple-touch-icon 引用', () => {
+  const singlePath = path.join(ROOT, SINGLE_FILE)
+  if (!fs.existsSync(singlePath)) return [`缺少 ${SINGLE_FILE}（应随 npm run build 生成）`]
+  const single = fs.readFileSync(singlePath, 'utf8')
+  const clean = stripHtmlComments(single)
+  const problems = []
+
+  if (!BUILD_MARKER.test(single)) problems.push(`${SINGLE_FILE} 缺少「由 scripts/build.mjs 生成」注释`)
+  if (!/单文件|便携/.test(single)) problems.push(`${SINGLE_FILE} 文件头缺少单文件/便携版说明注释`)
+  if (!single.includes('__SS_SINGLE_FILE')) {
+    problems.push(`${SINGLE_FILE} 缺少 __SS_SINGLE_FILE 标记（app.js 用它跳过 Service Worker 注册）`)
+  }
+
+  // CSS/JS 全部内联：不得有 <script src>，不得引用 assets/ 文件
+  if (/<script\b[^>]*\bsrc\s*=/i.test(clean)) {
+    problems.push(`${SINGLE_FILE} 不应出现 <script src>（脚本必须内联）`)
+  }
+
+  const styleCount = (clean.match(/<style\b/gi) || []).length
+  if (styleCount < 3) problems.push(`${SINGLE_FILE} 应内联 ≥3 个 <style>，实际 ${styleCount}`)
+
+  const scriptTags = [...clean.matchAll(/<script\b([^>]*)>/gi)]
+  const inlineScripts = scriptTags.filter((match) => !/\bsrc\s*=/i.test(match[1])).length
+  if (inlineScripts < 9) {
+    problems.push(`${SINGLE_FILE} 应内联 ≥9 个 <script>（8 个模块 + anti-FOUC 等），实际 ${inlineScripts}`)
+  }
+
+  // 单文件版没有独立图标文件：不应有 manifest / apple-touch-icon，favicon 必须是 data URI
+  if (/<link\b[^>]*\brel\s*=\s*["'][^"']*\bmanifest\b/i.test(clean)) {
+    problems.push(`${SINGLE_FILE} 不应包含 <link rel="manifest">（单文件版无 PWA 清单）`)
+  }
+  if (/apple-touch-icon/i.test(clean)) problems.push(`${SINGLE_FILE} 不应包含 apple-touch-icon`)
+
+  const iconLink = [...clean.matchAll(/<link\b[^>]*>/gi)]
+    .map((match) => match[0])
+    .find((tag) => /\brel\s*=\s*["'][^"']*\bicon\b/i.test(tag))
+  if (!iconLink) {
+    problems.push(`${SINGLE_FILE} 缺少 favicon <link rel="icon">`)
+  } else if (!/\bhref\s*=\s*["']data:/i.test(iconLink)) {
+    problems.push(`${SINGLE_FILE} 的 favicon 必须是 data: URI（不能指向独立文件）`)
+  }
+
+  // 任何资源标签都不得引用本地/外部文件（data: 允许）
+  for (const ref of extractResourceRefs(clean)) {
+    if (!ref.url || ref.url.startsWith('#') || ref.url.startsWith('data:')) continue
+    problems.push(`${SINGLE_FILE} 的 <${ref.tagName}> 引用了未内联资源：${ref.url}`)
+  }
+  for (const match of findAll(clean, /\b(?:src|href)\s*=\s*["']([^"']+)["']/gi)) {
+    const url = match[1].trim()
+    if (/^assets\//i.test(url)) problems.push(`${SINGLE_FILE} 仍引用 assets/ 文件：${url}`)
+  }
+
+  return problems
+})
+
+// ---------------------------------------------------------------- 25. v2.6 单文件体积
+
+check('v2.6 单文件体积（≤ 200KB，提示项不阻断）', () => {
+  const singlePath = path.join(ROOT, SINGLE_FILE)
+  if (!fs.existsSync(singlePath)) return [`缺少 ${SINGLE_FILE}`]
+  const bytes = fs.statSync(singlePath).size
+  const kb = bytes / 1024
+  const verdict = kb <= SINGLE_FILE_MAX_KB ? '达标' : '超出'
+  return {
+    problems: [],
+    notes: [`${SINGLE_FILE}：${kb.toFixed(1)} KB（${verdict} ≤ ${SINGLE_FILE_MAX_KB}KB 提示线；不含任何外部请求）`],
+  }
 })
 
 // ---------------------------------------------------------------- 输出摘要

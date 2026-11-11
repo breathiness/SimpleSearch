@@ -1,7 +1,7 @@
 # 自定义网站
 
 SimpleSearch 的站点按钮来自**唯一的数据源**：`assets/js/sites.js` 里的 `SS.sites` 数组。
-`scripts/build.mjs` 会从这份数据生成三个产物：唯一真实页面 `index.html`，以及两个 0 秒跳转的重定向壳 `SimpleSearch-Light.html` / `SimpleSearch-Dark.html`。**不需要、也不应该再去手工改 HTML**。
+`scripts/build.mjs` 会从这份数据生成五个产物：唯一真实页面 `index.html`、单文件便携版 `SimpleSearch.html`、两个 0 秒跳转的重定向壳 `SimpleSearch-Light.html` / `SimpleSearch-Dark.html`，以及 PWA 的 `sw.js`。**不需要、也不应该再去手工改 HTML**。
 
 ## 1. 数据源
 
@@ -78,7 +78,15 @@ SS.siteGroups = [
 
 > 站点改版可能让旧的搜索地址失效（v2 就修正了 Unsplash 的 `search?q=`）。发现点按钮后搜索词丢了，先手动在目标站搜一次，把浏览器地址栏里的真实搜索地址抄回来替换即可。
 
-## 5. 分类（`group`）
+## 5. `!bang` 快捷搜索
+
+站点的 `id` 和 `keywords` 会自动变成 `!bang` 的 token，不需要额外注册：
+
+- 加了 `id: 'example'`、`keywords: ['示例', 'demo']` 的站点后，输入 `!example 词`、`!示例 词`、`!demo 词` 都会在它里面搜；不带词（如 `!example`）直接打开它的 `home`。
+- 匹配规则：token 大小写不敏感、与 `id` 或某个 keyword **完全相等**才算命中；允许中文；**只认第一个 token**（`!nope !gh x` 不会命中 GitHub）；未知 token 当普通搜索。
+- 注意：keywords 是全表共享的匹配空间，两个站点用了同一个 keyword 时，命中的是注册表里靠前的那个站点——起别名时尽量别撞车。
+
+## 6. 分类（`group`）
 
 - 分类写在 `assets/js/sites.js` 的 `SS.siteGroups` 里，每个站点用 `group` 字段指过去。
 - 页面左侧的分类导航是「全部 + 每个分组」，**顺序跟 `SS.siteGroups` 数组一致**；点某个条目只显示该分组站点，点「全部」恢复。宽屏（≥960px）导航常驻 240px；窄屏（<960px）变成左侧抽屉，用顶栏汉堡按钮打开，点遮罩 / 按 `Esc` / 选中分类后自动收起。
@@ -86,7 +94,7 @@ SS.siteGroups = [
 - 新增分类：在 `SS.siteGroups` 里追加 `{ id: 'xxx', label: '显示名' }`（`id` 用小写 `[a-z0-9-]`，不能重复），把相关站点的 `group` 改成 `xxx`，再 `npm run build`。**导航图标按 `cat-<分组 id>` 取名**：内置 5 个分类已有图标；新分类还要在 `scripts/icons.mjs` 的 `UI_ICONS` 里加一条 `'cat-xxx'`，否则导航项的图标引用不到目标，`npm run validate` 会报错。
 - 删除分类：先把该分类下的站点挪到别的分类（或一起删掉），再从 `SS.siteGroups` 移除。空分组 build 只会警告，但站点 `group` 指向不存在的分类会让 build 失败。
 
-## 6. 图标（可选）
+## 7. 图标（可选）
 
 图标是加分项，不是必填：
 
@@ -108,15 +116,16 @@ SS.siteGroups = [
 - 请画**通用几何符号**，不要精确复制他人商标；整个 sprite 的 HTML 增量要控制在 8 KB 内（未压缩）。
 - 不要用外链 favicon 服务、外部图标库/CDN 或 emoji 来替代——前者会新增请求，后者跨平台风格不统一。
 
-## 7. 新增 / 删除网站
+## 8. 新增 / 删除网站
 
 新增：
 
 1. 在 `SS.sites` 末尾（或你想让它出现的位置）加一个对象，参考上一节模板；**别忘了 `group`**。
-2. 运行 `npm run build`，重新生成三个产物（`index.html` + 两个重定向壳）。
+2. 运行 `npm run build`，重新生成五个产物（`index.html` + `SimpleSearch.html` + 两个重定向壳 + `sw.js`，其中 sw.js 的 precache 列表会自动带上 `assets/css` / `assets/js` 下的全部文件）。
 3. 可选：`npm test` 跑单元测试，`npm run validate` 做静态检查与产物一致性检查。
 4. 本地打开 `index.html` 验证（或点两个老链接，它们会跳到首页）：空输入点按钮应打开 `home`，输入关键词点按钮应跳到站内搜索结果；左侧分类导航里应该能看到它。也可以试试深链 `?cat=<新分类>`、`?site=<新站点id>`：只预选 / 聚焦，不会自动跳转。
 5. 可选（需要网络）：`npm run check:sites` 会逐个请求各站点的 `home` / `search`，输出 OK / WARN / FAIL 表格；WARN 多为反爬 401/403 或跨域跳转（不阻断），`--strict` 时只有 FAIL 才退出 1。它**不进 CI**。
+6. 新站点的 `id` / `keywords` 会自动成为 `!bang` token，可以输入 `!<新站点id> 测试` 看看是否直达（不带词则打开 `home`）。
 
 删除：把对应对象从数组里删掉，再 `npm run build`。
 
@@ -136,9 +145,10 @@ SS.siteGroups = [
 
 > 如果只改了 `sites.js` 却忘了跑 `npm run build`，CI 的产物漂移检查会失败——因为提交的 HTML 和注册表对不上。报错时跑一次 `npm run build` 把生成结果一起提交即可。
 
-## 8. 为什么只改一处就够
+## 9. 为什么只改一处就够
 
-- 开发时，`scripts/build.mjs` 用 Node 直接 `import` 这个经典脚本，读 `globalThis.SimpleSearch.sites` / `SS.siteGroups`，按 `templates/page.html` 里的占位符生成唯一真实页面 `index.html`（含顶栏、左侧分类导航、卡片按钮墙和图标 sprite），再由 `templates/redirect.html` 生成两个指向它的重定向壳。
+- 开发时，`scripts/build.mjs` 用 Node 直接 `import` 这个经典脚本，读 `globalThis.SimpleSearch.sites` / `SS.siteGroups`，按 `templates/page.html` 里的占位符生成唯一真实页面 `index.html`（含顶栏、左侧分类导航、卡片按钮墙和图标 sprite），再由 `templates/redirect.html` 生成两个指向它的重定向壳，用 `templates/sw.js` 生成带版本号与 precache 列表的 `sw.js`，最后把 `index.html` 内联成单文件便携版 `SimpleSearch.html`。
 - 图标数据来自 `scripts/icons.mjs`，它同样是 **dev-time 资产**：只在构建时被 Node 读取，不会被页面加载、不会增加请求。
+- Service Worker 的 precache 列表由构建扫描生成：`assets/css` / `assets/js` 下的文件会自动加入；如果你在其它目录新增了本地资源，需要在 `scripts/build.mjs` 的 `buildPrecacheList` 里补一行。
 - 线上仍然是纯静态文件：浏览器只加载已经生成好的 HTML，不需要在运行时读取注册表，也不需要任何构建工具或依赖。
 - 想确认产物和模板/注册表是否一致：运行 `node scripts/build.mjs --check`（`npm run validate` 里也包含这个检查）。

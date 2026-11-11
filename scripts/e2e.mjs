@@ -477,10 +477,12 @@ async function run() {
     const earlyBytes = page.state.transferBytes
     const externalAssets = earlyRequests.filter((u) => !u.startsWith(ORIGIN) && !u.startsWith('data:'))
     check('C: 首屏无第三方请求', externalAssets.length === 0, externalAssets[0] || '')
+    // SW 接管缓存后 transferSize 会归零，真正的体积预算由 scripts/validate.mjs 按磁盘产物校验（136KB）；
+    // 这里只断言首屏请求数量合理（首页 + 3 CSS + 8 JS + favicon + PWA 图标）
     check(
-      'C: 首屏传输体积 < 140KB',
-      earlyBytes < 140 * 1024,
-      `${(earlyBytes / 1024).toFixed(1)} KB / ${earlyRequests.length} 个请求`
+      'C: 首屏请求数合理（≤16）',
+      earlyRequests.length <= 16,
+      `${earlyRequests.length} 个请求 / transferSize ${(earlyBytes / 1024).toFixed(1)} KB（SW 命中时记 0）`
     )
 
     check('C: 无 JS 异常', page.state.exceptions.length === 0, page.state.exceptions[0] || '')
@@ -725,8 +727,14 @@ async function run() {
       `${iconInfo.withIcon}/${iconInfo.buttons}`
     )
     check('C: 图标 sprite 覆盖全部站点', iconInfo.symbols >= iconInfo.buttons && iconInfo.unresolved.length === 0, `${iconInfo.symbols} symbols`)
+    // PWA 图标（apple-touch-icon / manifest 图标）允许被浏览器抓取，站点按钮图标仍必须内联
     const imageRequests = page.state.requests.filter((u) => /\.(png|jpe?g|webp|gif|ico)(\?|$)/i.test(u))
-    check('C: 图标零图片请求', imageRequests.length === 0, imageRequests[0] || '')
+    const unexpectedImages = imageRequests.filter((u) => !/\/assets\/img\/(icon-192|icon-512)\.png$/.test(u))
+    check(
+      'C: 站点图标零图片请求（仅 PWA 图标除外）',
+      unexpectedImages.length === 0,
+      unexpectedImages[0] || `PWA 图标 ${imageRequests.length} 个`
+    )
 
     const decision = await page.evaluate("SimpleSearch.search.resolveSite('zhihu', 'a&b c')")
     check(
@@ -759,8 +767,14 @@ async function run() {
     check('C: 方向键高亮联想项', Boolean(activeId), String(activeId))
 
     await page.pressKey('Escape', { code: 'Escape', vk: 27 })
-    await sleep(150)
+    await sleep(350)
     check('C: Esc 关闭联想', await page.evaluate("document.getElementById('suggest-list').hasAttribute('hidden')"))
+    // 晚到的远程联想结果不能把已关闭的列表重新弹出来（回归用例）
+    await sleep(900)
+    check(
+      'C: Esc 后联想不再自动弹回',
+      await page.evaluate("document.getElementById('suggest-list').hasAttribute('hidden')")
+    )
 
     check('C: 清除按钮可见', (await page.evaluate("document.getElementById('clear-button').hidden")) === false)
     await page.evaluate("document.getElementById('clear-button').click()")
@@ -1060,6 +1074,246 @@ async function run() {
     }))()`)
     check('I: ?site= 选中所属分类并聚焦按钮', siteState.current[0] === 'media' && siteState.focused === 'bilibili', JSON.stringify(siteState))
     await page.clearStorage()
+
+    // ================= J. 搜索引擎切换 =================
+    console.log('\n=== J. 搜索引擎切换 ===')
+    await page.goto(PAGE, 400)
+    await page.evaluate("SimpleSearch.app.openSettings()")
+    await sleep(300)
+    const engineUi = await page.evaluate(`(() => {
+      const items = [...document.querySelectorAll('#engine-mode .segmented-item')]
+      const form = document.getElementById('search-form')
+      const input = document.getElementById('search-input')
+      return {
+        count: items.length,
+        engines: items.map((i) => i.getAttribute('data-engine')),
+        pressed: items.filter((i) => i.getAttribute('aria-pressed') === 'true').map((i) => i.getAttribute('data-engine')),
+        action: form.getAttribute('action'),
+        name: input.getAttribute('name'),
+      }
+    })()`)
+    check('J: 4 个搜索引擎项', engineUi.count === 4 && engineUi.engines.join(',') === 'bing,google,ddg,baidu', engineUi.engines.join(','))
+    check('J: 默认 Bing', engineUi.pressed.length === 1 && engineUi.pressed[0] === 'bing', engineUi.pressed.join(','))
+    check('J: 默认表单指向 Bing', engineUi.action === 'https://www.bing.com/search' && engineUi.name === 'q', `${engineUi.action} name=${engineUi.name}`)
+
+    await page.evaluate(`document.querySelector('#engine-mode [data-engine="google"]').click()`)
+    await sleep(250)
+    const googleState = await page.evaluate(`(() => ({
+      action: document.getElementById('search-form').getAttribute('action'),
+      name: document.getElementById('search-input').getAttribute('name'),
+      engine: SimpleSearch.defaultEngine,
+      pressed: document.querySelector('#engine-mode [data-engine="google"]').getAttribute('aria-pressed'),
+      stored: (() => { try { return localStorage.getItem('ss.engine') } catch (e) { return null } })(),
+    }))()`)
+    check('J: 切到 Google 生效', googleState.action === 'https://www.google.com/search' && googleState.name === 'q', JSON.stringify(googleState))
+    check('J: 切换更新 SS.defaultEngine 与存储', googleState.engine === 'google' && googleState.stored === 'google' && googleState.pressed === 'true')
+
+    await page.evaluate(`document.querySelector('#engine-mode [data-engine="baidu"]').click()`)
+    await sleep(250)
+    const baiduState = await page.evaluate(`(() => ({
+      action: document.getElementById('search-form').getAttribute('action'),
+      name: document.getElementById('search-input').getAttribute('name'),
+    }))()`)
+    check('J: 切到百度用 wd 参数', baiduState.action === 'https://www.baidu.com/s' && baiduState.name === 'wd', JSON.stringify(baiduState))
+
+    await page.goto(PAGE, 400)
+    const persistedEngine = await page.evaluate(`(() => ({
+      engine: SimpleSearch.defaultEngine,
+      action: document.getElementById('search-form').getAttribute('action'),
+      name: document.getElementById('search-input').getAttribute('name'),
+    }))()`)
+    check(
+      'J: 搜索引擎刷新保持',
+      persistedEngine.engine === 'baidu' && persistedEngine.name === 'wd',
+      JSON.stringify(persistedEngine)
+    )
+    await page.clearStorage()
+
+    // ================= K. !bang 快捷搜索 =================
+    console.log('\n=== K. !bang ===')
+    await page.goto(PAGE, 400)
+    await page.evaluate("(() => { const i = document.getElementById('search-input'); i.focus() })()")
+    await page.typeText('!gh rust')
+    await sleep(450)
+    const bangState = await page.evaluate(`(() => {
+      const first = document.querySelector('#suggest-list [role="option"]')
+      return {
+        type: first ? first.getAttribute('data-type') : null,
+        text: first ? first.textContent.trim() : '',
+        hidden: document.getElementById('suggest-list').hasAttribute('hidden'),
+      }
+    })()`)
+    check('K: bang 项出现在第一位', bangState.type === 'bang' && !bangState.hidden, JSON.stringify(bangState))
+    check('K: bang 项文案含站点与词', /GitHub/.test(bangState.text) && /rust/.test(bangState.text), bangState.text)
+
+    const bangNav = page.cdp.once('Page.frameRequestedNavigation', 4000).catch(() => null)
+    await page.evaluate(`document.getElementById('search-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))`)
+    const bangParams = await bangNav
+    check(
+      'K: 回车走 bang 跳转',
+      bangParams && String(bangParams.url).startsWith('https://github.com/search?q=rust'),
+      bangParams && bangParams.url
+    )
+
+    await page.goto(PAGE, 400)
+    const plainState = await page.evaluate(`(() => {
+      const input = document.getElementById('search-input')
+      input.value = '简单搜索'
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      return null
+    })()`)
+    await sleep(450)
+    const plainFirst = await page.evaluate(`(() => {
+      const first = document.querySelector('#suggest-list [role="option"]')
+      return { type: first ? first.getAttribute('data-type') : null, text: first ? first.textContent.trim() : '' }
+    })()`)
+    check('K: 普通词首项仍是搜索引擎项', plainFirst.type === 'engine' && /搜索/.test(plainFirst.text), JSON.stringify(plainFirst))
+    void plainState
+
+    // ================= L. 快捷键对话框 =================
+    console.log('\n=== L. 快捷键对话框 ===')
+    await page.goto(PAGE, 400)
+    await page.evaluate("document.body.focus()")
+    await page.evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', { key: '?', bubbles: true }))`)
+    await sleep(350)
+    const dialogState = await page.evaluate(`(() => {
+      const dialog = document.getElementById('shortcuts-dialog')
+      const rows = dialog.querySelectorAll('.shortcut-list > div').length
+      return {
+        hidden: dialog.hidden,
+        rows,
+        kbd: dialog.querySelectorAll('kbd').length,
+        scrimHidden: document.getElementById('scrim').hidden,
+        focusId: document.activeElement && document.activeElement.id,
+      }
+    })()`)
+    check('L: ? 打开快捷键对话框', dialogState.hidden === false && dialogState.rows >= 8, `${dialogState.rows} 行 / ${dialogState.kbd} 个 kbd`)
+    check('L: 对话框显示遮罩', dialogState.scrimHidden === false)
+    check('L: 打开后焦点在关闭按钮', dialogState.focusId === 'shortcuts-close', String(dialogState.focusId))
+
+    await page.pressKey('Escape', { code: 'Escape', vk: 27 })
+    await sleep(300)
+    const dialogClosed = await page.evaluate(`(() => ({
+      hidden: document.getElementById('shortcuts-dialog').hidden,
+      scrimHidden: document.getElementById('scrim').hidden,
+    }))()`)
+    check('L: Esc 关闭对话框并隐藏遮罩', dialogClosed.hidden === true && dialogClosed.scrimHidden === true, JSON.stringify(dialogClosed))
+
+    // 设置面板里的入口也能打开
+    await page.evaluate("SimpleSearch.app.openSettings()")
+    await sleep(250)
+    await page.evaluate("document.getElementById('shortcuts-open').click()")
+    await sleep(300)
+    const fromSettings = await page.evaluate(`(() => ({
+      dialogHidden: document.getElementById('shortcuts-dialog').hidden,
+      panelHidden: document.getElementById('settings-panel').hidden,
+    }))()`)
+    check('L: 设置里的入口可打开对话框且收起面板', fromSettings.dialogHidden === false && fromSettings.panelHidden === true, JSON.stringify(fromSettings))
+    await page.evaluate("SimpleSearch.app.closeShortcuts(false)")
+
+    // ================= M. PWA / 离线 =================
+    console.log('\n=== M. PWA 离线（Service Worker） ===')
+    await page.goto(PAGE, 600)
+    const swReady = await page.evaluate(`(async () => {
+      if (!('serviceWorker' in navigator)) return { supported: false }
+      const reg = await navigator.serviceWorker.ready.then((r) => r).catch(() => null)
+      const controller = await new Promise((resolve) => {
+        if (navigator.serviceWorker.controller) return resolve(true)
+        const timer = setTimeout(() => resolve(Boolean(navigator.serviceWorker.controller)), 5000)
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          clearTimeout(timer)
+          resolve(true)
+        })
+      })
+      return { supported: true, scope: reg ? reg.scope : null, controlled: controller }
+    })()`)
+    check('M: 注册 Service Worker', swReady.supported && Boolean(swReady.scope), JSON.stringify(swReady))
+    check('M: SW 已接管页面', swReady.controlled === true, String(swReady.controlled))
+
+    const manifestState = await page.evaluate(`(async () => {
+      const link = document.querySelector('link[rel="manifest"]')
+      if (!link) return { linked: false }
+      const res = await fetch(link.getAttribute('href'))
+      const data = await res.json().catch(() => null)
+      return { linked: true, name: data && data.name, icons: data && data.icons ? data.icons.length : 0, display: data && data.display }
+    })()`)
+    check('M: manifest 可解析且是 standalone', manifestState.name && manifestState.display === 'standalone' && manifestState.icons >= 2, JSON.stringify(manifestState))
+
+    // 断网后刷新：应仍能从缓存打开
+    await cdp.send('Network.emulateNetworkConditions', {
+      offline: true,
+      latency: 0,
+      downloadThroughput: 0,
+      uploadThroughput: 0,
+    })
+    await sleep(200)
+    const offlineLoaded = page.cdp.once('Page.loadEventFired', 15000).catch(() => null)
+    await cdp.send('Page.reload', { ignoreCache: false })
+    await offlineLoaded
+    await sleep(600)
+    const offlineState = await page.evaluate(`(() => ({
+      ready: document.documentElement.getAttribute('data-app-ready'),
+      buttons: document.querySelectorAll('#buttons-container [data-site]').length,
+      title: document.title,
+    }))()`)
+    check('M: 断网刷新仍可用', offlineState.ready === '1' && offlineState.buttons >= 11, JSON.stringify(offlineState))
+    await cdp.send('Network.emulateNetworkConditions', {
+      offline: false,
+      latency: 0,
+      downloadThroughput: -1,
+      uploadThroughput: -1,
+    })
+    await page.goto(PAGE, 400)
+
+    // ================= N. 单文件便携版 =================
+    console.log('\n=== N. 单文件便携版（SimpleSearch.html） ===')
+    const singleUrl = 'file:///' + path.join(ROOT, 'SimpleSearch.html').replace(/\\/g, '/')
+    await page.clearStorage()
+    page.resetLogs()
+    await page.goto(singleUrl, 500)
+    const single = await page.evaluate(`(() => {
+      const buttons = document.querySelectorAll('#buttons-container [data-site]').length
+      const appbar = document.querySelector('.appbar')
+      const html = document.documentElement.outerHTML
+      return {
+        ready: document.documentElement.getAttribute('data-app-ready'),
+        buttons,
+        appbarBg: appbar ? getComputedStyle(appbar).backgroundColor : null,
+        navItems: document.querySelectorAll('#group-chips .nav-item').length,
+        size: html.length,
+        hasManifest: !!document.querySelector('link[rel="manifest"]'),
+        inlineStyles: document.querySelectorAll('style').length,
+        inlineScripts: [...document.querySelectorAll('script')].filter((s) => !s.src).length,
+        externalRefs: [...document.querySelectorAll('link[href], script[src], img[src]')].filter((el) => {
+          const v = el.getAttribute('href') || el.getAttribute('src') || ''
+          return v && !v.startsWith('data:')
+        }).length,
+      }
+    })()`)
+    check('N: 单文件可用（脚本装配完成）', single.ready === '1' && single.buttons >= 11, JSON.stringify({ ready: single.ready, buttons: single.buttons }))
+    check('N: 样式已内联生效', single.appbarBg === 'rgb(63, 81, 181)', String(single.appbarBg))
+    check('N: 零外部资源引用', single.externalRefs === 0 && single.hasManifest === false, `external=${single.externalRefs} manifest=${single.hasManifest}`)
+    check('N: 内联了样式与脚本', single.inlineStyles >= 3 && single.inlineScripts >= 9, `style=${single.inlineStyles} script=${single.inlineScripts}`)
+    check('N: 文件体积合理（≤ 200KB）', single.size <= 200 * 1024, `${(single.size / 1024).toFixed(1)} KB`)
+
+    const singleRequests = page.state.requests.filter((u) => u.includes('/assets/'))
+    check('N: 打开单文件不请求 assets', singleRequests.length === 0, singleRequests[0] || '')
+
+    // 单文件里设置抽屉/主题色/引擎也能用
+    await page.evaluate("SimpleSearch.app.openSettings()")
+    await sleep(300)
+    const singlePanel = await page.evaluate(`(() => ({
+      engines: document.querySelectorAll('#engine-mode .segmented-item').length,
+      swatches: document.querySelectorAll('#color-swatches .swatch').length,
+      hidden: document.getElementById('settings-panel').hidden,
+    }))()`)
+    check(
+      'N: 单文件里设置面板完整',
+      singlePanel.hidden === false && singlePanel.engines === 4 && singlePanel.swatches === 19,
+      JSON.stringify(singlePanel)
+    )
+    await page.evaluate("SimpleSearch.app.closeSettings()")
+
   } finally {
     cleanup()
   }

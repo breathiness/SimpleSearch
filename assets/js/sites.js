@@ -109,12 +109,32 @@
     { id: 'content', label: '素材资讯' },
   ]
 
-  // 默认搜索引擎：SS.search.resolveDefault 使用；表单无 JS 时的回退也是 Bing
+  // 搜索引擎表（v3.0 起 4 个）：param 是该引擎查询参数名，app.js 切换引擎时同步
+  // 表单 action 与 #search-input 的 name；SS.search.resolveDefault 使用 search 模板。
   SS.engines = {
     bing: {
       id: 'bing',
       label: 'Bing',
       search: 'https://www.bing.com/search?q={q}',
+      param: 'q',
+    },
+    google: {
+      id: 'google',
+      label: 'Google',
+      search: 'https://www.google.com/search?q={q}',
+      param: 'q',
+    },
+    ddg: {
+      id: 'ddg',
+      label: 'DuckDuckGo',
+      search: 'https://duckduckgo.com/?q={q}',
+      param: 'q',
+    },
+    baidu: {
+      id: 'baidu',
+      label: '百度',
+      search: 'https://www.baidu.com/s?wd={q}',
+      param: 'wd',
     },
   }
 

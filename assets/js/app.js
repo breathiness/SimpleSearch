@@ -59,6 +59,19 @@
         input.focus()
         return
       }
+
+      // !bang 快捷搜索：!gh rust → 直接在 GitHub 里搜 rust
+      const bang = SS.search && SS.search.resolveBang ? SS.search.resolveBang(query) : null
+      if (bang) {
+        event.preventDefault()
+        if (SS.history && SS.history.record && bang.term) {
+          SS.history.record(bang.term)
+          notifyHistoryChanged()
+        }
+        window.location.href = bang.url
+        return
+      }
+
       if (SS.history && SS.history.record) {
         SS.history.record(query)
         notifyHistoryChanged()
@@ -126,8 +139,10 @@
   // 不要只看 body class —— openSettings 要等 rAF 才加 class，早一步判断会漏掉。
   function anyOverlayOpen() {
     const panel = $('settings-panel')
+    const dialog = $('shortcuts-dialog')
     const panelOpen = Boolean(panel && !panel.hidden)
-    return panelOpen || document.body.classList.contains('nav-open')
+    const dialogOpen = Boolean(dialog && !dialog.hidden)
+    return panelOpen || dialogOpen || document.body.classList.contains('nav-open')
   }
 
   function syncScrim() {
@@ -137,6 +152,7 @@
   }
 
   function openNav() {
+    closeShortcuts(false)
     closeSettings(false)
     document.body.classList.add('nav-open')
     const toggle = $('nav-toggle')
@@ -153,6 +169,7 @@
   }
 
   function openSettings() {
+    closeShortcuts(false)
     closeNav(false)
     const panel = $('settings-panel')
     const toggle = $('settings-toggle')
@@ -179,6 +196,31 @@
     return anyOverlayOpen()
   }
 
+  // ---------------------------------------------------------------- 快捷键对话框
+  let shortcutsTrigger = null
+
+  function openShortcuts(trigger) {
+    closeSettings(false)
+    closeNav(false)
+    const dialog = $('shortcuts-dialog')
+    if (!dialog) return
+    shortcutsTrigger = trigger || null
+    dialog.hidden = false
+    syncScrim()
+    const close = $('shortcuts-close')
+    if (close && typeof close.focus === 'function') close.focus()
+  }
+
+  function closeShortcuts(restoreFocus = true) {
+    const dialog = $('shortcuts-dialog')
+    if (!dialog || dialog.hidden) return
+    dialog.hidden = true
+    syncScrim()
+    const target = shortcutsTrigger
+    shortcutsTrigger = null
+    if (restoreFocus && target && typeof target.focus === 'function') target.focus()
+  }
+
   function bindDrawers() {
     const scrim = $('scrim')
     const navToggle = $('nav-toggle')
@@ -201,14 +243,36 @@
     if (settingsClose) settingsClose.addEventListener('click', () => closeSettings())
     if (scrim) {
       scrim.addEventListener('click', () => {
-        if (panel && !panel.hidden) closeSettings()
+        const dialog = $('shortcuts-dialog')
+        if (dialog && !dialog.hidden) closeShortcuts()
+        else if (panel && !panel.hidden) closeSettings()
         else if (document.body.classList.contains('nav-open')) closeNav()
       })
     }
+    const shortcutsOpen = $('shortcuts-open')
+    if (shortcutsOpen) {
+      shortcutsOpen.addEventListener('click', () => openShortcuts(shortcutsOpen))
+    }
+    const shortcutsClose = $('shortcuts-close')
+    if (shortcutsClose) shortcutsClose.addEventListener('click', () => closeShortcuts())
     document.addEventListener('keydown', (event) => {
-      // 设置面板是 aria-modal 对话框：Tab 在面板内循环，不跑到背后的页面
-      if (event.key === 'Tab' && panel && !panel.hidden) {
-        const focusables = panel.querySelectorAll('button, a[href]')
+      // ? 打开快捷键说明（输入框里打 ? 不拦截）
+      if ((event.key === '?' || (event.key === '/' && event.shiftKey)) && !event.metaKey && !event.ctrlKey && !event.altKey) {
+        const active = document.activeElement
+        const typing = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)
+        const dialog = $('shortcuts-dialog')
+        if (!typing && dialog && dialog.hidden) {
+          event.preventDefault()
+          openShortcuts(active)
+        }
+      }
+    })
+    document.addEventListener('keydown', (event) => {
+      const dialog = $('shortcuts-dialog')
+      const trap = dialog && !dialog.hidden ? dialog : panel && !panel.hidden ? panel : null
+      // aria-modal 覆盖层：Tab 在内部循环，不跑到背后的页面
+      if (event.key === 'Tab' && trap) {
+        const focusables = trap.querySelectorAll('button, a[href]')
         if (focusables.length > 0) {
           const first = focusables[0]
           const last = focusables[focusables.length - 1]
@@ -223,10 +287,80 @@
         return
       }
       if (event.key !== 'Escape' || !isScrimVisible()) return
-      if (panel && !panel.hidden) closeSettings()
+      if (dialog && !dialog.hidden) closeShortcuts()
+      else if (panel && !panel.hidden) closeSettings()
       else closeNav()
       event.preventDefault()
     })
+  }
+
+  // ---------------------------------------------------------------- 搜索引擎
+  const ENGINE_KEY = 'ss.engine'
+  const FALLBACK_ENGINE = 'bing'
+
+  function knownEngines() {
+    return SS.engines && typeof SS.engines === 'object' ? SS.engines : {}
+  }
+
+  function getStoredEngine() {
+    try {
+      const stored = window.localStorage ? window.localStorage.getItem(ENGINE_KEY) : null
+      return knownEngines()[stored] ? stored : FALLBACK_ENGINE
+    } catch (error) {
+      return FALLBACK_ENGINE
+    }
+  }
+
+  function saveEngine(id) {
+    try {
+      if (window.localStorage) window.localStorage.setItem(ENGINE_KEY, id)
+    } catch (error) {
+      // 存储不可用时仅当次生效
+    }
+  }
+
+  // 切换搜索引擎：更新 SS.defaultEngine、表单 action 与参数名、分段控件状态
+  function applyEngine(id, options) {
+    const engine = knownEngines()[id]
+    if (!engine || typeof engine.search !== 'string') return
+    SS.defaultEngine = id
+    const form = $('search-form')
+    const input = $('search-input')
+    if (form) form.setAttribute('action', engine.search.split('?')[0])
+    if (input) input.setAttribute('name', engine.param || 'q')
+    const group = $('engine-mode')
+    if (group) {
+      for (const item of group.querySelectorAll('[data-engine]')) {
+        item.setAttribute('aria-pressed', item.getAttribute('data-engine') === id ? 'true' : 'false')
+      }
+    }
+    if (!options || options.persist !== false) saveEngine(id)
+  }
+
+  function bindEngines() {
+    const group = $('engine-mode')
+    if (group) {
+      group.addEventListener('click', (event) => {
+        const item = event.target.closest('[data-engine]')
+        if (!item || !group.contains(item)) return
+        applyEngine(item.getAttribute('data-engine'))
+      })
+    }
+    applyEngine(getStoredEngine(), { persist: false })
+  }
+
+  // ---------------------------------------------------------------- PWA
+  function registerServiceWorker() {
+    try {
+      // 单文件便携版没有 sw.js / manifest，不注册
+      if (window.__SS_SINGLE_FILE) return
+      if (!('serviceWorker' in navigator)) return
+      // file:// 下不注册（本地双击场景不需要也不支持）
+      if (window.location.protocol !== 'http:' && window.location.protocol !== 'https:') return
+      navigator.serviceWorker.register('sw.js').catch(() => undefined)
+    } catch (error) {
+      // 注册失败不影响页面功能
+    }
   }
 
   // ---------------------------------------------------------------- 其它
@@ -322,12 +456,25 @@
     bindSearchForm()
     bindDrawers()
     bindRipple()
+    bindEngines()
     applyDeepLinks()
+    registerServiceWorker()
     // 供 E2E/调试判断"装配完成"（脚本 defer 执行完 ≠ 已绑定事件）
     document.documentElement.setAttribute('data-app-ready', '1')
   }
 
-  SS.app = { boot, handleSiteClick, applyGroupFilter, openSettings, closeSettings, openNav, closeNav }
+  SS.app = {
+    boot,
+    handleSiteClick,
+    applyGroupFilter,
+    openSettings,
+    closeSettings,
+    openNav,
+    closeNav,
+    openShortcuts,
+    closeShortcuts,
+    applyEngine,
+  }
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot, { once: true })

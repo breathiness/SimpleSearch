@@ -11,6 +11,8 @@
   <meta property="og:description" content="{{DESCRIPTION}}">
   <meta property="og:type" content="website">
   <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/img/icon-192.png">
+  <link rel="manifest" href="manifest.webmanifest">
   <script>
     // 防闪烁：样式表生效前确定主题。优先级与 theme.js 一致：
     // ?theme= 参数 → localStorage ss.theme → 系统深色偏好 → 浅色
@@ -119,15 +121,47 @@
         <span class="settings-label">主题色</span>
         <div id="color-swatches" class="swatches" role="group" aria-label="主题色"></div>
       </div>
+      <div class="settings-row">
+        <span class="settings-label">搜索引擎</span>
+        <div id="engine-mode" class="segmented" role="group" aria-label="搜索引擎">
+          <button class="segmented-item" type="button" data-engine="bing" aria-pressed="true">Bing</button>
+          <button class="segmented-item" type="button" data-engine="google" aria-pressed="false">Google</button>
+          <button class="segmented-item" type="button" data-engine="ddg" aria-pressed="false">DDG</button>
+          <button class="segmented-item" type="button" data-engine="baidu" aria-pressed="false">百度</button>
+        </div>
+      </div>
       <button id="suggest-source-toggle" class="switch-row" type="button" aria-pressed="true">联网联想</button>
       <div class="settings-row settings-row-inline">
         <span class="settings-label">搜索历史 <span id="history-count" class="settings-value">0 条</span></span>
         <button id="history-clear" class="text-button" type="button" disabled>清空</button>
       </div>
       <a class="panel-link" href="https://github.com/breathiness/SimpleSearch">GitHub 仓库 · 关于</a>
+      <div class="settings-row settings-row-inline">
+        <span class="settings-label">键盘快捷键</span>
+        <button id="shortcuts-open" class="text-button" type="button">查看</button>
+      </div>
       <p class="panel-version">简单搜索 v{{APP_VERSION}}</p>
     </div>
   </aside>
+
+  <section id="shortcuts-dialog" class="dialog" role="dialog" aria-modal="true"
+           aria-labelledby="shortcuts-title" hidden>
+    <div class="dialog-header">
+      <h2 id="shortcuts-title" class="dialog-title">键盘快捷键</h2>
+      <button id="shortcuts-close" class="icon-button dialog-close" type="button" aria-label="关闭">✕</button>
+    </div>
+    <dl class="shortcut-list">
+      <div><dt><kbd>/</kbd></dt><dd>聚焦搜索框</dd></div>
+      <div><dt><kbd>↑</kbd><kbd>↓</kbd></dt><dd>在联想列表里移动</dd></div>
+      <div><dt><kbd>Enter</kbd></dt><dd>采用高亮项或提交搜索</dd></div>
+      <div><dt><kbd>Esc</kbd></dt><dd>关闭联想、抽屉或对话框</dd></div>
+      <div><dt><kbd>Tab</kbd></dt><dd>移出搜索框（自动收起联想）</dd></div>
+      <div><dt><kbd>Delete</kbd></dt><dd>删除高亮的历史项</dd></div>
+      <div><dt><kbd>?</kbd></dt><dd>打开这个快捷键说明</dd></div>
+      <div><dt><kbd>!</kbd></dt><dd>站点快捷搜索，例如 !gh rust</dd></div>
+      <div><dt><kbd>Ctrl</kbd><kbd>⌘</kbd></dt><dd>按住再点击站点按钮：新标签页打开</dd></div>
+    </dl>
+  </section>
 
   <script defer src="assets/js/sites.js"></script>
   <script defer src="assets/js/search.js"></script>

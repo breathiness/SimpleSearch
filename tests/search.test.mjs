@@ -180,3 +180,115 @@ testIt('回归矩阵：全部站点 × 特殊词，URL 一律由 encodeURICompon
     }
   }
 })
+
+// ---------------------------------------------------------------- v2.6 §17.2 !bang（resolveBang）
+
+const hasBang = loaded.ok && search && typeof search.resolveBang === 'function'
+
+function testBang(name, fn) {
+  test(name, hasBang ? {} : { skip: '等待 core-engine 交付 SS.search.resolveBang' }, fn)
+}
+
+function siteById(id) {
+  return SS.sites.find((site) => site.id === id)
+}
+
+testBang('resolveBang：!gh rust → GitHub 站内搜索（siteId/term/kind/token/url 完整）', () => {
+  const result = search.resolveBang('!gh rust')
+  assert.ok(result, '应返回匹配结果')
+  const site = siteById('github')
+  assert.equal(result.siteId, 'github')
+  assert.equal(result.term, 'rust')
+  assert.equal(result.kind, 'search')
+  assert.equal(result.token, 'gh')
+  assert.equal(result.url, site.search.replace('{q}', encodeURIComponent('rust')))
+})
+
+testBang('resolveBang：!gh 无词 → 打开站点首页（kind nav）', () => {
+  const result = search.resolveBang('!gh')
+  const site = siteById('github')
+  assert.ok(result, '!gh 应返回结果')
+  assert.equal(result.kind, 'nav')
+  assert.equal(result.url, site.home)
+  assert.equal(result.term, '')
+  assert.equal(result.siteId, 'github')
+  assert.equal(result.token, 'gh')
+})
+
+testBang('resolveBang：!b站 视频 → 通过站点 keywords 命中 bilibili', () => {
+  const result = search.resolveBang('!b站 视频')
+  const site = siteById('bilibili')
+  assert.ok(result, '!b站 应能通过 keywords 匹配到 bilibili')
+  assert.equal(result.siteId, 'bilibili')
+  assert.equal(result.term, '视频')
+  assert.equal(result.kind, 'search')
+  assert.equal(result.token, 'b站')
+  assert.equal(result.url, site.search.replace('{q}', encodeURIComponent('视频')))
+})
+
+testBang('resolveBang：!archwiki kernel → 站点 id 全名匹配', () => {
+  const result = search.resolveBang('!archwiki kernel')
+  const site = siteById('archwiki')
+  assert.ok(result)
+  assert.equal(result.siteId, 'archwiki')
+  assert.equal(result.term, 'kernel')
+  assert.equal(result.kind, 'search')
+  assert.equal(result.url, site.search.replace('{q}', encodeURIComponent('kernel')))
+})
+
+testBang('resolveBang：未知 token / 非法语法 → null', () => {
+  const cases = ['!nope x', '!', '!!x', '! x', '!-x y', 'plain query', '', '   ', null, undefined, 42]
+  for (const raw of cases) {
+    assert.equal(
+      search.resolveBang(raw),
+      null,
+      `输入 ${JSON.stringify(raw)} 应返回 null（未知 token 视为普通查询）`,
+    )
+  }
+})
+
+testBang('resolveBang：token 大小写不敏感（!GH rust → github）', () => {
+  const result = search.resolveBang('!GH rust')
+  assert.ok(result, '!GH 应匹配 github（token 大小写不敏感）')
+  assert.equal(result.siteId, 'github')
+  assert.equal(result.term, 'rust')
+})
+
+testBang('resolveBang：特殊字符正确编码（a&b c#d）', () => {
+  const result = search.resolveBang('!gh a&b c#d')
+  const site = siteById('github')
+  assert.ok(result)
+  assert.equal(result.term, 'a&b c#d')
+  assert.equal(result.url, site.search.replace('{q}', encodeURIComponent('a&b c#d')))
+})
+
+testBang('resolveBang：首尾/连续空白被规范化', () => {
+  const result = search.resolveBang('  !gh    rust  ')
+  assert.ok(result)
+  assert.equal(result.term, 'rust')
+  assert.equal(result.kind, 'search')
+})
+
+testBang('resolveBang：term 中的 ! 不会被当成新 token（!gh !important）', () => {
+  const result = search.resolveBang('!gh !important')
+  assert.ok(result)
+  assert.equal(result.siteId, 'github')
+  assert.equal(result.term, '!important')
+})
+
+testBang('resolveBang：结果 url 与 resolveSite 一致（多站矩阵）', () => {
+  const cases = [
+    ['!gh rust', 'github', 'rust'],
+    ['!steam 赛博朋克', 'steam', '赛博朋克'],
+    ['!知乎 如何', 'zhihu', '如何'],
+    ['!taobao 键盘', 'taobao', '键盘'],
+  ]
+  for (const [raw, siteId, term] of cases) {
+    const result = search.resolveBang(raw)
+    const expected = search.resolveSite(siteId, term)
+    assert.ok(result, `${raw} 应命中 ${siteId}`)
+    assert.equal(result.siteId, siteId, `${raw} 的 siteId`)
+    assert.equal(result.url, expected.url, `${raw} 的 URL 应与 resolveSite 一致`)
+    assert.equal(result.kind, expected.kind, `${raw} 的 kind 应与 resolveSite 一致`)
+  }
+})

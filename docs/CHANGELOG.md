@@ -3,6 +3,30 @@
 本项目的对用户可见变化都记录在这里。
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)：主版本号在页面结构/使用方式有明显变化时递增。
 
+## 2.6.0（未发布）
+
+PWA 离线、`!bang` 快捷搜索、搜索引擎切换、快捷键说明、覆盖率门槛和单文件便携版。版本口径特意停在 2.x。
+
+### 新增
+
+- **PWA / 离线**：新增 `manifest.webmanifest`（name「简单搜索」、`standalone`、192/512 图标）和 `sw.js`（构建时注入版本号 2.6.0 与 16 项 precache）。安装后可独立窗口打开，**断网刷新仍可用**；`install` 预缓存、`activate` 清旧缓存并 `claim`、`fetch` 只处理同源 GET（跨域请求直接放行、不缓存）；升级版本旧缓存自动清理；`file://` 下不注册 SW。
+- **`!bang` 站点快捷搜索**：`!<token> [搜索词]`，token 匹配站点 `id` 或 `keywords`（支持中文，如 `!b站 视频`、`!淘宝 键盘`），**只认第一个 token**；`!gh` 不带词直接打开 GitHub 首页；未知 token 当普通搜索；联想列表首项会给出「在 GitHub 搜索：rust」，选中即直达。
+- **搜索引擎切换**：Bing / Google / DuckDuckGo / 百度四选一（默认 Bing），记住 `ss.engine`；切换后表单 `action` 与参数名自动适配（百度用 `wd`），回车 / 「搜索」立即用新引擎，联想首项文案跟着变。
+- **快捷键说明对话框**：按 `?`（焦点不在输入框）或设置里「查看」打开 MDUI 对话框，列出 9 条快捷键；`Esc` / 关闭按钮 / 遮罩关闭，并把焦点还给触发元素。
+- **覆盖率**：`npm run coverage`（Node 内置覆盖率 + 阈值 90% 行 / 75% 分支 / 80% 函数），零依赖、**不进 CI 必跑**。
+- **单文件便携版 `SimpleSearch.html`**：`npm run build` 的第 5 个产物。CSS / JS / 图标全部内联（3 个 `<style>`、8 个 JS + 防闪烁脚本 + `window.__SS_SINGLE_FILE` 标记），favicon 改成 data URI，移除 `manifest.webmanifest` 与 `apple-touch-icon`，`app.js` 在单文件模式下不注册 Service Worker。**零外部请求**，双击即用、可单文件分享；体积 **132.6 KB（135,750 B）/ gzip 34.2 KB**。取舍：没有 PWA 安装 / 离线缓存（Service Worker 必须是独立文件），改一个字整页都要重新下载——要 PWA 用 `index.html` 多文件版。
+- localStorage 变为 **5 个键**（新增 `ss.engine`）。
+
+### 工程
+
+- 构建产物变为 5 个：`index.html` + `SimpleSearch.html`（单文件便携版）+ `sw.js` + 两个重定向壳；CI 的产物漂移检查把 `SimpleSearch.html` 和 `sw.js` 一起 `git diff`。
+- `app.js` 通过 `window.__SS_SINGLE_FILE` 判断单文件模式，跳过 Service Worker 注册；单文件版不引用任何 `assets/` 文件（favicon 为 data URI）。
+- `SS.engines` 扩为 4 个（带 `param`）；`SS.search.resolveBang` 为纯函数；`app.js` 负责注册 SW、搜索引擎切换、快捷键对话框与 `?` 触发、深链兼容。
+- 体积：多文件版单页静态资源约 130 KB 未压缩 / gzip 约 39 KB（预算 136 KB）；单文件版 **132.6 KB / gzip 34.2 KB**。`sw.js` 约 2.5 KB、`manifest.webmanifest` 665 B、PWA 图标约 21 KB **不计入首屏**。首屏 14 个请求、零第三方（其中一次是浏览器按 `apple-touch-icon` 抓取 PWA 图标，属预期）。
+- `e2e` 的首屏断言改为「请求数 ≤16 + 零第三方」，不再断言传输体积（Service Worker 接管后 `transferSize` 会归零）；体积预算由 `validate` 按磁盘产物校验。
+- 测试基线：`npm test` **172 例**、`npm run validate` **25 项**、`npm run e2e` **149 项**全绿；覆盖率约 **96.04% 行 / 80.3% 分支 / 87.17% 函数**（阈值 90 / 75 / 80）。
+- 文档同步：README（PWA、`!bang`、搜索引擎、快捷键、单文件便携版与取舍、隐私 5 键、体积/首屏口径）、CONTRIBUTING（PWA / `!bang` / 引擎 / 快捷键 / 覆盖率 / 单文件生成流程）、`docs/custom-sites.md`（`!bang` token、precache、五产物）。
+
 ## 2.5.0（未发布）
 
 深链、主题三态、搜索历史管理、版本号与可选的站点自检。按需求**不做**「把本站设为浏览器默认搜索引擎（`?q=%s` 自动提交）」。

@@ -185,6 +185,22 @@ function readTemplate(relative) {
   return fs.readFileSync(file, 'utf8')
 }
 
+// Service Worker 预缓存列表：首页 + 全部本地 CSS/JS/图标 + manifest（sw.js 自身不缓存）
+function buildPrecacheList() {
+  const files = ['index.html', 'manifest.webmanifest']
+  for (const dir of ['assets/css', 'assets/js']) {
+    const abs = path.join(ROOT, dir)
+    if (!fs.existsSync(abs)) continue
+    for (const name of fs.readdirSync(abs).sort()) {
+      if (/\.(css|js)$/.test(name)) files.push(`${dir}/${name}`)
+    }
+  }
+  for (const name of ['favicon.svg', 'icon-192.png', 'icon-512.png']) {
+    if (fs.existsSync(path.join(ROOT, 'assets/img', name))) files.push(`assets/img/${name}`)
+  }
+  return files
+}
+
 function readAppVersion() {
   const pkgPath = path.join(ROOT, 'package.json')
   try {
@@ -195,10 +211,49 @@ function readAppVersion() {
   }
 }
 
+// 把多文件页面折叠成单文件便携版：CSS/JS/图标全部内联，零外部请求。
+// 注意：单文件版没有 sw.js / manifest，因此不注册 Service Worker（PWA 用多文件版）。
+function renderSingleFile(html) {
+  let out = html
+
+  // 1) 样式表 → <style>
+  out = out.replace(/<link rel="stylesheet" href="(assets\/css\/[^"]+)">/g, (match, href) => {
+    const css = fs.readFileSync(path.join(ROOT, href), 'utf8')
+    return `<style>\n/* ${href} */\n${css}\n</style>`
+  })
+
+  // 2) favicon 内联为 data URI；去掉 apple-touch-icon / manifest（单文件无独立资源）
+  const favicon = fs.readFileSync(path.join(ROOT, 'assets/img/favicon.svg'), 'utf8')
+  out = out.replace(
+    /<link rel="icon" href="assets\/img\/favicon\.svg" type="image\/svg\+xml">/,
+    `<link rel="icon" href="data:image/svg+xml,${encodeURIComponent(favicon)}">`
+  )
+  out = out.replace(/\s*<link rel="apple-touch-icon" href="assets\/img\/icon-192\.png">/, '')
+  out = out.replace(/\s*<link rel="manifest" href="manifest\.webmanifest">/, '')
+
+  // 3) 脚本 → 内联 <script>（保持原顺序与位置）；先插单文件标记
+  out = out.replace(
+    '<script defer src="assets/js/sites.js"></script>',
+    '<script>window.__SS_SINGLE_FILE = true;</script>\n  <script defer src="assets/js/sites.js"></script>'
+  )
+  out = out.replace(/<script defer src="(assets\/js\/[^"]+)"><\/script>/g, (match, src) => {
+    const js = fs.readFileSync(path.join(ROOT, src), 'utf8')
+    return `<script>\n/* ${src} */\n${js}\n</script>`
+  })
+
+  // 4) 文件头注释
+  return out.replace(
+    '<!DOCTYPE html>',
+    '<!DOCTYPE html>\n<!-- 单文件便携版：CSS/JS/图标全部内联，零外部请求；PWA 安装/离线请用 index.html + assets -->'
+  )
+}
+
 async function main() {
   const pageTemplate = readTemplate(PAGE.template)
   const redirectTemplate = readTemplate('templates/redirect.html')
+  const swTemplate = readTemplate('templates/sw.js')
   const appVersion = readAppVersion()
+  const precacheList = buildPrecacheList()
 
   const SS = await loadRegistry()
   validateSites(SS.sites)
@@ -220,6 +275,23 @@ async function main() {
         '{{SITE_BUTTONS}}': renderSiteButtons(SS.sites, SITE_ICONS),
       },
       PAGE.output
+    ),
+  })
+
+  outputs.push({
+    file: 'SimpleSearch.html',
+    html: renderSingleFile(outputs[0].html),
+  })
+
+  outputs.push({
+    file: 'sw.js',
+    html: renderTemplate(
+      swTemplate,
+      {
+        '{{APP_VERSION}}': escapeHtml(appVersion),
+        '{{PRECACHE_LIST}}': JSON.stringify(precacheList, null, 2),
+      },
+      'sw.js'
     ),
   })
 

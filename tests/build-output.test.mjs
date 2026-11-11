@@ -1,17 +1,14 @@
-// v2.5 产物静态校验：MDUI 文档站骨架 + 主题三态 + 历史行/版本号 + 内联 SVG sprite（契约 §13、§14、§15、§16）。
+// v2.6 产物静态校验：PWA / 搜索引擎分段 / 快捷键对话框 + v2.5 骨架（契约 §13-§17）。
 //
-// 直接对生成的 index.html / tokens.css 做静态解析（不跑浏览器）：
-//   - 骨架：.appbar（含 .appbar-logo → #i-logo）/ .shell / #main-content / 卡片 / 左侧 #site-nav
-//   - 分类：nav-item 数量 = 分组数 + 1，aria-current 选中语义；每个 nav-item 有 .nav-icon（#i-cat-<group>）+ .nav-label
-//   - 设置面板：#settings-panel[role=dialog][hidden]、#theme-mode 三段式（auto/light/dark）、唯一 .switch-row（联网联想）、
-//     主题色行 .settings-row + 空 #color-swatches、历史行（#history-count「0 条」+ #history-clear[disabled]）、
-//     .panel-version「简单搜索 v<semver>」；不得存在 #theme-toggle
-//   - 无 #site-footer；<html data-color="indigo">
-//   - tokens.css：19 组 :root[data-color='…']（每组 4 个 --c-*）+ 语义变量 --primary-bg 等
-//   - sprite：11 站点 + 3 UI(menu/settings/close) + 1 logo + 6 分类 = 21 个 symbol，体积 ≤ 8KB
-//   - 零额外图片请求
+// 直接对生成的 index.html / tokens.css / manifest.webmanifest / sw.js 做静态解析（不跑浏览器）：
+//   - PWA：<link rel="manifest"> + manifest JSON（name/start_url/scope/display/icons）+ 192/512 图标文件存在
+//   - service worker：sw.js 生成物含版本号与 precache（首页 + 全部 CSS/JS/图标/manifest），经典脚本无 import/export
+//   - 搜索引擎：#engine-mode 4 个 .segmented-item[data-engine]，初始只有 bing 选中
+//   - 快捷键对话框：#shortcuts-dialog 结构 + ≥8 行 <kbd> + 设置面板 #shortcuts-open
+//   - 骨架/主题三态/历史行/版本号/分类导航/图标 sprite/零图片请求（v2.3-v2.5 断言保留）
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import vm from 'node:vm'
 import { loadClassic, makeTester, hasRepo, readRepo, BUILD_MARKER } from './helpers/load.mjs'
 
 const loaded = await loadClassic('sites')
@@ -88,6 +85,19 @@ const skipReason = !present
     : !isV25
       ? '等待 lead「产物已重建」：当前 index.html 还是 v2.4 产物（无 #theme-mode/#history-count/.panel-version）'
       : null
+
+// v2.6 签名：manifest 链接 / #engine-mode / #shortcuts-dialog。缺失时 v2.6 专项用例先 skip。
+const v3SkipReason = !present
+  ? '等待 lead 重建产物：index.html 不存在'
+  : !built
+    ? '等待 lead 重建产物：index.html 不是 build.mjs 生成物'
+    : /rel\s*=\s*["']manifest["']|engine-mode|shortcuts-dialog/.test(html)
+      ? null
+      : '等待 lead「产物已重建」：当前产物还是 v2.5（无 manifest/#engine-mode/#shortcuts-dialog）'
+
+function testV3(name, fn) {
+  test(name, v3SkipReason ? { skip: v3SkipReason } : {}, fn)
+}
 
 function testOutput(name, fn) {
   test(name, skipReason ? { skip: skipReason } : {}, fn)
@@ -756,4 +766,195 @@ testOutput('图标零额外请求：无 <img>/<picture>、无外链 favicon 服�
     const href = getAttr(tag, 'href') || ''
     assert.ok(!/^(https?:)?\/\//i.test(href), `favicon 不得外链：${href}`)
   }
+})
+
+// ---------------------------------------------------------------- v2.6 §17：PWA / 搜索引擎 / 快捷键对话框
+
+function extractSegmentedItems(source, containerId, keyAttr) {
+  const container = findTagById(source, containerId)
+  if (!container) return null
+  const tagName = (container.match(/^<([a-zA-Z][\w:-]*)/) || [])[1]
+  const inner = innerOfTag(source, container, tagName) || ''
+  const items = []
+  for (const match of inner.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/gi)) {
+    const tag = match[0]
+    const openTag = tag.slice(0, tag.indexOf('>') + 1)
+    if (!hasClass(openTag, 'segmented-item')) continue
+    items.push({
+      key: getAttr(openTag, keyAttr),
+      pressed: getAttr(openTag, 'aria-pressed'),
+      text: textOf(tag.slice(tag.indexOf('>') + 1, tag.lastIndexOf('</button>'))),
+    })
+  }
+  return {
+    container,
+    role: getAttr(container, 'role'),
+    label: getAttr(container, 'aria-label'),
+    hasSegmentedClass: hasClass(container, 'segmented'),
+    items,
+  }
+}
+
+function extractResourceRefs(source) {
+  const refs = []
+  for (const match of String(source).matchAll(/<(link|script|img|source|iframe|embed|object)\b[^>]*>/gi)) {
+    const tag = match[0]
+    const tagName = match[1].toLowerCase()
+    for (const attr of ['src', 'href', 'data', 'poster']) {
+      if (attr === 'data' && tagName !== 'object') continue
+      const url = getAttr(tag, attr)
+      if (!url || url.trim() === '') continue
+      refs.push({ tagName, attr, url: url.trim() })
+    }
+  }
+  return refs
+}
+
+function isExternalUrl(url) {
+  return /^(https?:)?\/\//i.test(url) || /^(data|blob|mailto|tel):/i.test(url)
+}
+
+testV3('PWA：<link rel="manifest"> + manifest.webmanifest 合法且 icons(192/512) 文件存在', () => {
+  const clean = stripHtmlComments(html)
+  const manifestHrefs = []
+  for (const match of clean.matchAll(/<link\b[^>]*>/gi)) {
+    const tag = match[0]
+    const rel = (getAttr(tag, 'rel') || '').toLowerCase()
+    if (!rel.split(/\s+/).includes('manifest')) continue
+    manifestHrefs.push(getAttr(tag, 'href') || '')
+  }
+  assert.ok(manifestHrefs.length > 0, 'index.html 缺少 <link rel="manifest">')
+  assert.ok(
+    manifestHrefs.some((href) => /manifest\.webmanifest/.test(href)),
+    `manifest 链接目标不对：${JSON.stringify(manifestHrefs)}`,
+  )
+
+  assert.ok(hasRepo('manifest.webmanifest'), '缺少 manifest.webmanifest')
+  let manifest
+  assert.doesNotThrow(() => {
+    manifest = JSON.parse(readRepo('manifest.webmanifest'))
+  }, 'manifest.webmanifest 必须是合法 JSON')
+
+  assert.equal(manifest.name, '简单搜索', `manifest.name 应为「简单搜索」，实际 ${JSON.stringify(manifest.name)}`)
+  assert.equal(
+    manifest.short_name,
+    '简单搜索',
+    `manifest.short_name 应为「简单搜索」，实际 ${JSON.stringify(manifest.short_name)}`,
+  )
+  assert.equal(manifest.start_url, './index.html')
+  assert.equal(manifest.scope, './')
+  assert.equal(manifest.display, 'standalone')
+  assert.ok(Array.isArray(manifest.icons), 'manifest.icons 必须是数组')
+
+  const sizes = manifest.icons.map((icon) => String(icon.sizes || ''))
+  assert.ok(sizes.includes('192x192'), `manifest.icons 缺少 192x192：${sizes.join(', ')}`)
+  assert.ok(sizes.includes('512x512'), `manifest.icons 缺少 512x512：${sizes.join(', ')}`)
+  for (const icon of manifest.icons) {
+    assert.match(String(icon.src || ''), /\.png$/i, `manifest icon 应为 png：${icon.src}`)
+    assert.ok(hasRepo(String(icon.src).replace(/^\.\//, '')), `manifest icon 文件不存在：${icon.src}`)
+  }
+})
+
+testV3('sw.js：build 生成物含版本号 + precache 覆盖首页/CSS/JS/图标/manifest，且为经典脚本', () => {
+  assert.ok(hasRepo('sw.js'), '缺少 sw.js（应由 build 从 templates/sw.js 生成）')
+  const sw = readRepo('sw.js')
+  const pkg = JSON.parse(readRepo('package.json'))
+
+  assert.ok(sw.includes(pkg.version), `sw.js 未包含 package.json 版本号 ${pkg.version}`)
+  assert.ok(/index\.html/.test(sw), 'sw.js 的 precache 应包含 index.html')
+  assert.ok(/manifest\.webmanifest/.test(sw), 'sw.js 的 precache 应包含 manifest.webmanifest')
+  assert.ok(/icon-192\.png/.test(sw), 'sw.js 的 precache 应包含 icon-192.png')
+  assert.ok(/icon-512\.png/.test(sw), 'sw.js 的 precache 应包含 icon-512.png')
+
+  for (const ref of extractResourceRefs(html)) {
+    if (!ref.url || isExternalUrl(ref.url) || ref.url.startsWith('#')) continue
+    const pathOnly = ref.url.split('?')[0].split('#')[0]
+    if (!/\.(css|js|png|svg)$/i.test(pathOnly)) continue
+    assert.ok(sw.includes(pathOnly), `sw.js 的 precache 缺少 index.html 引用的资源：${pathOnly}`)
+  }
+
+  assert.doesNotThrow(() => new vm.Script(sw, { filename: 'sw.js' }), 'sw.js 含 ESM 语法（应使用经典脚本）')
+  assert.ok(
+    !/<script\b[^>]*\bsrc\s*=\s*["'][^"']*sw\.js/i.test(stripHtmlComments(html)),
+    'index.html 不应直接 <script src="sw.js">（只由 app.js 注册）',
+  )
+})
+
+testV3('搜索引擎：#engine-mode 4 个 .segmented-item[data-engine]，初始只有 bing 选中', () => {
+  const clean = stripHtmlComments(html)
+  const segmented = extractSegmentedItems(clean, 'engine-mode', 'data-engine')
+  assert.ok(segmented, '缺少 #engine-mode 分段控件（搜索引擎切换）')
+  assert.ok(segmented.hasSegmentedClass, '#engine-mode 应带 .segmented 类')
+  assert.equal((segmented.role || '').toLowerCase(), 'group', '#engine-mode 的 role 应为 group')
+  assert.equal(segmented.label, '搜索引擎', '#engine-mode 的 aria-label 应为「搜索引擎」')
+
+  assert.equal(segmented.items.length, 4, `#engine-mode 内应有 4 个 .segmented-item，实际 ${segmented.items.length}`)
+  assert.deepEqual([...segmented.items.map((item) => item.key)], ['bing', 'google', 'ddg', 'baidu'])
+  assert.deepEqual([...segmented.items.map((item) => item.text)], ['Bing', 'Google', 'DDG', '百度'])
+
+  const pressed = segmented.items.filter((item) => item.pressed === 'true')
+  assert.equal(pressed.length, 1, `初始应只有一个引擎选中，实际 ${pressed.length} 个`)
+  assert.equal(pressed[0].key, 'bing', '初始选中的应为 bing')
+})
+
+testV3('快捷键对话框：#shortcuts-dialog 结构 + ≥8 个 <kbd> + 设置面板 #shortcuts-open', () => {
+  const clean = stripHtmlComments(html)
+  const dialog = findTagById(clean, 'shortcuts-dialog')
+  assert.ok(dialog, '缺少 #shortcuts-dialog')
+  assert.ok(hasClass(dialog, 'dialog'), '#shortcuts-dialog 应带 .dialog 类')
+  assert.equal((getAttr(dialog, 'role') || '').toLowerCase(), 'dialog', '#shortcuts-dialog 的 role 应为 dialog')
+  assert.equal(getAttr(dialog, 'aria-modal'), 'true', '#shortcuts-dialog 的 aria-modal 应为 true')
+  assert.ok(hasHiddenAttr(dialog), '#shortcuts-dialog 初始应带 hidden')
+
+  assert.ok(findTagById(clean, 'shortcuts-title'), '缺少 #shortcuts-title')
+  assert.ok(findTagById(clean, 'shortcuts-close'), '缺少 #shortcuts-close')
+  assert.ok(findTagWithClass(clean, 'shortcut-list'), '缺少 .shortcut-list')
+
+  const kbdCount = (clean.match(/<kbd\b/gi) || []).length
+  assert.ok(kbdCount >= 8, `.shortcut-list 至少应有 8 行快捷键，实际 <kbd> 数量 ${kbdCount}`)
+
+  assert.ok(findTagById(clean, 'shortcuts-open'), '设置面板缺少 #shortcuts-open（快捷键按钮）')
+})
+
+// ---------------------------------------------------------------- v2.6 单文件便携版 SimpleSearch.html
+
+function testSingle(name, fn) {
+  const reason = hasRepo('SimpleSearch.html') ? v3SkipReason : '等待 lead 重建产物：SimpleSearch.html 不存在'
+  test(name, reason ? { skip: reason } : {}, fn)
+}
+
+testSingle('v2.6 单文件便携版：build 生成 + CSS/JS 全内联 + 无 assets/manifest/apple-touch-icon 引用', () => {
+  const single = readRepo('SimpleSearch.html')
+  const clean = stripHtmlComments(single)
+
+  assert.ok(BUILD_MARKER.test(single), 'SimpleSearch.html 缺少「由 scripts/build.mjs 生成」注释')
+  assert.match(single, /单文件|便携/, 'SimpleSearch.html 文件头缺少单文件/便携版说明')
+  assert.ok(single.includes('__SS_SINGLE_FILE'), '缺少 __SS_SINGLE_FILE 标记（app.js 用它跳过 SW 注册）')
+
+  assert.ok(!/<script\b[^>]*\bsrc\s*=/i.test(clean), '单文件版不应有 <script src>')
+  const styleCount = (clean.match(/<style\b/gi) || []).length
+  assert.ok(styleCount >= 3, `应内联 ≥3 个 <style>，实际 ${styleCount}`)
+  const inlineScripts = [...clean.matchAll(/<script\b([^>]*)>/gi)].filter((match) => !/\bsrc\s*=/i.test(match[1])).length
+  assert.ok(inlineScripts >= 9, `应内联 ≥9 个 <script>，实际 ${inlineScripts}`)
+
+  assert.ok(!/<link\b[^>]*\brel\s*=\s*["'][^"']*\bmanifest\b/i.test(clean), '单文件版不应包含 <link rel="manifest">')
+  assert.ok(!/apple-touch-icon/i.test(clean), '单文件版不应包含 apple-touch-icon')
+
+  const iconLink = [...clean.matchAll(/<link\b[^>]*>/gi)]
+    .map((match) => match[0])
+    .find((tag) => /\brel\s*=\s*["'][^"']*\bicon\b/i.test(tag))
+  assert.ok(iconLink, '缺少 favicon <link rel="icon">')
+  assert.match(iconLink, /\bhref\s*=\s*["']data:/i, '单文件版的 favicon 必须是 data: URI')
+
+  assert.ok(!/(?:src|href)\s*=\s*["']assets\//i.test(clean), '单文件版不应引用 assets/ 文件')
+
+  for (const ref of extractResourceRefs(clean)) {
+    if (!ref.url || ref.url.startsWith('#') || ref.url.startsWith('data:')) continue
+    assert.fail(`单文件版资源 <${ref.tagName}> 未内联：${ref.url}`)
+  }
+})
+
+testSingle('v2.6 单文件体积 ≤ 200KB（未压缩，零外部请求）', () => {
+  const bytes = Buffer.byteLength(readRepo('SimpleSearch.html'), 'utf8')
+  assert.ok(bytes <= 200 * 1024, `SimpleSearch.html 体积 ${(bytes / 1024).toFixed(1)} KB，超过 200KB 上限`)
 })

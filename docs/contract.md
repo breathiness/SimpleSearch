@@ -296,7 +296,7 @@ npm run serve      # 本地静态服务器 http://127.0.0.1:8080
 6. 关闭联网联想（`ss.remote='off'`）时**零第三方网络请求**，全部核心功能离线可用。
 7. 开启联网联想时：请求只发往 provider 域（百度），700ms 超时/失败静默降级为本地联想，永不阻塞键盘。
 8. `file://` 直接打开可用（无 CORS 报错、无 module 加载失败；联网联想在 file:// 下也能工作）。
-9. 单文件页面 + 全部资源体积目标：< 128 KB（gzip 前；v2.5 实际约 120 KB，gzip 后约 38 KB）。内联图标 sprite 约 5.6 KB（gzip 0.97 KB）且零额外请求。**以 gzip 体积为真实成本口径**（GitHub Pages 默认 gzip）。
+9. 单文件页面 + 全部资源体积目标：< 136 KB（gzip 前；v2.6 实际约 132 KB，gzip 后约 39 KB）。内联图标 sprite 约 5.6 KB（gzip 0.97 KB）且零额外请求。**以 gzip 体积为真实成本口径**（GitHub Pages 默认 gzip）。
 
 ## 10. 沟通规则
 
@@ -381,7 +381,7 @@ SS.siteGroups = [
 - `scripts/build.mjs` 把用到的图标渲染成一个隐藏的 `<svg class="icon-sprite">` + `<symbol id="i-<siteId>">`，插在 `<body>` 开头；每个按钮里放 `<svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-<siteId>"></use></svg>`。
 - 没有配图标的站点（用户自加的站点）**不留空**：渲染 `<span class="button-icon button-icon-text" aria-hidden="true">首字符</span>` 做字母/汉字 monogram 兜底。
 - 图标风格：24×24 viewBox、`fill="none"` + `stroke="currentColor"` + 1.8 线宽 + 圆头，**通用几何符号而不是他人商标的精确复制**（避免商标问题）。
-- 体积红线：sprite 全部内联后 HTML 增量 ≤ 4 KB（未压缩），全站仍满足 §9.9 的 128 KB 预算（当前约 120 KB）；首屏不得因此新增任何网络请求。
+- 体积红线：sprite 全部内联后 HTML 增量 ≤ 4 KB（未压缩），全站仍满足 §9.9 的 136 KB 预算（当前约 130 KB）；首屏不得因此新增任何网络请求。
 
 ## 14. v2.3：改成 MDUI 文档站式骨架（用户要求）
 
@@ -479,7 +479,7 @@ SS.siteGroups = [
 
 - 每个 `.nav-item` 内含 `<svg class="nav-icon"><use href="#i-cat-<group>"></use></svg>` + `<span class="nav-label">…</span>`；`all` 用网格图标。
 - `UI_ICONS` 新增 `cat-all`（九宫格）、`cat-tech`（终端）、`cat-community`（对话气泡）、`cat-media`（播放电视）、`cat-shopping`（手提袋）、`cat-content`（相机）。
-- sprite 体积红线：≤ 8 KB（未压缩）；全站预算 ≤ 128 KB。
+- sprite 体积红线：≤ 8 KB（未压缩）；全站预算 ≤ 136 KB。
 
 ## 16. v2.5：深链、主题三态、历史管理、站点自检、版本号（批次 A 去掉 `?q=` 默认搜索引擎）
 
@@ -529,3 +529,79 @@ SS.siteGroups = [
 
 - 新增 `scripts/check-sites.mjs` + `npm run check:sites`：逐个站点请求 `home` 与 `search`（把 `{q}` 换成 `test`），8s 超时、`redirect: 'follow'`，输出表格：站点 id、home 状态、search 状态、最终 URL、判定（OK / 重定向到首页 / 非 2xx / 网络失败）。
 - 默认退出码 0（只报告）；`--strict` 时有 FAIL 退出 1。**不加入 `npm run check` 和 CI**（避免网络抖动误伤）。
+
+## 17. v2.6：批次 B（PWA 离线 + `!bang` + 搜索引擎切换 + 快捷键帮助 + 覆盖率）+ 单文件便携版
+
+### 17.1 PWA / 离线
+
+- 新增 `manifest.webmanifest`（静态，链接在模板 `<head>`）：`name`/`short_name`「简单搜索」、`start_url: "./index.html"`、`scope: "./"`、`display: "standalone"`、`background_color: "#f5f5f5"`、`theme_color: "#3f51b5"`、icons 指向 `assets/img/icon-192.png` / `icon-512.png`（构建前手工生成并提交，PNG）。
+- 新增 `templates/sw.js`，由 `scripts/build.mjs` 生成 `sw.js`：注入 `{{APP_VERSION}}` 与 `{{PRECACHE_LIST}}`（首页 + 全部 CSS/JS/图标/manifest）。
+  - `install`：`cache.addAll(PRECACHE_LIST)` + `skipWaiting()`
+  - `activate`：删除非当前版本的 cache + `clients.claim()`
+  - `fetch`：只处理**同源 GET**；navigation 请求 cache-first 回退 index.html；其他 cache-first → 网络 → 回填缓存；**跨域请求（百度联想）直接放行、不缓存**
+- `app.js` 注册：仅当 `location.protocol` 是 http/https 且浏览器支持 `serviceWorker` 时 `navigator.serviceWorker.register('sw.js')`，失败静默（`file://` 下不注册）。
+- 缓存版本必须与 `package.json` 版本绑定，发布后旧缓存自动清理。
+
+### 17.2 `!bang` 站内搜索
+
+- 语法：`!<token> <搜索词>`，token 匹配 `site.id` 或该站的 `keywords`（小写）；`!gh rust` → 在 GitHub 搜 rust；`!gh` 无词 → 打开 GitHub 首页；未知 token 视为普通查询。
+- `SS.search.resolveBang(raw)`（core-engine，纯函数）返回 `{ siteId, term, url, kind, token }` 或 `null`：
+  - `normalizeQuery` 后必须以 `!` 开头；token = `!` 之后到第一个空白之间的整段（**允许中文**，如 `!b站`），小写后按注册表顺序**先比 `site.id` 再比 `keywords`**，精确相等才算命中
+  - term = 剩余部分（保留用户大小写、折叠空白）；空 term → `kind: 'nav'` 指向 home；`url/kind` 复用 `resolveSite`
+  - **只认第一个 token**（`!nope !gh x` → null，不做后扫）
+  - `!`、`!!x`、`!` 后紧跟空白、未知 token、非字符串 → 一律 `null`，不抛错；另导出 `SS.search.BANG = '!'`
+- 联想列表：当输入是合法 bang 时，第一项固定为「在 <站点> 搜索：<词>」（`type: 'bang'`，sublabel `!<token>`），采用即跳转（不再记录历史）。
+- 表单提交路径（无高亮项直接回车）：`app.js` 的 submit 处理器先 `resolveBang`，命中则 `preventDefault` + 记历史 + 跳转；未命中走原生提交。
+
+### 17.3 搜索引擎切换
+
+- `SS.engines` 扩展为 4 个（core-engine）：`bing`（q）、`google`（q）、`ddg`（q）、`baidu`（wd），每个含 `{ id, label, search, param }`；`SS.defaultEngine` 仍为 `bing`。
+- 存储键 `ss.engine`（默认 `bing`，非法回退）。`app.js` 启动时：读存储 → 设 `SS.defaultEngine` → 同步表单 `action`（`search` 去掉查询串）与 `#search-input` 的 `name`（`engine.param`）。
+- 设置面板新增分段控件：
+```html
+<div class="settings-row">
+  <span class="settings-label">搜索引擎</span>
+  <div id="engine-mode" class="segmented" role="group" aria-label="搜索引擎">
+    <button class="segmented-item" type="button" data-engine="bing" aria-pressed="true">Bing</button>
+    <button class="segmented-item" type="button" data-engine="google" aria-pressed="false">Google</button>
+    <button class="segmented-item" type="button" data-engine="ddg" aria-pressed="false">DDG</button>
+    <button class="segmented-item" type="button" data-engine="baidu" aria-pressed="false">百度</button>
+  </div>
+</div>
+```
+- 切换后：表单 `action`/`name` 立即生效、`SS.defaultEngine` 更新、联想首项文案用当前引擎 label（如「用 Google 搜索：xxx」）、持久化 `ss.engine`。
+
+### 17.4 快捷键帮助对话框
+
+- 触发：按 `?`（Shift+/，且焦点不在输入框内）或点设置面板里的「快捷键」按钮（`#shortcuts-open`）。
+- DOM：
+```html
+<section id="shortcuts-dialog" class="dialog" role="dialog" aria-modal="true" aria-labelledby="shortcuts-title" hidden>
+  <div class="dialog-header"><h2 id="shortcuts-title" class="dialog-title">键盘快捷键</h2>
+    <button id="shortcuts-close" class="icon-button dialog-close" type="button" aria-label="关闭">✕</button></div>
+  <dl class="shortcut-list">
+    <div><dt><kbd>/</kbd></dt><dd>聚焦搜索框</dd></div>
+    <div><dt><kbd>↑</kbd><kbd>↓</kbd></dt><dd>在联想列表里移动</dd></div>
+    <div><dt><kbd>Enter</kbd></dt><dd>采用高亮项 / 提交搜索</dd></div>
+    <div><dt><kbd>Esc</kbd></dt><dd>关闭联想 / 抽屉 / 对话框</dd></div>
+    <div><dt><kbd>Tab</kbd></dt><dd>移出搜索框</dd></div>
+    <div><dt><kbd>Delete</kbd></dt><dd>删除高亮的历史项</dd></div>
+    <div><dt><kbd>?</kbd></dt><dd>打开本对话框</dd></div>
+    <div><dt><kbd>!</kbd></dt><dd>站点快捷搜索，如 !gh rust</dd></div>
+    <div><dt><kbd>Ctrl</kbd>/<kbd>⌘</kbd>+点击</dt><dd>新标签页打开站点</dd></div>
+  </dl>
+</section>
+```
+- 焦点：打开时聚焦关闭按钮；Esc/scrim/关闭按钮关闭并把焦点还给触发元素；Tab 循环（复用设置面板的 trap 思路）。
+- 与设置抽屉共用 `#scrim`，同一时刻只开一个。
+
+### 17.5 覆盖率
+
+- `package.json` 新增 `npm run coverage`：`node --test --experimental-test-coverage --test-coverage-lines=90 --test-coverage-branches=75 --test-coverage-functions=80 "tests/**/*.test.mjs"`（不引入依赖，不进 CI 必跑）。
+- 阈值以当前基线设定，低于阈值命令失败。
+
+### 17.6 验收门增补
+
+- `manifest.webmanifest` 存在且被 `<link rel="manifest">` 引用；`sw.js` 生成物带版本号与 precache 列表；`file://` 下不注册。
+- E2E 需覆盖：SW 注册 → 断网（CDP offline）后刷新仍可用；`!gh rust` 跳转 GitHub 搜索；切换搜索引擎后表单 action/name 与 `ss.engine` 正确；`?` 打开快捷键对话框且 Esc 关闭归还焦点。
+- 体积：新增 `sw.js`/manifest 不计入首页静态资源（首屏不加载 sw.js，仅后台注册），首页资源预算仍 136 KB。

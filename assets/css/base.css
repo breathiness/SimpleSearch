@@ -84,6 +84,8 @@ body.panel-open #settings-panel{transform:none}
 .segmented-item[aria-pressed='true']{background-color:var(--primary-bg);color:var(--on-primary)}
 @media (hover:hover){.segmented-item[aria-pressed='false']:hover{background-color:var(--overlay-hover)}}
 .segmented-item:focus-visible{outline:var(--focus-ring-width) solid var(--focus-ring);outline-offset:-2px}
+/* 搜索引擎 4 段：窄屏允许换行，避免 320px 面板横向溢出 */
+#engine-mode{flex-wrap:wrap;max-width:100%}
 
 /* 设置行：左标签 + 右侧值/按钮（搜索历史等） */
 .settings-row-inline{flex-direction:row;align-items:center;justify-content:space-between;min-height:48px}
@@ -105,6 +107,18 @@ body.panel-open #settings-panel{transform:none}
 
 /* ------------------------------------------------------------ 遮罩 */
 #scrim{position:fixed;inset:0;background-color:rgba(0,0,0,.5);z-index:var(--z-scrim)}
+
+/* ------------------------------------------------------------ MD1 快捷键对话框（与 #scrim 共用遮罩） */
+.dialog{position:fixed;left:50%;top:50%;z-index:var(--z-dialog);transform:translate(-50%,-50%);width:min(480px,90vw);max-height:80vh;overflow:auto;background-color:var(--surface);border-radius:var(--radius-sm);box-shadow:0 11px 15px -7px rgba(0,0,0,.2),0 24px 38px 3px rgba(0,0,0,.14),0 9px 46px 8px rgba(0,0,0,.12);overscroll-behavior:contain}
+.dialog-header{display:flex;align-items:center;justify-content:space-between;padding:16px 16px 8px 24px}
+.dialog-title{margin:0;font-size:20px;font-weight:var(--font-weight-medium);color:var(--text)}
+.dialog-close{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;padding:0;border:0;border-radius:var(--radius-full);background-color:transparent;color:var(--text-secondary);font-size:16px;line-height:1;cursor:pointer;transition:background-color var(--transition-fast) var(--ease)}
+@media (hover:hover){.dialog-close:hover{background-color:var(--overlay-hover)}}
+.shortcut-list{display:flex;flex-direction:column;gap:2px;margin:0;padding:8px 24px 24px}
+.shortcut-list > div{display:flex;align-items:center;gap:12px;min-height:36px}
+.shortcut-list dt{display:flex;flex:0 0 96px;flex-wrap:wrap;align-items:center;gap:4px;min-width:96px}
+.shortcut-list dd{margin:0;color:var(--text-secondary);font-size:14px}
+kbd{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:22px;padding:0 6px;border:1px solid var(--divider);border-radius:3px;background-color:var(--bg);color:var(--text);font-family:inherit;font-size:12px;font-weight:500;line-height:1}
 
 /* ------------------------------------------------------------ skip-link / 焦点 / 兜底 */
 .skip-link{position:fixed;top:var(--space-2);left:var(--space-2);z-index:var(--z-skip-link);padding:var(--space-2) var(--space-4);border-radius:var(--radius-sm);background-color:var(--primary-bg);color:var(--on-primary);font-size:var(--font-size-sm);font-weight:var(--font-weight-medium);text-decoration:none;box-shadow:var(--elevation-2);transform:translateY(calc(-100% - var(--space-4)));transition:transform var(--transition-base) var(--ease)}
@@ -130,6 +144,10 @@ body.nav-open .site-nav{transform:none}
 /* 窄屏：输入框与搜索按钮同一行，站点按钮触控 ≥44px */
 #search-form .search-field{flex:1 1 0}
 .button{min-height:var(--control-height-lg)}
+/* 窄屏：对话框与引擎分段压缩内边距 */
+.dialog{width:min(480px,92vw);max-height:78vh}
+.shortcut-list{padding:8px 16px 16px}
+#engine-mode .segmented-item{padding:0 10px}
 }
 
 /* reduced motion：关闭涟漪与过渡 */

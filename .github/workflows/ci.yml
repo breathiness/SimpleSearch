@@ -25,9 +25,11 @@ jobs:
       - name: 产物漂移检查
         # 必须在 npm run check 之前执行：check 里的 build 会重新写入产物，
         # 先 build 再 diff 才能发现「改了 sites.js / 模板却忘了提交生成页」的漂移。
+        # sw.js 也是 build 产物（含版本号 + precache 列表），必须一起检查；
+        # manifest.webmanifest / PWA 图标是手写静态文件，不参与 diff。
         run: |
           npm run build
-          git diff --exit-code -- index.html SimpleSearch-Light.html SimpleSearch-Dark.html
+          git diff --exit-code -- index.html SimpleSearch.html SimpleSearch-Light.html SimpleSearch-Dark.html sw.js
 
       - name: 构建、单元测试、静态校验
         run: npm run check
