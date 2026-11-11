@@ -552,6 +552,9 @@ async function run() {
         allShopping: visible.every((b) => b.dataset.group === 'shopping'),
         total: buttons.length,
         current: items.filter((i) => i.getAttribute('aria-current') === 'true').map((i) => i.getAttribute('data-group')),
+        // 真实渲染断言：hidden 必须真的 display:none（不能只信 DOM 属性）
+        renderedVisible: buttons.filter((b) => getComputedStyle(b).display !== 'none').length,
+        hiddenRendered: buttons.filter((b) => b.hidden && getComputedStyle(b).display !== 'none').length,
       }
     })()`)
     check(
@@ -560,6 +563,11 @@ async function run() {
       `${filtered.visible.join(',')}（共 ${filtered.total}）`
     )
     check('C: aria-current 同步', filtered.current.length === 1 && filtered.current[0] === 'shopping', filtered.current.join(','))
+    check(
+      'C: 分类筛选在渲染层真的生效（hidden 必须 display:none）',
+      filtered.hiddenRendered === 0 && filtered.renderedVisible === filtered.visible.length,
+      `渲染可见=${filtered.renderedVisible}，期望=${filtered.visible.length}，隐藏但仍在渲染=${filtered.hiddenRendered}`
+    )
 
     await page.evaluate(`document.querySelector('#group-chips [data-group="all"]').click()`)
     await sleep(200)
@@ -1313,6 +1321,22 @@ async function run() {
       JSON.stringify(singlePanel)
     )
     await page.evaluate("SimpleSearch.app.closeSettings()")
+
+    // 单文件版里的分类筛选同样要在渲染层生效（v2.6.1 修复的 [hidden] 特异性问题）
+    await page.evaluate(`document.querySelector('#group-chips [data-group="shopping"]').click()`)
+    await sleep(250)
+    const singleFilter = await page.evaluate(`(() => {
+      const buttons = [...document.querySelectorAll('#buttons-container [data-site]')]
+      return {
+        rendered: buttons.filter((b) => getComputedStyle(b).display !== 'none').length,
+        expected: buttons.filter((b) => b.dataset.group === 'shopping').length,
+      }
+    })()`)
+    check(
+      'N: 单文件里分类筛选在渲染层生效',
+      singleFilter.rendered === singleFilter.expected && singleFilter.expected > 0,
+      `渲染可见=${singleFilter.rendered}，期望=${singleFilter.expected}`
+    )
 
   } finally {
     cleanup()

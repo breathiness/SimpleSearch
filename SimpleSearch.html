@@ -122,7 +122,9 @@
 *,*::before,*::after{box-sizing:border-box}
 html{color-scheme:var(--color-scheme)}
 body{min-height:100vh;min-height:100dvh;margin:0;display:flex;flex-direction:column;background-color:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:var(--font-size-base);line-height:var(--line-height);transition:background-color var(--transition-base) var(--ease),color var(--transition-base) var(--ease)}
-[hidden]{display:none}
+/* [hidden] 必须能压过组件自带的 display（如 .button{display:inline-flex}）：
+   用 :root 提高特异性到 (0,1,1)，避免在禁用 !important 的前提下失效。 */
+:root [hidden]{display:none}
 
 /* 涟漪（MDUI 招牌反馈）：JS 只注入 span.ripple 并写内联尺寸/位置 */
 .ripple{position:absolute;border-radius:50%;transform:scale(0);animation:ripple var(--ripple-duration) linear;background:currentColor;opacity:.24;pointer-events:none}
@@ -693,7 +695,7 @@ body.nav-open .site-nav{transform:none}
         <span class="settings-label">键盘快捷键</span>
         <button id="shortcuts-open" class="text-button" type="button">查看</button>
       </div>
-      <p class="panel-version">简单搜索 v2.6.0</p>
+      <p class="panel-version">简单搜索 v2.6.1</p>
     </div>
   </aside>
 
