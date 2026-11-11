@@ -3,6 +3,23 @@
 本项目的对用户可见变化都记录在这里。
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)：主版本号在页面结构/使用方式有明显变化时递增。
 
+## 2.7.0（未发布）
+
+站点库扩充：从 11 个扩到 33 个，每个分类补齐 4–5 个站点。
+
+### 新增
+
+- 技术开发 +StackOverflow、MDN、Gitee、npm、掘金；社区问答 +豆瓣、微博、V2EX、Reddit；影音游戏 +YouTube、抖音、爱奇艺、腾讯视频、Twitch；购物 +天猫、拼多多、闲鱼、亚马逊；素材资讯 +Pexels、Pixabay、36氪、站酷。共 **33 个站点**，「全部」按注册表顺序展示（最早内置的 11 个在前），分类视图只显示该组。
+- 新站点的 `!bang` token 自动可用（`id` 与 `keywords`），例如 `!so rust`、`!youtube cats`；keyword 重复时按注册表顺序命中靠前站点（`!购物` → 淘宝、`!视频` → 哔哩哔哩）。
+- 图标三级策略：11 个新站点画了专属图标，另外 11 个用 `icon: 'cat-<group>'` 复用分类图标，最后兜底首字符 monogram；sprite 变为 32 个 symbol（22 站点 + 3 UI + 1 logo + 6 分类），红线 8 KB → **12 KB**。
+
+### 工程
+
+- `assets/js/sites.js` 追加 22 个站点（最早 11 个内置站点的顺序不变），字段含 `group` / `keywords` / 可选 `icon`。
+- build 的图标解析顺序：`SITE_ICONS[site.id]` → `site.icon` 指向的 symbol → 首字符 monogram。
+- 体积：多文件版单页 **146.4 KB 未压缩 / gzip 42.4 KB**（预算 136 → **156 KB**）；单文件版 **146.7 KB / gzip 36.5 KB**；sprite **8.23 KB / gzip 1.34 KB**（红线 12 KB）。
+- 测试基线：`npm test` **174 例**、`npm run validate` **26 项**、`npm run e2e` **153 项**全绿。
+
 ## 2.6.1（未发布）
 
 ### 修复

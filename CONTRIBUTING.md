@@ -122,9 +122,10 @@ SS.remote.provider = {
 - `scripts/build.mjs` 把用到的图标渲染成隐藏的 `<svg class="icon-sprite">` + `<symbol id="i-<name>">` 插到 `<body>` 开头：站点按钮输出 `<svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-<siteId>"></use></svg>`，顶栏/面板输出 `#i-menu` / `#i-settings` / `#i-close`；模板里对应 `{{ICON_SPRITE}}`、`{{GROUP_NAV}}` 两个占位符；
 - **它不属于运行时脚本**：不要把它加进 `templates/page.html` 的 `<script>` 列表（那 8 个才是运行时脚本）；
 - 风格：24×24 viewBox、`fill="none"`、`stroke="currentColor"`、线宽 1.8、圆头；画**通用几何符号**，不要精确复制他人商标（避免商标问题）；
-- 体积红线：sprite（21 个 symbol：11 站点 + 3 UI + 1 logo + 6 分类）让 HTML 的增量 ≤ 8 KB（未压缩），全站仍需 < 136 KB 预算；
+- **站点图标三级解析**：站点专属图标 `SITE_ICONS[site.id]` → `site.icon` 指向的 symbol（可写成 `cat-tech` 复用分类图标，必须存在于 `SITE_ICONS` / `UI_ICONS`）→ 首字符 monogram。所以不是每个站点都要画新图标。
+- 体积红线：sprite（32 个 symbol：22 站点 + 3 UI + 1 logo + 6 分类）让 HTML 的增量 ≤ **12 KB**（未压缩），全站仍需 < 156 KB 预算；
 - 禁止：外链 favicon 服务（如 `icons.duckduckgo.com`、Google favicon API）、外部图标库/CDN、用 emoji 冒充品牌图标——前两者会新增请求，后者跨平台不一致；
-- 新增图标：站点图标在 `SITE_ICONS` 里加一条（键 = 站点 `id`）→ `npm run build`；UI 图标同理加进 `UI_ICONS`；
+- 新增图标：站点专属图标在 `SITE_ICONS` 里加一条（键 = 站点 `id`）→ `npm run build`；UI 图标同理加进 `UI_ICONS`；
 - 分类导航的小图标按**固定 id** 取：`cat-<group.id>`（例如 `cat-tech`）。加新分类时 build 只用已存在的 `cat-<id>` 图标，没有对应图标就只显示文字，需要的话在 `UI_ICONS` 补一条。
 - 没配图标的站点由 build 自动渲染首字符 monogram（`<span class="button-icon button-icon-text" aria-hidden="true">首</span>`），不用手工补。
 
@@ -177,7 +178,7 @@ SS.remote.provider = {
 ## 站点健康自检（可选，不进 CI）
 
 - `scripts/check-sites.mjs` + `package.json` 的 `check:sites`：从 `SS.sites` 读站点，逐个请求 `home` 和把 `{q}` 换成 `test` 的 `search`，8s 超时、`redirect: 'follow'`，输出表格（站点 id / home 状态 / search 状态 / 最终 URL / 判定：OK / 重定向到首页 / 非 2xx / 网络失败）。
-- 判定分级：`OK`（2xx 正常）、`WARN`（网络失败 / 反爬 401/403/429 / 被重定向到首页 / 跨域跳转，需人工确认）、`FAIL`（404/410/5xx 真坏链）。实测当前 11 个站点是 OK 8 / WARN 3 / FAIL 0（WARN 来自 Unsplash 401、知乎 403 反爬、京东跨域跳转）。
+- 判定分级：`OK`（2xx 正常）、`WARN`（网络失败 / 反爬 401/403/429 / 被重定向到首页 / 跨域跳转，需人工确认）、`FAIL`（404/410/5xx 真坏链）。站点库有 33 个站点后 WARN 会更常见（Unsplash 401、知乎 403 反爬、京东跨域跳转等），可以用它逐个自查。
 - 默认退出码 0（只报告）；`npm run check:sites -- --strict` 时**只有 FAIL** 才退出 1（WARN 不阻断）。
 - **不加入 `npm run check`、不进 CI**（网络抖动会误伤）。站方改版或新增站点后可以手动跑它自查。
 
@@ -218,7 +219,7 @@ SS.remote.provider = {
 
 - 由 `scripts/build.mjs` 的 `renderSingleFile()` 从 `index.html` 生成：把 3 个 `<style>`、8 个经典脚本、防闪烁脚本全部内联，favicon 转成 data URI，并删掉 `<link rel="manifest">` 与 `apple-touch-icon`；HTML 里加 `window.__SS_SINGLE_FILE = true` 标记。
 - `app.js` 看到 `__SS_SINGLE_FILE` 就不再注册 Service Worker（SW 必须是独立文件），所以单文件版**没有 PWA 安装 / 离线缓存**；它零外部请求、双击即用，但改一个字整页都要重新下载。要 PWA 用 `index.html` 多文件版。
-- 版本口径：当前 **2.6.0**（停在 2.x，不跳 3.x）；`sw.js` 的缓存名与设置面板版本号都跟随 `package.json`。
+- 版本口径：当前 **2.7.0**（停在 2.x，不跳 3.x）；`sw.js` 的缓存名与设置面板版本号都跟随 `package.json`。
 - 改任何 CSS / JS / 模板后都要 `npm run build` 重新生成它；CI 的产物漂移检查包含 `SimpleSearch.html`，测试 / validate 也有「CSS/JS 全内联、无 `assets/`、无 manifest/apple-touch 引用」的断言。
 
 ## 新增或删除网站
@@ -233,12 +234,14 @@ SS.remote.provider = {
   search: 'https://example.com/search?q={q}',
   keywords: ['示例', 'demo'],
   group: 'tech',
+  icon: 'cat-tech',
 },
 ```
 
 - `id` 只能是小写字母/数字/连字符且全表唯一；`home`、`search` 必须是 `https://`；`search` 必须含 `{q}`。
 - `group` **必填**，取值见 `SS.siteGroups`（目前 `tech` / `community` / `media` / `shopping` / `content`）；新分类要先登记到 `SS.siteGroups`。
-- 图标可选：不配就自动 monogram；配图标只改 `scripts/icons.mjs`，不要引外部图标库或 CDN。
+- 图标可选：不配就自动 monogram；想复用分类图标写 `icon: 'cat-<group>'`；配专属图标只改 `scripts/icons.mjs`，不要引外部图标库或 CDN。
+- 新站点的 `id` / `keywords` 会自动成为 `!bang` token，不需要额外注册。
 - **不要自己编码关键词**（不要手写 `%20`），`{q}` 交给代码替换。
 - 新增站点不会影响 `npm test`；如果删掉了默认内置的站点，测试会失败并提示恢复（内置站点是契约的一部分）。
 - 改完记得把五个生成产物（`index.html`、`SimpleSearch.html`、两个重定向壳、`sw.js`）一起提交。
@@ -246,13 +249,13 @@ SS.remote.provider = {
 ## 测试与 CI
 
 - 单元测试用 Node 内置的 `node:test`，放在 `tests/`，文件名以 `.test.mjs` 结尾，`npm test` 用 `node --test "tests/**/*.test.mjs"` 的 glob 自动发现，不用额外登记。
-- `tests/sites.test.mjs` 要求默认内置的 11 个站点都存在、且相对顺序一致；**新增站点不会让测试变红**，删除内置站点才会失败并提示恢复。
+- `tests/sites.test.mjs` 要求默认内置的站点都存在、且相对顺序一致（站点库现为 33 个）；**新增站点不会让测试变红**，删除内置站点才会失败并提示恢复。
 - 提交/开 PR 前必须本地跑通 `npm run check`（构建 + 测试 + 静态校验/产物一致性）。
-- 当前测试基线：`npm test` **172 例**、`npm run validate` **25 项**、`npm run e2e` **149 项**全绿；覆盖率基线约 96.04% 行 / 80.3% 分支 / 87.17% 函数（阈值 90 / 75 / 80）。
+- 当前测试基线：`npm test` **174 例**、`npm run validate` **26 项**、`npm run e2e` **153 项**全绿；覆盖率基线约 96.04% 行 / 80.3% 分支 / 87.17% 函数（阈值 90 / 75 / 80）。
 - `npm run coverage` 可选、不进 CI 必跑；`npm run check:sites` 同样可选、需要网络。
 - `npm run e2e` 用本机 Edge/Chrome（CDP）跑真实浏览器检查：单页主题解析、主题三态与主题色切换与持久化、深链 `?cat=` / `?q=` / `?site=`、`!bang` 直达、搜索引擎切换（表单 action/name/存储）、快捷键对话框（`?` 打开、Esc 关闭归还焦点）、PWA 注册与断网刷新、两个旧链接的 0 秒跳转与地址栏清理、联网联想开关 / 超时降级 / 真实百度联调、分类导航筛选与左侧抽屉开合、设置面板、搜索历史计数 / 清空 / 单条删除、设置里的版本号、图标 sprite（无额外图片请求）、960px 断点与 390px 移动端布局、`file://` 打开。CI 不跑它（需要浏览器）。
 - GitHub Actions（`.github/workflows/ci.yml`）在 `push` 和 `pull_request` 时用 Node 22 跑 `npm run check`，并检查五个生成产物（`index.html`、`SimpleSearch.html`、两个重定向壳、`sw.js`）是否与 `sites.js` / 模板漂移。
-- `e2e` 只断言首屏请求数 ≤16 + 零第三方，**不校验体积**（Service Worker 接管后传输字节会记 0）；体积预算由 `validate` 按磁盘产物校验（136 KB）。
+- `e2e` 只断言首屏请求数 ≤16 + 零第三方，**不校验体积**（Service Worker 接管后传输字节会记 0）；体积预算由 `validate` 按磁盘产物校验（156 KB）。
 - 本项目零依赖，CI 里**不需要 `npm ci` / `npm install`**。
 - 只改文档或样式时也请跑一次 `npm run check`，确认没有把生成页改漂。
 
@@ -277,8 +280,8 @@ SS.remote.provider = {
 - [ ] 搜索引擎四选一可切换、`ss.engine` 持久化、表单 action/name 与联想首项文案同步
 - [ ] 快捷键对话框：`?` 打开、9 条快捷键、Esc / 关闭按钮 / 遮罩关闭并归还焦点
 - [ ] `npm run coverage` 通过阈值（90 / 75 / 80）
-- [ ] 单文件便携版 `SimpleSearch.html` 已随源码 build：CSS/JS 全内联、无 `assets/` / manifest / apple-touch-icon 引用、零外部请求（约 132.6 KB / gzip 34.2 KB）
-- [ ] 站点图标来自内联 sprite（没有新增图片请求）；没配图标的站点显示 monogram
+- [ ] 单文件便携版 `SimpleSearch.html` 已随源码 build：CSS/JS 全内联、无 `assets/` / manifest / apple-touch-icon 引用、零外部请求（约 146.7 KB / gzip 36.5 KB）
+- [ ] 站点图标来自内联 sprite（没有新增图片请求）；没配图标的站点显示 monogram；新增站点可用 `icon: 'cat-<group>'` 复用分类图标，sprite 增量 ≤12 KB
 - [ ] 直接双击 `index.html`（`file://`）无报错
 - [ ] `README.md` / `docs/custom-sites.md` / `docs/CHANGELOG.md` 等受影响的文档已同步
 - [ ] PR 描述里写清楚改动内容、验证方式和截图（如涉及视觉变化）

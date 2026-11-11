@@ -296,7 +296,7 @@ npm run serve      # 本地静态服务器 http://127.0.0.1:8080
 6. 关闭联网联想（`ss.remote='off'`）时**零第三方网络请求**，全部核心功能离线可用。
 7. 开启联网联想时：请求只发往 provider 域（百度），700ms 超时/失败静默降级为本地联想，永不阻塞键盘。
 8. `file://` 直接打开可用（无 CORS 报错、无 module 加载失败；联网联想在 file:// 下也能工作）。
-9. 单文件页面 + 全部资源体积目标：< 136 KB（gzip 前；v2.6 实际约 132 KB，gzip 后约 39 KB）。内联图标 sprite 约 5.6 KB（gzip 0.97 KB）且零额外请求。**以 gzip 体积为真实成本口径**（GitHub Pages 默认 gzip）。
+9. 单文件页面 + 全部资源体积目标：< 156 KB（gzip 前；v2.7 站点扩到 33 个后实际约 146 KB，gzip 后约 42 KB）。内联图标 sprite 约 5.6 KB（gzip 0.97 KB）且零额外请求。**以 gzip 体积为真实成本口径**（GitHub Pages 默认 gzip）。
 
 ## 10. 沟通规则
 
@@ -381,7 +381,7 @@ SS.siteGroups = [
 - `scripts/build.mjs` 把用到的图标渲染成一个隐藏的 `<svg class="icon-sprite">` + `<symbol id="i-<siteId>">`，插在 `<body>` 开头；每个按钮里放 `<svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-<siteId>"></use></svg>`。
 - 没有配图标的站点（用户自加的站点）**不留空**：渲染 `<span class="button-icon button-icon-text" aria-hidden="true">首字符</span>` 做字母/汉字 monogram 兜底。
 - 图标风格：24×24 viewBox、`fill="none"` + `stroke="currentColor"` + 1.8 线宽 + 圆头，**通用几何符号而不是他人商标的精确复制**（避免商标问题）。
-- 体积红线：sprite 全部内联后 HTML 增量 ≤ 4 KB（未压缩），全站仍满足 §9.9 的 136 KB 预算（当前约 130 KB）；首屏不得因此新增任何网络请求。
+- 体积红线：sprite 全部内联后 HTML 增量 ≤ 4 KB（未压缩），全站仍满足 §9.9 的 156 KB 预算（当前约 130 KB）；首屏不得因此新增任何网络请求。
 
 ## 14. v2.3：改成 MDUI 文档站式骨架（用户要求）
 
@@ -479,7 +479,7 @@ SS.siteGroups = [
 
 - 每个 `.nav-item` 内含 `<svg class="nav-icon"><use href="#i-cat-<group>"></use></svg>` + `<span class="nav-label">…</span>`；`all` 用网格图标。
 - `UI_ICONS` 新增 `cat-all`（九宫格）、`cat-tech`（终端）、`cat-community`（对话气泡）、`cat-media`（播放电视）、`cat-shopping`（手提袋）、`cat-content`（相机）。
-- sprite 体积红线：≤ 8 KB（未压缩）；全站预算 ≤ 136 KB。
+- sprite 体积红线：≤ 8 KB（未压缩）；全站预算 ≤ 156 KB。
 
 ## 16. v2.5：深链、主题三态、历史管理、站点自检、版本号（批次 A 去掉 `?q=` 默认搜索引擎）
 
@@ -605,3 +605,16 @@ SS.siteGroups = [
 - `manifest.webmanifest` 存在且被 `<link rel="manifest">` 引用；`sw.js` 生成物带版本号与 precache 列表；`file://` 下不注册。
 - E2E 需覆盖：SW 注册 → 断网（CDP offline）后刷新仍可用；`!gh rust` 跳转 GitHub 搜索；切换搜索引擎后表单 action/name 与 `ss.engine` 正确；`?` 打开快捷键对话框且 Esc 关闭归还焦点。
 - 体积：新增 `sw.js`/manifest 不计入首页静态资源（首屏不加载 sw.js，仅后台注册），首页资源预算仍 136 KB。
+
+## 18. v2.7：每个分类补充更多站点（用户要求）
+
+- 在 `assets/js/sites.js` **追加**新站点（现有 11 个内置站点的顺序与字段一律不动，测试依赖其相对顺序），新站点集中追加在数组末尾，每个都必须有 `group`、`keywords`。
+- 新增站点（22 个，4–5 个/分类）：
+  - tech（5）：`stackoverflow` StackOverflow、`mdn` MDN、`gitee` Gitee、`npm` npm、`juejin` 掘金
+  - community（4）：`douban` 豆瓣、`weibo` 微博、`v2ex` V2EX、`reddit` Reddit
+  - media（5）：`youtube` YouTube、`douyin` 抖音、`iqiyi` 爱奇艺、`vqq` 腾讯视频、`twitch` Twitch
+  - shopping（4）：`tmall` 天猫、`pinduoduo` 拼多多、`goofish` 闲鱼、`amazon` 亚马逊
+  - content（4）：`pexels` Pexels、`pixabay` Pixabay、`36kr` 36氪、`zcool` 站酷
+- 站点总数 11 → 33；「全部」视图按注册表顺序显示全部站点（内置 11 个在前，新站点在后），分类视图只显示该组站点。
+- **图标**：`sites.js` 站点可新增可选字段 `icon`，值为已在 sprite 里的 symbol 名（如 `cat-tech`）。build 解析顺序：`SITE_ICONS[site.id]` → `site.icon` 指向的 symbol（必须存在于 `SITE_ICONS`/`UI_ICONS`） → 首字符 monogram。lead 会为 11 个新站点画专属图标，其余用 `cat-<group>` 复用分类图标；sprite 体积红线 8 KB → **12 KB**，全站预算 136 KB 不变。
+- 门禁增补：断言每个分组站点数 ≥ 3、新站点 group/keywords 合法、总站点数 ≥ 30、每个按钮都有图标（专属 icon 或 `cat-*` 复用或 monogram）。

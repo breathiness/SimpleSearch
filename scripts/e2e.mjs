@@ -734,7 +734,31 @@ async function run() {
       iconInfo.withIcon === iconInfo.buttons && iconInfo.uses === iconInfo.buttons,
       `${iconInfo.withIcon}/${iconInfo.buttons}`
     )
-    check('C: 图标 sprite 覆盖全部站点', iconInfo.symbols >= iconInfo.buttons && iconInfo.unresolved.length === 0, `${iconInfo.symbols} symbols`)
+    // 图标可以复用分类图标（site.icon = 'cat-*'），所以 symbol 数不一定 ≥ 按钮数；
+    // 关键是：每个按钮都有图标、所有 <use> 都能命中 sprite。
+    check(
+      'C: 图标 sprite 无悬空引用',
+      iconInfo.symbols >= 21 && iconInfo.unresolved.length === 0,
+      `${iconInfo.symbols} symbols / ${iconInfo.buttons} 按钮`
+    )
+
+    // ---- v2.7：站点库扩充到 30+，每个分类至少 3 站 ----
+    const siteStats = await page.evaluate(`(() => {
+      const buttons = [...document.querySelectorAll('#buttons-container [data-site]')]
+      const byGroup = {}
+      for (const b of buttons) {
+        const g = b.getAttribute('data-group') || ''
+        byGroup[g] = (byGroup[g] || 0) + 1
+      }
+      return { total: buttons.length, byGroup }
+    })()`)
+    check('C: 站点总数 ≥ 30', siteStats.total >= 30, String(siteStats.total))
+    const thinGroups = Object.entries(siteStats.byGroup).filter(([, count]) => count < 3)
+    check(
+      'C: 每个分类至少 3 个站点',
+      thinGroups.length === 0,
+      thinGroups.length ? thinGroups.map(([g, n]) => `${g}=${n}`).join(',') : JSON.stringify(siteStats.byGroup)
+    )
     // PWA 图标（apple-touch-icon / manifest 图标）允许被浏览器抓取，站点按钮图标仍必须内联
     const imageRequests = page.state.requests.filter((u) => /\.(png|jpe?g|webp|gif|ico)(\?|$)/i.test(u))
     const unexpectedImages = imageRequests.filter((u) => !/\/assets\/img\/(icon-192|icon-512)\.png$/.test(u))
@@ -1028,7 +1052,7 @@ async function run() {
     check(
       'H: 脚本与数据可用',
       await page.evaluate(
-        "(window.SimpleSearch && Array.isArray(SimpleSearch.sites) && SimpleSearch.sites.length === 11) && SimpleSearch.search.resolveSite('jd','x').url === 'https://search.jd.com/Search?keyword=x'"
+        "(window.SimpleSearch && Array.isArray(SimpleSearch.sites) && SimpleSearch.sites.length >= 11) && SimpleSearch.search.resolveSite('jd','x').url === 'https://search.jd.com/Search?keyword=x'"
       )
     )
     check(

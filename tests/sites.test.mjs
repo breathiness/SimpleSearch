@@ -38,13 +38,58 @@ const EXPECTED_GROUP_LABELS = {
   content: '素材资讯',
 }
 
-testIt('SS.sites 是数组且至少包含全部内置站点', () => {
+// v2.7 §18：在内置 11 站之后按此顺序追加 22 站（总计 33）
+const EXPECTED_NEW_IDS = [
+  // tech
+  'stackoverflow',
+  'mdn',
+  'gitee',
+  'npm',
+  'juejin',
+  // community
+  'douban',
+  'weibo',
+  'v2ex',
+  'reddit',
+  // media
+  'youtube',
+  'douyin',
+  'iqiyi',
+  'vqq',
+  'twitch',
+  // shopping
+  'tmall',
+  'pinduoduo',
+  'goofish',
+  'amazon',
+  // content
+  'pexels',
+  'pixabay',
+  '36kr',
+  'zcool',
+]
+
+testIt('SS.sites 是数组且站点总数 ≥ 30（v2.7 扩充到 33）', () => {
   assert.ok(Array.isArray(SS.sites), 'SS.sites 必须是数组')
   assert.ok(
-    SS.sites.length >= BUILTIN_IDS.length,
-    `站点数量至少应有 ${BUILTIN_IDS.length} 个（内置站点），实际 ${SS.sites.length} 个。` +
-      `内置站点被删除：${BUILTIN_IDS.filter((id) => !SS.sites.some((site) => site.id === id)).join(', ')}，` +
-      '请从 assets/js/sites.js 恢复，或同步更新 tests/sites.test.mjs 的 BUILTIN_IDS',
+    SS.sites.length >= 30,
+    `站点总数应 ≥30（v2.7 目标 33），实际 ${SS.sites.length}；` +
+      `内置站点被删除：${BUILTIN_IDS.filter((id) => !SS.sites.some((site) => site.id === id)).join(', ') || '（无）'}`,
+  )
+})
+
+testIt('内置 11 站仍排在最前，v2.7 新增 22 站按契约 §18 顺序追加在后', () => {
+  const ids = SS.sites.map((site) => site.id)
+  assert.deepEqual(
+    [...ids.slice(0, BUILTIN_IDS.length)],
+    BUILTIN_IDS,
+    '前 11 个必须仍是内置站点且相对顺序不变',
+  )
+  const appended = ids.slice(BUILTIN_IDS.length)
+  assert.deepEqual(
+    [...appended],
+    EXPECTED_NEW_IDS,
+    `新增站点应按契约 §18 顺序追加；期望 ${EXPECTED_NEW_IDS.length} 个，实际 ${appended.length} 个：${appended.join(', ')}`,
   )
 })
 
@@ -109,14 +154,14 @@ testIt('每个站点 group 必填，且必须是 siteGroups 中的 id', () => {
   }
 })
 
-testIt('5 个分组每个至少有一个站点', () => {
+testIt('5 个分组每个至少有 3 个站点（v2.7 §18）', () => {
   assert.ok(Array.isArray(SS.siteGroups), '缺少 SS.siteGroups')
   const counts = new Map(SS.siteGroups.map((group) => [group.id, 0]))
   for (const site of SS.sites) {
     if (counts.has(site.group)) counts.set(site.group, counts.get(site.group) + 1)
   }
-  const empty = [...counts.entries()].filter(([, count]) => count === 0).map(([id]) => id)
-  assert.deepEqual(empty, [], `以下分组没有任何站点：${empty.join(', ')}`)
+  const tooFew = [...counts.entries()].filter(([, count]) => count < 3).map(([id, count]) => `${id}(${count})`)
+  assert.deepEqual(tooFew, [], `以下分组的站点数 <3：${tooFew.join(', ')}`)
 })
 
 testIt('内置站点的分组与契约 §13.1 示例一致', () => {
@@ -183,14 +228,22 @@ testIt('Unsplash 搜索地址使用修正后的 /s/photos/{q}', () => {
   assert.equal(unsplash.search, 'https://unsplash.com/s/photos/{q}')
 })
 
-testIt('keywords 若存在必须是字符串数组（允许空数组）', () => {
+testIt('每个站点 keywords 必须是非空字符串数组（v2.7 §18 新站必填）', () => {
   for (const site of SS.sites) {
-    if (!Object.hasOwn(site, 'keywords')) continue
-    assert.ok(Array.isArray(site.keywords), `${site.id} 的 keywords 必须是数组`)
+    assert.ok(Array.isArray(site.keywords), `站点 ${site.id} 缺少 keywords 数组（v2.7 必填）`)
+    assert.ok(site.keywords.length > 0, `站点 ${site.id} 的 keywords 不能为空`)
     for (const keyword of site.keywords) {
       assert.equal(typeof keyword, 'string', `${site.id} 的 keyword 必须是字符串：${JSON.stringify(keyword)}`)
       assert.ok(keyword.trim().length > 0, `${site.id} 存在空 keyword`)
     }
+  }
+})
+
+testIt('可选字段 icon：若存在必须是非空合法 symbol 名', () => {
+  for (const site of SS.sites) {
+    if (!Object.hasOwn(site, 'icon')) continue
+    assert.equal(typeof site.icon, 'string', `站点 ${site.id} 的 icon 必须是字符串`)
+    assert.match(site.icon, /^[a-z][a-z0-9-]*$/, `站点 ${site.id} 的 icon 非法：${JSON.stringify(site.icon)}`)
   }
 })
 

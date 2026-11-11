@@ -43,11 +43,14 @@ SS.siteGroups = [
 | `search` | `string` | 是 | 站内搜索地址模板，**必须**以 `https://` 开头且**必须**包含 `{q}` 占位符；不满足时 `npm run build` 会报错退出。 |
 | `keywords` | `string[]` | 否 | 用于本地关键词联想的别名/关键词（如 `['gh', 'git', '代码', '开源']`），可为空数组。构建时会被写进按钮的 `data-keywords` 属性；只影响联想排序，不影响跳转。 |
 | `group` | `string` | 是 | 所属分类，取值必须是 `SS.siteGroups` 里某个 `id`（当前为 `tech` / `community` / `media` / `shopping` / `content`）。决定它出现在左侧分类导航的哪个分类下。 |
+| `icon` | `string` | 否 | 可选图标：复用分类图标写 `cat-<group>`（如 `cat-tech`），或写 sprite 里已有的 symbol 名；不写则显示首字母 monogram。 |
 
 其他规则：
 
 - **数组顺序 = 按钮渲染顺序**；`SS.siteGroups` 的顺序 = 左侧分类导航条目的顺序。
 - 站点缺 `group` 或 `group` 不在 `SS.siteGroups` 里时，`npm run build` 会失败；某个分组暂时没有站点时只会警告（建议别留空分组）。
+- 新站点的 `id` / `keywords` 会自动成为 `!bang` token，不需要额外注册。
+- 图标解析顺序：站点专属图标 `SITE_ICONS[site.id]` → `icon` 指向的 symbol（如 `cat-tech`）→ 首字母 monogram。
 - 缩进用 2 个空格、字符串用单引号、对象末尾保留逗号，和文件里现有条目保持一致。
 - `id` 一旦发布就尽量别改名，改名等于换了一个站点（测试与用户书签都可能引用它）。
 
@@ -96,10 +99,11 @@ SS.siteGroups = [
 
 ## 7. 图标（可选）
 
-图标是加分项，不是必填：
+图标是加分项，不是必填。构建时的解析顺序是：**站点专属图标 → `icon` 指向的 symbol → 首字符 monogram**。
 
 - 不配图标的站点会**自动退化为首字符 monogram**（例如 `示例站点` 显示「示」），由构建生成，零额外成本。
-- 想配图标：在 `scripts/icons.mjs` 的 `SITE_ICONS` 里加一条，键就是站点 `id`：
+- **复用分类图标**：在站点对象里写 `icon: 'cat-tech'`（或 `cat-community` / `cat-media` / `cat-shopping` / `cat-content`），就不用单独画图标。
+- 想配专属图标：在 `scripts/icons.mjs` 的 `SITE_ICONS` 里加一条，键就是站点 `id`：
 
   ```js
   export const SITE_ICONS = {
@@ -113,7 +117,7 @@ SS.siteGroups = [
 
 - 图标会被 `npm run build` **内联进 `index.html` 的 SVG sprite**（`<symbol id="i-example">` + `<use>`），不新增任何图片请求，也不会生成独立图片文件。
 - 画图标守则：24×24 viewBox、`fill="none"`、`stroke="currentColor"`、线宽 1.8、圆头；颜色跟随主题文字色，所以不需要为深浅色各画一套。
-- 请画**通用几何符号**，不要精确复制他人商标；整个 sprite 的 HTML 增量要控制在 8 KB 内（未压缩）。
+- 请画**通用几何符号**，不要精确复制他人商标；整个 sprite 的 HTML 增量要控制在 **12 KB** 内（未压缩）。
 - 不要用外链 favicon 服务、外部图标库/CDN 或 emoji 来替代——前者会新增请求，后者跨平台风格不统一。
 
 ## 8. 新增 / 删除网站
@@ -129,7 +133,7 @@ SS.siteGroups = [
 
 删除：把对应对象从数组里删掉，再 `npm run build`。
 
-> **内置站点与测试**：`tests/sites.test.mjs` 要求内置的 11 个站点都在、且它们之间的相对顺序与契约一致（防止再出现不同页面/主题之间的漂移），但**允许你随意追加新站点**。所以只加站点的话 `npm test` 不会红；只有删掉内置站点时它才会失败并提示恢复。`npm run validate` 里的「站点渲染与注册表一致」始终按实际注册表比对，也不受追加影响。
+> **内置站点与测试**：`tests/sites.test.mjs` 要求内置站点都在、且它们之间的相对顺序与契约一致（防止再出现不同页面/主题之间的漂移；最早内置的 11 个老站点顺序固定，站点库现为 33 个），但**允许你随意追加新站点**。所以只加站点的话 `npm test` 不会红；只有删掉内置站点时它才会失败并提示恢复。`npm run validate` 里的「站点渲染与注册表一致」始终按实际注册表比对，也不受追加影响。
 
 ```js
 // 新增一个示例（顺序即按钮顺序）：
@@ -140,6 +144,7 @@ SS.siteGroups = [
   search: 'https://example.com/search?q={q}',
   keywords: ['示例', 'demo'],
   group: 'tech',
+  icon: 'cat-tech',
 },
 ```
 

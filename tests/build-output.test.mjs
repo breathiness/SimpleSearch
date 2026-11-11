@@ -1,11 +1,12 @@
-// v2.6 产物静态校验：PWA / 搜索引擎分段 / 快捷键对话框 + v2.5 骨架（契约 §13-§17）。
+// v2.7 产物静态校验：PWA / 搜索引擎分段 / 快捷键对话框 / 33 站点图标（契约 §13-§18）。
 //
 // 直接对生成的 index.html / tokens.css / manifest.webmanifest / sw.js 做静态解析（不跑浏览器）：
 //   - PWA：<link rel="manifest"> + manifest JSON（name/start_url/scope/display/icons）+ 192/512 图标文件存在
 //   - service worker：sw.js 生成物含版本号与 precache（首页 + 全部 CSS/JS/图标/manifest），经典脚本无 import/export
 //   - 搜索引擎：#engine-mode 4 个 .segmented-item[data-engine]，初始只有 bing 选中
 //   - 快捷键对话框：#shortcuts-dialog 结构 + ≥8 行 <kbd> + 设置面板 #shortcuts-open
-//   - 骨架/主题三态/历史行/版本号/分类导航/图标 sprite/零图片请求（v2.3-v2.5 断言保留）
+//   - 图标 sprite：站点/UI/分类/共享图标动态数量（v2.7 站点 33，symbol 总数 ≥21），体积 ≤ 12KB
+//   - 骨架/主题三态/历史行/版本号/分类导航/零图片请求（v2.3-v2.6 断言保留）
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import vm from 'node:vm'
@@ -350,7 +351,7 @@ function rootBlock(css) {
 
 // ---------------------------------------------------------------- sprite
 
-testOutput('index.html 含隐藏的内联 <svg class="icon-sprite">，体积 ≤ 8KB', () => {
+testOutput('index.html 含隐藏的内联 <svg class="icon-sprite">，体积 ≤ 12KB（v2.7 §18）', () => {
   const sprite = extractSprite(stripHtmlComments(html))
   assert.ok(sprite, 'index.html 缺少 <svg class="icon-sprite">（图标必须内联）')
   assert.ok(
@@ -360,37 +361,53 @@ testOutput('index.html 含隐藏的内联 <svg class="icon-sprite">，体积 ≤
     `icon-sprite 必须是隐藏的（hidden / aria-hidden / display:none）：${sprite.openTag}`,
   )
   const bytes = Buffer.byteLength(sprite.outer, 'utf8')
-  assert.ok(bytes <= 8192, `sprite 体积 ${bytes} 字节，超过 8KB 红线（未压缩）`)
+  assert.ok(bytes <= 12288, `sprite 体积 ${bytes} 字节，超过 12KB 红线（未压缩，契约 §18）`)
 })
 
-testOutput('sprite = 21 个 symbol（11 站点 + 3 UI + 1 logo + 6 分类）；所有 use 目标都能命中', () => {
+testOutput('sprite：内置 11 站 + UI 图标齐全，symbol 总数 ≥ 21 且所有 use 目标命中', () => {
   const clean = stripHtmlComments(html)
   const sprite = extractSprite(clean)
   assert.ok(sprite, '缺少 icon-sprite')
   const symbols = extractSymbols(sprite.inner)
   const ids = symbols.map((symbol) => symbol.id)
+  const idSet = new Set(ids)
 
   assert.ok(!ids.includes(null), `symbol 缺少 id：${JSON.stringify(ids)}`)
-  assert.equal(new Set(ids).size, ids.length, `symbol id 重复：${JSON.stringify(ids)}`)
+  assert.equal(idSet.size, ids.length, `symbol id 重复：${JSON.stringify(ids)}`)
+  for (const id of ids) assert.match(String(id), /^i-[a-z0-9-]+$/, `symbol id 不合法：${id}`)
 
   const siteIds = new Set(SS.sites.map((site) => site.id))
+  const useTargets = extractUseTargets(clean)
+  const useTargetSet = new Set(useTargets)
+  assert.ok(useTargets.length > 0, '页面里没有任何 <use> 图标引用')
+
+  // 内置 11 站专属图标 + 约定的 UI 图标必须存在
   for (const builtinId of BUILTIN_IDS) {
-    assert.ok(ids.includes(`i-${builtinId}`), `sprite 缺少内置站点图标 #i-${builtinId}`)
+    assert.ok(idSet.has(`i-${builtinId}`), `sprite 缺少内置站点图标 #i-${builtinId}`)
   }
   for (const uiId of UI_SYMBOL_IDS) {
-    assert.ok(ids.includes(uiId), `sprite 缺少 UI 图标 #${uiId}`)
+    assert.ok(idSet.has(uiId), `sprite 缺少 UI 图标 #${uiId}`)
   }
 
-  const siteSymbols = ids.filter((id) => id !== null && siteIds.has(String(id).slice(2)))
-  assert.equal(siteSymbols.length, BUILTIN_IDS.length, `站点 symbol 应为 ${BUILTIN_IDS.length} 个，实际 ${siteSymbols.length}`)
-  const expectedTotal = BUILTIN_IDS.length + UI_SYMBOL_IDS.length
-  assert.equal(ids.length, expectedTotal, `symbol 总数应为 ${expectedTotal}（11 站点 + 3 UI + 1 logo + 6 分类），实际 ${ids.length}`)
+  // v2.7：总数会随 33 个站点/专属图标增加，只断言下界
+  const minTotal = BUILTIN_IDS.length + UI_SYMBOL_IDS.length
+  assert.ok(idSet.size >= minTotal, `symbol 总数应 ≥ ${minTotal}，实际 ${idSet.size}`)
+  const siteSymbols = ids.filter((id) => siteIds.has(String(id).slice(2)))
+  assert.ok(
+    siteSymbols.length >= BUILTIN_IDS.length,
+    `站点 symbol 应 ≥ ${BUILTIN_IDS.length} 个，实际 ${siteSymbols.length}`,
+  )
 
-  // 不允许孤儿 symbol
-  const allowedUi = new Set(UI_SYMBOL_IDS)
+  // 所有 <use> 目标都能在 sprite 命中
+  for (const target of useTargets) {
+    assert.ok(idSet.has(target), `use 目标 #${target} 不在 sprite 中`)
+  }
+
+  // 不允许孤儿 symbol：允许 UI 图标 / 站点图标 / 页面实际引用到的共享图标（如 cat-*）
   for (const id of ids) {
-    if (allowedUi.has(id)) continue
-    assert.ok(siteIds.has(String(id).slice(2)), `symbol ${id} 既不是站点图标也不是约定的 UI 图标`)
+    if (UI_SYMBOL_IDS.includes(id)) continue
+    if (siteIds.has(String(id).slice(2))) continue
+    assert.ok(useTargetSet.has(id), `symbol ${id} 既不是站点/UI 图标，也没有被页面 <use> 引用`)
   }
 
   for (const symbol of symbols) {
@@ -398,13 +415,6 @@ testOutput('sprite = 21 个 symbol（11 站点 + 3 UI + 1 logo + 6 分类）；�
       /<(path|rect|circle|line|polyline|polygon|ellipse)\b/i.test(symbol.body || ''),
       `symbol ${symbol.id} 里没有几何图形`,
     )
-  }
-
-  const symbolSet = new Set(ids)
-  const useTargets = extractUseTargets(clean)
-  assert.ok(useTargets.length > 0, '页面里没有任何 <use> 图标引用')
-  for (const target of useTargets) {
-    assert.ok(symbolSet.has(target), `use 目标 #${target} 不在 sprite 中`)
   }
 })
 
@@ -478,7 +488,7 @@ testOutput('顶栏与面板图标引用正确：#nav-toggle→i-menu、#settings
   }
 })
 
-testOutput('每个 data-site 按钮都有 .button-icon；内置站点为 <use> 且目标存在', () => {
+testOutput('「全部」视图：33 个 data-site 按钮齐全、data-group 与注册表一致，每个都有 .button-icon', () => {
   const clean = stripHtmlComments(html)
   const sprite = extractSprite(clean)
   assert.ok(sprite, '缺少 icon-sprite')
@@ -486,23 +496,39 @@ testOutput('每个 data-site 按钮都有 .button-icon；内置站点为 <use> �
   const builtinSet = new Set(BUILTIN_IDS)
 
   const buttons = extractSiteButtons(clean)
-  assert.equal(buttons.length, SS.sites.length, 'data-site 按钮数应等于注册表站点数')
+  assert.equal(buttons.length, SS.sites.length, `data-site 按钮数应等于注册表站点数（${SS.sites.length}）`)
 
-  for (const button of buttons) {
+  const buttonIds = buttons.map((button) => button.id)
+  assert.equal(new Set(buttonIds).size, buttonIds.length, `data-site 按钮重复：${JSON.stringify(buttonIds)}`)
+  const byId = new Map(buttons.map((button) => [button.id, button]))
+  for (const site of SS.sites) {
+    assert.ok(buttonIds.includes(site.id), `「全部」视图缺少站点按钮 data-site="${site.id}"`)
+    const button = byId.get(site.id)
+    assert.equal(button.group, site.group, `站点 ${site.id} 的 data-group 应与注册表一致`)
+
     const icon = inspectButtonIcon(button.inner)
-    assert.ok(icon.hasIconClass, `站点 ${button.id} 的按钮缺少 .button-icon`)
+    assert.ok(icon.hasIconClass, `站点 ${site.id} 的按钮缺少 .button-icon`)
 
-    if (builtinSet.has(button.id)) {
-      assert.ok(icon.useTarget, `内置站点 ${button.id} 应使用 <svg class="button-icon"><use href="#i-${button.id}">`)
-      assert.equal(icon.useTarget, `i-${button.id}`, `站点 ${button.id} 的 use 目标应为 #i-${button.id}`)
+    if (builtinSet.has(site.id)) {
+      assert.ok(icon.useTarget, `内置站点 ${site.id} 应使用 <svg class="button-icon"><use href="#i-${site.id}">`)
+      assert.equal(icon.useTarget, `i-${site.id}`, `内置站点 ${site.id} 的 use 目标应为 #i-${site.id}`)
       assert.ok(symbolIds.has(icon.useTarget), `use 目标 #${icon.useTarget} 不在 sprite 中`)
-    } else {
-      assert.ok(
-        icon.useTarget || (icon.monogram && icon.monogram.length > 0),
-        `自加站点 ${button.id} 既没有 svg 图标也没有 monogram 兜底`,
-      )
-      if (icon.useTarget) assert.ok(symbolIds.has(icon.useTarget), `use 目标 #${icon.useTarget} 不在 sprite 中`)
+      continue
     }
+
+    // v2.7 §18：新增站点可用专属图标（i-<id>）、复用 icon 字段指向的 symbol，或 monogram 兜底
+    if (site.icon) {
+      assert.ok(icon.useTarget, `站点 ${site.id} 声明了 icon="${site.icon}"，应由 <use> 引用`)
+      assert.ok(
+        icon.useTarget === `i-${site.id}` || icon.useTarget === `i-${site.icon}`,
+        `站点 ${site.id} 的 use 目标应为 #i-${site.id} 或 #i-${site.icon}，实际 #${icon.useTarget}`,
+      )
+    }
+    assert.ok(
+      icon.useTarget || (icon.monogram && icon.monogram.length > 0),
+      `站点 ${site.id} 既没有 svg 图标也没有 monogram 兜底`,
+    )
+    if (icon.useTarget) assert.ok(symbolIds.has(icon.useTarget), `use 目标 #${icon.useTarget} 不在 sprite 中`)
   }
 })
 

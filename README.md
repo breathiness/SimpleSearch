@@ -44,14 +44,14 @@ Chrome / Edge 打开首页后，地址栏右侧可以「安装」简单搜索，
 
 仓库根目录的 `SimpleSearch.html` 是**单文件便携版**：CSS、JS、图标全部内联，双击就能用，也可以只把这一个文件发给别人。
 
-- 体积 **132.6 KB（135,750 B）/ gzip 34.2 KB**，**零外部请求**——没有 CSS/JS/图片文件要加载，favicon 是 data URI，连 `assets/` 都不引用。
+- 体积 **146.7 KB（150,188 B）/ gzip 36.5 KB**，**零外部请求**——没有 CSS/JS/图片文件要加载，favicon 是 data URI，连 `assets/` 都不引用。
 - 没有 PWA 安装 / 离线缓存（Service Worker 必须是独立文件），也移除了 manifest 和 apple-touch-icon。
 - 单文件版改一个字，整个文件都要重新下载；体积上也比分文件版略大（重复内容无法跨文件缓存）。
 
 | 版本 | 适合 | PWA 安装 / 离线 | 体积 |
 |---|---|---|---|
-| `index.html`（多文件，线上） | 日常使用、要装到桌面 | ✅ manifest + `sw.js` | 首屏约 130 KB 未压缩 / gzip 约 39 KB |
-| `SimpleSearch.html`（单文件） | 下载 / 双击 / 单文件分享 | ❌ 无 SW、无缓存 | 132.6 KB 未压缩 / gzip 34.2 KB，零外部请求 |
+| `index.html`（多文件，线上） | 日常使用、要装到桌面 | ✅ manifest + `sw.js` | 首屏约 146 KB 未压缩 / gzip 约 42 KB |
+| `SimpleSearch.html`（单文件） | 下载 / 双击 / 单文件分享 | ❌ 无 SW、无缓存 | 146.7 KB 未压缩 / gzip 36.5 KB，零外部请求 |
 
 ## 使用说明
 
@@ -68,6 +68,8 @@ Chrome / Edge 打开首页后，地址栏右侧可以「安装」简单搜索，
 | 输入 | 效果 |
 |---|---|
 | `!gh rust` | 在 GitHub 里搜 rust |
+| `!so rust` | 在 StackOverflow 里搜 rust |
+| `!youtube cats` | 在 YouTube 里搜 cats |
 | `!b站 视频` | 在哔哩哔哩里搜「视频」（token 可以是中文关键词） |
 | `!淘宝 键盘` | 在淘宝里搜「键盘」 |
 | `!gh` | 不带搜索词：直接打开 GitHub 首页 |
@@ -75,6 +77,7 @@ Chrome / Edge 打开首页后，地址栏右侧可以「安装」简单搜索，
 
 - 语法是 `!<token> [搜索词]`；`<token>` 匹配**站点 id** 或该站的 **keywords**（大小写不敏感，支持中文）。
 - 只认第一个 token；未知 token 一律当普通搜索。
+- keyword 是全表共享的，重复时按注册表顺序命中靠前的内置站点——比如 `!购物` → 淘宝、`!视频` → 哔哩哔哩。
 - 输入合法 bang 时，联想列表第一项会变成「在 GitHub 搜索：rust」，选中即可直达。
 
 ### 页面布局（v2.3）
@@ -93,6 +96,18 @@ Chrome / Edge 打开首页后，地址栏右侧可以「安装」简单搜索，
 点某个分类就只显示这一组的站点，再点「全部」恢复全量。点分类时地址栏会同步成 `?cat=<id>`（点「全部」时去掉这个参数），所以某个分类视图可以直接收藏或分享；刷新时以 URL 为准，不做本地记忆。
 
 小屏（<960px）时导航变成左侧抽屉：点汉堡打开，点遮罩、按 `Esc`、或选中一个分类后会自动收起。
+
+### 内置站点（33 个）
+
+| 分类 | 站点 |
+|---|---|
+| 技术开发（7） | GitHub、ArchWiki、StackOverflow、MDN、Gitee、npm、掘金 |
+| 社区问答（6） | 知乎、百度贴吧、豆瓣、微博、V2EX、Reddit |
+| 影音游戏（8） | 哔哩哔哩、Steam、萌娘百科、YouTube、抖音、爱奇艺、腾讯视频、Twitch |
+| 购物（6） | 淘宝、京东、天猫、拼多多、闲鱼、亚马逊 |
+| 素材资讯（6） | Unsplash、少数派、Pexels、Pixabay、36氪、站酷 |
+
+「全部」按注册表顺序显示全部 33 个（最早内置的 11 个在前，后来补的按分类追加在后）；点分类只显示该组。每个新站点的 `id` / `keywords` 也自动成为 `!bang` token。
 
 ### 深链（可收藏 / 分享）
 
@@ -115,7 +130,7 @@ Chrome / Edge 打开首页后，地址栏右侧可以「安装」简单搜索，
 - **搜索历史**：显示当前条数（例如「搜索历史 3 条」），后面是「清空」按钮，0 条时按钮是禁用状态。
 - **键盘快捷键**：右边有「查看」按钮，点开就是快捷键说明对话框（按 `?` 也能打开，见下方键盘操作）。
 - Github 仓库链接。
-- 底部显示当前版本，例如「简单搜索 v2.6.0」（构建时从 `package.json` 注入）。
+- 底部显示当前版本，例如「简单搜索 v2.7.0」（构建时从 `package.json` 注入）。
 
 点关闭按钮、点遮罩或按 `Esc` 都能收起；打开时焦点会进入面板，关闭后回到设置按钮。分类抽屉和设置抽屉共用一层遮罩，同时只会开一个。
 
@@ -146,6 +161,7 @@ Chrome / Edge 打开首页后，地址栏右侧可以「安装」简单搜索，
 - **搜索引擎切换（v2.6.0）**：设置里四选一（Bing / Google / DuckDuckGo / 百度），选择会记住，表单参数自动适配。
 - **快捷键说明对话框（v2.6.0）**：按 `?`（焦点不在输入框时）或设置里的「查看」打开，列了 9 条常用快捷键；`Esc` / 关闭按钮 / 点遮罩关闭并把焦点还给触发元素。
 - **单文件便携版（v2.6.0）**：`SimpleSearch.html` 一个文件包含全部 CSS/JS/图标，双击即用、零外部请求，方便下载或分享。
+- **站点库扩充（v2.7.0）**：内置站点从 11 个扩到 **33 个**，每个分类都补齐；新站点的 `!bang` token 自动可用，图标支持专属图标 / 复用分类图标 / monogram 三级兜底。
 - **站点图标**：每个站点按钮前都有 24×24 的内联 SVG 图标，颜色跟随主题文字色，**不新增任何图片请求**；没配图标的站点自动显示首字符。原理和取舍见「技术说明 · 站点图标」。
 
 ### 键盘操作
@@ -169,13 +185,13 @@ Chrome / Edge 打开首页后，地址栏右侧可以「安装」简单搜索，
 
 2023 年在原项目上测过：使用 GitHub Pages 的在线版测试的加载完成时间是 **656 毫秒**；本地版（直接双击打开文件）的加载时间更是只要 **3 毫秒**。
 
-v2 / v2.1 之后仍然是**纯静态 + 零依赖**：核心页面与功能不依赖任何第三方资源，没有框架、网络字体或统计脚本；单页静态资源合计大约 130 KB（未压缩），**gzip 传输后约 39 KB**——GitHub Pages 默认走 gzip，所以真实下载量接近后者。本地打开依旧是「点一下就到」的 3 毫秒级体验。（如果开着联网联想，输入关键词会额外发一次百度请求，但那发生在页面加载之后，不影响首屏；站点图标、logo、分类图标都是内联 SVG，也不会多出任何图片请求。）需要说明的是，v2 没有在相同网络条件下重新做一次 656ms/3ms 的计时，所以这里不编新数字——在线时间主要取决于你的网络和 GitHub Pages，本地时间基本只看磁盘。
+v2 / v2.1 之后仍然是**纯静态 + 零依赖**：核心页面与功能不依赖任何第三方资源，没有框架、网络字体或统计脚本；单页静态资源合计大约 146 KB（未压缩），**gzip 传输后约 42 KB**——GitHub Pages 默认走 gzip，所以真实下载量接近后者。本地打开依旧是「点一下就到」的 3 毫秒级体验。（如果开着联网联想，输入关键词会额外发一次百度请求，但那发生在页面加载之后，不影响首屏；站点图标、logo、分类图标都是内联 SVG，也不会多出任何图片请求。）需要说明的是，v2 没有在相同网络条件下重新做一次 656ms/3ms 的计时，所以这里不编新数字——在线时间主要取决于你的网络和 GitHub Pages，本地时间基本只看磁盘。
 
-首屏实测：**14 个请求、零第三方**，其中没有一张站点图片——HTML 一个、CSS 三个、JS 八个、favicon 一个，外加浏览器按 `apple-touch-icon` 惯例抓取的一次 PWA 图标（属预期）。单文件便携版 `SimpleSearch.html` 则是 1 个请求、132.6 KB / gzip 34.2 KB。
+首屏实测：**14 个请求、零第三方**，其中没有一张站点图片——HTML 一个、CSS 三个、JS 八个、favicon 一个，外加浏览器按 `apple-touch-icon` 惯例抓取的一次 PWA 图标（属预期）。单文件便携版 `SimpleSearch.html` 则是 1 个请求、146.7 KB / gzip 36.5 KB。
 
-PWA 的 `sw.js`（约 2.4 KB）、`manifest.webmanifest`（665 B）和两个 PWA 图标（共约 21 KB）**不计入首屏**：SW 是后台注册的，manifest/图标只在安装时用；体积预算由 `validate` 按磁盘产物校验（136 KB），`e2e` 只断言首屏请求数 ≤16、零第三方，不校验体积（SW 接管后传输字节会记 0，不可靠）。
+PWA 的 `sw.js`（约 2.4 KB）、`manifest.webmanifest`（665 B）和两个 PWA 图标（共约 21 KB）**不计入首屏**：SW 是后台注册的，manifest/图标只在安装时用；体积预算由 `validate` 按磁盘产物校验（**156 KB**），`e2e` 只断言首屏请求数 ≤16、零第三方，不校验体积（SW 接管后传输字节会记 0，不可靠）。
 
-解答一下「加图标对速度影响大吗」：v2.2 加站点图标和分类那一轮，未压缩体积从 77 KB 涨到 86 KB，但 **gzip 后只从 28.6 KB 涨到 30.7 KB：真实传输只多约 2.1 KB**，多出来的主要是内联图标 sprite（gzip 后不到 1 KB）和分类导航，没有新增任何图片请求。之后又陆续加了文档站骨架、主题色、logo、分类图标、深链、设置项、PWA 和 `!bang`，整体约 130 KB / gzip 约 39 KB（预算 136 KB），增长都来自 HTML/CSS/JS 与内联 sprite，依然没有图片请求。
+解答一下「加图标对速度影响大吗」：v2.2 加站点图标和分类那一轮，未压缩体积从 77 KB 涨到 86 KB，但 **gzip 后只从 28.6 KB 涨到 30.7 KB：真实传输只多约 2.1 KB**，多出来的主要是内联图标 sprite（gzip 后不到 1 KB）和分类导航，没有新增任何图片请求。之后又陆续加了文档站骨架、主题色、logo、分类图标、深链、设置项、PWA、`!bang` 和 33 个站点库，整体约 146 KB / gzip 约 42 KB（预算 156 KB），增长都来自 HTML/CSS/JS 与内联 sprite，依然没有图片请求。
 
 ## 自定义网站
 
@@ -191,8 +207,9 @@ v2 把站点列表收拢到了**一处**：`assets/js/sites.js` 里的 `SS.sites
      label: '示例站点',                                // 按钮上显示的文字
      home: 'https://example.com',                     // 空关键词时直接打开
      search: 'https://example.com/search?q={q}',      // 站内搜索地址，必须有 {q}
-     keywords: ['示例', 'demo'],                       // 可选，用于关键词联想
+     keywords: ['示例', 'demo'],                       // 可选，用于关键词联想和 !bang token
      group: 'tech',                                   // 必填：所属分类，见 SS.siteGroups
+     icon: 'cat-tech',                                // 可选：复用分类图标；也可写专属图标 symbol 名
    },
    ```
 
@@ -209,6 +226,7 @@ v2 把站点列表收拢到了**一处**：`assets/js/sites.js` 里的 `SS.sites
        search: 'https://example.com/search?q={q}',
        keywords: ['示例', 'demo'],
        group: 'tech',
+       icon: 'cat-tech',
      },
    ]
    ```
@@ -232,7 +250,7 @@ v2 把站点列表收拢到了**一处**：`assets/js/sites.js` 里的 `SS.sites
 
 - **分类必填**：每个站点要带 `group`，取值来自 `assets/js/sites.js` 里的 `SS.siteGroups`。目前有 5 个：`tech`（技术开发）、`community`（社区问答）、`media`（影音游戏）、`shopping`（购物）、`content`（素材资讯）；左侧导航条目的顺序就是 `SS.siteGroups` 数组的顺序。
 - **加新分类**：在 `SS.siteGroups` 里追加 `{ id: 'xxx', label: '显示名' }`，再把相关站点的 `group` 指过去。站点缺 `group` 或 `group` 不在表里时 `npm run build` 会失败；分类暂时没有站点时 build 会给警告（建议别留空分类）。
-- **图标可选**：不配图标就自动显示站点名的首字符（monogram），零额外成本；想配图标只需在 `scripts/icons.mjs` 里加一条（键是站点 `id`），再 `npm run build`。图标是 dev-time 数据，不会变成图片请求。
+- **图标可选**：不配图标就自动显示站点名的首字符（monogram）；想复用分类图标可以写 `icon: 'cat-tech'`（或 `cat-community` / `cat-media` / `cat-shopping` / `cat-content`）；想要专属图标就在 `scripts/icons.mjs` 里加一条（键是站点 `id`），再 `npm run build`。构建时按「站点专属 symbol → `icon` 指定的 symbol → 首字符 monogram」的顺序解析，图标是 dev-time 数据，不会变成图片请求。
 
 ### 删除网站
 
@@ -244,9 +262,10 @@ v2 把站点列表收拢到了**一处**：`assets/js/sites.js` 里的 `SS.sites
 - `home` 和 `search` 必须是 `https://` 开头；`search` 必须包含 `{q}`，否则 `npm run build` 会直接报错。
 - 只改了 `sites.js` 却忘了跑 `npm run build`，提交上去的 HTML 会和数据对不上——CI 的产物漂移检查会拦住这种提交，本地 `npm run validate` 也能发现。
 - 新增站点必须给 `group`（取值见 `SS.siteGroups`）；`group` 缺失或不在表里 `npm run build` 会失败，分类暂时没有站点时 build 会警告（建议别留空分类）。
-- 图标可选：不配就 monogram；配图标只改 `scripts/icons.mjs`（dev-time），不要引外部图标库或 CDN。
+- 图标可选：不配就 monogram；想复用分类图标写 `icon: 'cat-<group>'`；专属图标只改 `scripts/icons.mjs`（dev-time），不要引外部图标库或 CDN。
+- 新站点的 `id` 和 `keywords` 会自动成为 `!bang` token（例如 id 为 `example` 时 `!example 词` 可用），不需要额外注册。
 - 字段含义、更多站点的搜索地址模板、图标与分类的完整说明，见 [docs/custom-sites.md](docs/custom-sites.md)。
-- 默认内置 11 个常用站点，其中**内置站点的 id 和它们之间的相对顺序**由 `tests/sites.test.mjs` 固定。**新增站点不会让测试变红**（测试只要求内置站点都在、且相对顺序不变）；只有删掉内置站点时 `npm test` 才会提示你恢复。自己用的话随便增删，跑一次 `npm run build` 就行。
+- 默认内置 33 个常用站点，其中**内置站点的 id 和它们之间的相对顺序**由 `tests/sites.test.mjs` 固定。**新增站点不会让测试变红**（测试只要求内置站点都在、且相对顺序不变）；只有删掉内置站点时 `npm test` 才会提示你恢复。自己用的话随便增删，跑一次 `npm run build` 就行。
 
 ## 目录结构
 
@@ -303,12 +322,12 @@ npm run serve
 # 打开 http://127.0.0.1:8080/
 ```
 
-当前测试基线：`npm test` **172 例**、`npm run validate` **25 项**、`npm run e2e` **149 项**全绿；`npm run coverage` 行覆盖 **96.04%** / 分支 **80.3%** / 函数 **87.17%**（阈值 90/75/80）。`e2e` 是可选的真实浏览器检查（本机 Edge/Chrome，CI 不跑），覆盖单页主题解析、主题三态与主题色、深链、`!bang`、搜索引擎切换、快捷键对话框、PWA 注册与断网刷新、单文件便携版（零外部资源/内联样式脚本）、联网联想开关与真实百度联调、分类导航与抽屉、设置面板、搜索历史管理、版本号、图标 sprite（无额外图片请求）、960px 断点与移动端布局和 `file://` 打开。
+当前测试基线：`npm test` **174 例**、`npm run validate` **26 项**、`npm run e2e` **153 项**全绿；`npm run coverage` 行覆盖 **96.04%** / 分支 **80.3%** / 函数 **87.17%**（阈值 90/75/80）。`e2e` 是可选的真实浏览器检查（本机 Edge/Chrome，CI 不跑），覆盖单页主题解析、主题三态与主题色、深链、`!bang`、搜索引擎切换、快捷键对话框、PWA 注册与断网刷新、单文件便携版（零外部资源/内联样式脚本）、联网联想开关与真实百度联调、分类导航与抽屉、设置面板、搜索历史管理、版本号、33 站点渲染与图标、图标 sprite（无额外图片请求）、960px 断点与移动端布局和 `file://` 打开。
 
 ## 技术说明
 
 - **线上零构建、零运行时依赖**：开发时 `scripts/build.mjs` 在本地生成 `index.html`、`SimpleSearch.html`（单文件便携版）、`sw.js` 和两个重定向壳并提交入库；部署后浏览器拿到的就是纯 HTML/CSS/JS，没有框架、没有包管理器、没有构建步骤。
-- **PWA / 离线（v2.6.0）**：`manifest.webmanifest` 提供安装信息（`standalone`、192/512 图标）；`sw.js` 由构建从 `templates/sw.js` 生成，注入版本号（当前 2.6.0）和 16 项 precache 列表——`install` 预缓存、`activate` 清掉旧版本缓存并 `claim`、`fetch` 只处理同源 GET（导航请求回退缓存的首页，跨域请求直接放行不缓存）。`file://` 下不注册；换版本后旧缓存自动清理。
+- **PWA / 离线（v2.6.0）**：`manifest.webmanifest` 提供安装信息（`standalone`、192/512 图标）；`sw.js` 由构建从 `templates/sw.js` 生成，注入版本号（当前 2.7.0）和 16 项 precache 列表——`install` 预缓存、`activate` 清掉旧版本缓存并 `claim`、`fetch` 只处理同源 GET（导航请求回退缓存的首页，跨域请求直接放行不缓存）。`file://` 下不注册；换版本后旧缓存自动清理。
 - **单文件便携版（v2.6.0）**：`SimpleSearch.html` 由 `index.html` 内联生成——3 个 `<style>`、8 个经典脚本 + 防闪烁脚本 + `window.__SS_SINGLE_FILE` 标记；favicon 转成 data URI，移除 manifest / apple-touch-icon；`app.js` 看到 `__SS_SINGLE_FILE` 就不注册 SW。因此它**零外部请求**、双击即用，但没有 PWA 安装/离线缓存，且任何改动都要整页重下。
 - **`!bang`（v2.6.0）**：`SS.search.resolveBang` 是纯函数，`!<token> [词]` 的 token 按注册表顺序先比 `site.id` 再比 `keywords`（小写精确匹配、支持中文），只认第一个 token；命中后 `url/kind` 复用 `resolveSite`，无词就是站点首页。未知 token / `!` 后接空白 / `!!x` 一律返回 `null`，当普通搜索。
 - **搜索引擎（v2.6.0）**：`SS.engines` 有 Bing / Google / DuckDuckGo / 百度四个定义（各自带 `search` 模板和 `param`：百度用 `wd`，其余 `q`）；`ss.engine` 记住选择，切换时同步 `SS.defaultEngine`、表单 `action`、输入框 `name`，联想首项文案跟着变。
@@ -322,7 +341,7 @@ npm run serve
 - **单一数据源**：站点只写在 `assets/js/sites.js` 一处；页面只有一份（`index.html`），明暗两套只是 `assets/css/tokens.css` 里的两套 CSS 变量，不会再出现「浅色页有、夜间页没有」的漂移。
 - **第三方请求**：核心页面与核心功能零第三方资源——字体用系统字体栈，没有 CDN、没有统计、没有追踪、没有网络字体。唯一的例外是默认开启的**联网联想**：输入关键词时会向 `suggestion.baidu.com` 发一次 JSONP 请求；在设置里关掉后**零第三方请求**，联想只剩本地数据，完全离线可用。目前只接了百度一个源；`SS.remote.provider` 是可插拔的，但实测 Google / DuckDuckGo 的联想接口不一定可达、Bing 的 `osjson` 没有 CORS 头，所以没有接更多源（想接的话见 [CONTRIBUTING.md](CONTRIBUTING.md)）。Service Worker 只缓存同源静态资源，跨域请求一律直接放行、不缓存。
 - **状态只存本地**：`localStorage` 里只有 `ss.theme`（显式选择的浅色 / 深色；跟随系统时该键不存在）、`ss.color`（主题色）、`ss.engine`（搜索引擎）、`ss.history`（最近 10 条搜索词）、`ss.remote`（联网联想开关）五个键；隐私模式/禁用存储时会自动降级，不报错、不影响核心功能。深链参数只存在 URL 里，不会额外写入存储。
-- **体积**：单页静态资源合计约 130 KB（未压缩；**gzip 后约 39 KB**，预算 136 KB），其中内联图标 sprite 约 5.6 KB（gzip 约 0.97 KB）、`remote.js` 约 10 KB。`sw.js` / `manifest.webmanifest` / PWA 图标不算首屏资源（SW 后台注册、manifest 安装时才用）。所有资源都是仓库里的本地文件，没有第三方运行时、没有框架。
+- **体积**：单页静态资源合计约 146 KB（未压缩；**gzip 后约 42 KB**，预算 156 KB），其中内联图标 sprite 约 8.2 KB（gzip 约 1.34 KB）、`remote.js` 约 10 KB。`sw.js` / `manifest.webmanifest` / PWA 图标不算首屏资源（SW 后台注册、manifest 安装时才用）。所有资源都是仓库里的本地文件，没有第三方运行时、没有框架。
 
 ### 设计风格
 
@@ -335,11 +354,12 @@ npm run serve
 v2.2 给每个站点按钮加了图标，但**没有新增任何图片请求**：
 
 - 图标在构建时全部内联进 `index.html`：一个隐藏的 `<svg class="icon-sprite">` 里放一组 `<symbol id="i-<站点id>">`，按钮里用 `<use href="#i-<站点id>">` 引用。浏览器只解析当前 HTML，不会去下载图片。
-- sprite 里现在有 **21 个 symbol**：11 个站点图标、3 个 UI 图标（`#i-menu` / `#i-settings` / `#i-close`）、1 个顶栏 logo（`#i-logo`）、6 个分类图标（`#i-cat-all` / `#i-cat-tech` / `#i-cat-community` / `#i-cat-media` / `#i-cat-shopping` / `#i-cat-content`）。全部内联、全部零请求。
+- sprite 里现在有 **32 个 symbol**：22 个站点图标（最早 11 个 + 新站点里 11 个画了专属图标的）、3 个 UI 图标（`#i-menu` / `#i-settings` / `#i-close`）、1 个顶栏 logo（`#i-logo`）、6 个分类图标（`#i-cat-all` / `#i-cat-tech` / `#i-cat-community` / `#i-cat-media` / `#i-cat-shopping` / `#i-cat-content`）。另外 11 个新站点用 `icon: 'cat-<group>'` 复用分类图标，不重复占 symbol。全部内联、全部零请求。
 - 图标是 24×24、`fill="none"` + `stroke="currentColor"` 的线条，颜色自动跟随主题文字色，深浅色不用各存一套。
 - 图标数据在 `scripts/icons.mjs`，是 **dev-time 资产**：只在 `npm run build` 时被 Node 读取，运行时不加载、不增加任何请求。
 - 没有配图标的站点（比如你自己加的）会退化成首字符 monogram（`<span class="button-icon-text">首</span>`），零额外成本。
-- 体积：sprite 约 **5.6 KB**（未压缩），gzip 后约 **0.97 KB**；全站静态资源约 **130 KB** 未压缩 / gzip 约 **39 KB**。光看「图标 + 分类」这一轮，**真实传输量只比 v2.1 多约 2.1 KB（gzip）**——未压缩数字看着多了 9 KB，但 SVG sprite 压缩率很高。
+- 新站点不一定要新画图标：站点可以带 `icon` 字段复用分类图标（例如 `icon: 'cat-tech'`），build 的解析顺序是「站点专属 symbol → `icon` 指定的 symbol → 首字符 monogram」。
+- 体积：sprite 约 **8.2 KB**（未压缩），gzip 后约 **1.34 KB**；全站静态资源约 **146 KB** 未压缩 / gzip 约 **42 KB**。光看「图标 + 分类」这一轮，**真实传输量只比 v2.1 多约 2.1 KB（gzip）**——未压缩数字看着多了 9 KB，但 SVG sprite 压缩率很高。
 
 #### 为什么不用更省事的做法
 
@@ -415,6 +435,11 @@ v2.6.0 又补上的：
 - [x] 快捷键说明对话框（按 `?` 或设置里「查看」打开）
 - [x] `npm run coverage` 覆盖率门槛（90 / 75 / 80）
 - [x] 单文件便携版 `SimpleSearch.html`（全部内联、零外部请求、双击即用）
+
+v2.7.0 又补上的：
+
+- [x] 站点库从 11 个扩到 33 个（每个分类补齐 4–5 个）
+- [x] 新站点自动可用 `!bang`；图标支持 `icon: 'cat-<group>'` 复用分类图标 + monogram 兜底
 
 **明确不做**：把本站设为浏览器默认搜索引擎（`?q=%s` 自动提交）——这是按需求有意排除的，搜索始终由你触发。
 

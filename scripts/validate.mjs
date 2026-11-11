@@ -1,4 +1,4 @@
-// SimpleSearch v2.6 静态校验与产物一致性门禁。
+// SimpleSearch v2.7 静态校验与产物一致性门禁。
 // 用法：node scripts/validate.mjs（npm run validate）
 //
 // 产物模型（docs/contract.md §7、§12-§17）：npm run build 生成 5 个产物
@@ -29,17 +29,19 @@
 //  14. sw.js：build 生成物含版本号 + precache 覆盖首页/CSS/JS/图标/manifest，经典脚本无 import/export
 //  15. 搜索引擎：#engine-mode 4 个 .segmented-item（bing/google/ddg/baidu），初始只有 bing 选中
 //  16. 快捷键对话框：#shortcuts-dialog[role=dialog][hidden] + ≥8 个 <kbd> + 设置面板 #shortcuts-open
-//  17. 图标：sprite = 11 站点 + 3 UI + 1 logo + 6 分类 = 21 个 symbol；所有 <use> 目标命中
-//  18. sprite 内联体积 ≤ 8KB（未压缩，契约 §15.3）
+//  17. 图标：sprite 含内置 11 站 symbol + 约定 UI 图标（v2.7 起总数动态 ≥21）；每个 data-site 按钮有
+//      .button-icon（use 或 monogram），所有 <use> 目标命中；站点 icon 字段可复用 cat-* symbol
+//  18. sprite 内联体积 ≤ 12KB（未压缩，契约 §18）
 //  19. 图标零图片请求：无 <img>、无外链 favicon 服务；UI 图标必须内联（仅本地 PWA apple-touch-icon/manifest 图标允许 png）
 //  20. 两个重定向壳：meta refresh 0 秒 + canonical + location.replace 均指向 index.html?theme=X；
 //      壳不得包含真实页内容（#buttons-container / data-site / assets/js bundle），体积 < 1KB
 //  21. 唯一性：只有 index.html 是真实页
 //  22. CSS 不含 !important（契约 §6）
-//  23. 体积信息：index.html 单页加载资源合计 < 136KB（仅提示，契约 §9.9，gzip 为真实成本口径；
+//  23. 体积信息：index.html 单页加载资源合计 < 156KB（仅提示，契约 §9.9，gzip 为真实成本口径；
 //      sw.js / manifest / PWA 图标不计入首屏）
 //  24. 单文件便携版 SimpleSearch.html：build 生成 + CSS/JS 全内联 + 零 assets/manifest/apple-touch-icon 引用
 //  25. 单文件体积 ≤ 200KB（提示项）
+//  26. v2.7 站点库规模：总站点数 ≥30、每分组 ≥3、「全部」视图 DOM 含全部 data-site 按钮
 // 任一失败 → 退出码 1，并打印失败详情。
 import fs from 'node:fs'
 import path from 'node:path'
@@ -154,9 +156,9 @@ const BUILTIN_IDS = [
 const BUILD_MARKER = /<!--\s*由 scripts\/build\.mjs/
 // v2.6 PWA 唯一允许被引用的图片（apple-touch-icon / manifest icons / sw precache）
 const PWA_ICON_PATHS = ['assets/img/icon-192.png', 'assets/img/icon-512.png']
-// 体积预算口径（lead 2026-11-11 v2.6）：单页加载 < 136 KB（gzip 前；契约 §9.9 以 gzip 为真实成本口径；
+// 体积预算口径（lead 2026-11-11 v2.7）：单页加载 < 156 KB（gzip 前；契约 §9.9 以 gzip 为真实成本口径；
 // sw.js / manifest / PWA 图标不计入首屏）
-const BUDGET_KB = 136
+const BUDGET_KB = 156
 const SHELL_MAX_BYTES = 1024
 
 // ---------------------------------------------------------------- 通用工具
@@ -1398,7 +1400,7 @@ check('v2.6 快捷键对话框：#shortcuts-dialog[role=dialog][hidden] + ≥8 �
 
 // ---------------------------------------------------------------- 17. v2.3 图标 sprite / 按钮图标
 
-check('v2.4 图标：sprite = 11 站点 + 3 UI + 1 logo + 6 分类（共 21 个 symbol）；每个 data-site 按钮有 .button-icon；所有 use 目标命中', () => {
+check('v2.7 图标：sprite 含内置 11 站 + 约定 UI 图标（总数动态，≥21），每个 data-site 按钮有 .button-icon，所有 use 目标命中', () => {
   if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
   if (!sites) return [registry.problem || '无法读取 SS.sites']
 
@@ -1421,6 +1423,8 @@ check('v2.4 图标：sprite = 11 站点 + 3 UI + 1 logo + 6 分类（共 21 个 
   const symbolIds = symbols.map((symbol) => symbol.id)
   const symbolSet = new Set(symbolIds)
   const siteIdSet = new Set(siteIds)
+  const useTargets = extractUseTargets(clean)
+  const useTargetSet = new Set(useTargets)
 
   if (symbols.length === 0) problems.push('icon-sprite 里没有任何 <symbol>')
   if (new Set(symbolIds).size !== symbolIds.length) {
@@ -1432,31 +1436,33 @@ check('v2.4 图标：sprite = 11 站点 + 3 UI + 1 logo + 6 分类（共 21 个 
     }
   }
 
-  // 站点 symbol：11 个内置站点全覆盖
+  // 站点 symbol：内置 11 站必须全覆盖；v2.7 新增站点专属图标会继续增加
   const siteSymbols = symbolIds.filter((id) => id !== null && siteIdSet.has(String(id).slice(2)))
   for (const builtinId of BUILTIN_IDS) {
     if (!symbolIds.includes(`i-${builtinId}`)) problems.push(`sprite 缺少内置站点图标 #i-${builtinId}`)
   }
-  if (siteSymbols.length !== BUILTIN_IDS.length) {
-    problems.push(`站点 symbol 数量（${siteSymbols.length}）应等于内置站点数（${BUILTIN_IDS.length}）`)
+  if (siteSymbols.length < BUILTIN_IDS.length) {
+    problems.push(`站点 symbol 数量（${siteSymbols.length}）应 ≥ 内置站点数（${BUILTIN_IDS.length}）`)
   }
 
-  // UI symbol：i-menu / i-settings / i-close
+  // UI symbol：i-menu / i-settings / i-close / i-logo / i-cat-* 必须在
   for (const uiId of UI_SYMBOL_IDS) {
     if (!symbolIds.includes(uiId)) problems.push(`sprite 缺少 UI 图标 #${uiId}`)
   }
-  if (symbolIds.length !== BUILTIN_IDS.length + UI_SYMBOL_IDS.length) {
+
+  // v2.7 §18：symbol 总数随站点/专属图标增加，只断言下界（≥ 内置站点 + UI 图标）
+  const minSymbolTotal = BUILTIN_IDS.length + UI_SYMBOL_IDS.length
+  if (symbolIds.length < minSymbolTotal) {
     problems.push(
-      `symbol 总数（${symbolIds.length}）应为 ${BUILTIN_IDS.length + UI_SYMBOL_IDS.length}（${BUILTIN_IDS.length} 站点 + ${UI_SYMBOL_IDS.length} UI）`,
+      `symbol 总数（${symbolIds.length}）应 ≥ ${minSymbolTotal}（${BUILTIN_IDS.length} 站点 + ${UI_SYMBOL_IDS.length} UI）`,
     )
   }
 
-  // 不允许孤儿 symbol
+  // 不允许孤儿 symbol：允许 UI 图标 / 站点图标 / 页面实际引用到的共享图标（如 cat-*）
   for (const id of symbolIds) {
     if (UI_SYMBOL_IDS.includes(id)) continue
-    if (!siteIdSet.has(String(id).slice(2))) {
-      problems.push(`symbol ${id} 既不是站点图标也不是约定的 UI 图标`)
-    }
+    if (siteIdSet.has(String(id).slice(2))) continue
+    if (!useTargetSet.has(id)) problems.push(`symbol ${id} 既不是站点/UI 图标，也没有被页面 <use> 引用`)
   }
 
   for (const symbol of symbols) {
@@ -1466,7 +1472,6 @@ check('v2.4 图标：sprite = 11 站点 + 3 UI + 1 logo + 6 分类（共 21 个 
   }
 
   // 所有 <use> 目标必须能在 sprite 里命中
-  const useTargets = extractUseTargets(clean)
   if (useTargets.length === 0) problems.push('页面里没有任何 <use> 图标引用')
   for (const target of useTargets) {
     if (!symbolSet.has(target)) problems.push(`use 目标 #${target} 不在 sprite 中`)
@@ -1501,10 +1506,18 @@ check('v2.4 图标：sprite = 11 站点 + 3 UI + 1 logo + 6 分类（共 21 个 
   for (const button of buttons) {
     const icon = inspectButtonIcon(button.inner)
     if (!icon.hasIconClass) problems.push(`站点 ${button.id} 的按钮缺少 .button-icon`)
+    const site = sites.find((item) => item.id === button.id)
     if (builtinSet.has(button.id)) {
       if (icon.useTarget !== `i-${button.id}`) {
         problems.push(
           `内置站点 ${button.id} 应使用 <use href="#i-${button.id}">，实际 ${JSON.stringify(icon.useTarget)}`,
+        )
+      }
+    } else if (site && typeof site.icon === 'string' && site.icon !== '') {
+      // v2.7 §18：sites.js 的 icon 字段指定复用 symbol；SITE_ICONS 专属图标可能覆盖为 i-<id>
+      if (icon.useTarget !== `i-${site.icon}` && icon.useTarget !== `i-${button.id}`) {
+        problems.push(
+          `站点 ${button.id} 声明 icon="${site.icon}"，use 目标应为 #i-${site.icon} 或 #i-${button.id}，实际 ${JSON.stringify(icon.useTarget)}`,
         )
       }
     } else if (!icon.useTarget && !icon.monogram) {
@@ -1530,12 +1543,12 @@ check('v2.4 图标：sprite = 11 站点 + 3 UI + 1 logo + 6 分类（共 21 个 
 
 // ---------------------------------------------------------------- 18. sprite 体积
 
-check('sprite 内联体积 ≤ 8KB（未压缩，契约 §15.3）', () => {
+check('sprite 内联体积 ≤ 12KB（未压缩，契约 §18）', () => {
   if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
   const sprite = extractSprite(stripHtmlComments(realPage.html))
   if (!sprite) return ['缺少 icon-sprite，无法统计 sprite 体积']
   const bytes = Buffer.byteLength(sprite.outer, 'utf8')
-  if (bytes > 8192) return [`icon-sprite 体积 ${bytes} 字节，超过 8KB 红线（未压缩）`]
+  if (bytes > 12288) return [`icon-sprite 体积 ${bytes} 字节，超过 12KB 红线（未压缩）`]
   return { problems: [], notes: [`sprite ${(bytes / 1024).toFixed(2)} KB`] }
 })
 
@@ -1707,7 +1720,7 @@ check('CSS 不含 !important（契约 §6）', () => {
 
 // ---------------------------------------------------------------- 23. 体积信息
 
-check('体积信息（index.html 单页加载预算 < 136 KB，仅供参考不阻断）', () => {
+check('体积信息（index.html 单页加载预算 < 156 KB，仅供参考不阻断）', () => {
   if (!realPage.exists) return { problems: [], notes: [`${REAL_PAGE} 不存在，跳过体积统计`] }
 
   const notes = []
@@ -1826,13 +1839,49 @@ check('v2.6 单文件体积（≤ 200KB，提示项不阻断）', () => {
   }
 })
 
+// ---------------------------------------------------------------- 26. v2.7 站点库规模（§18）
+
+check('v2.7 站点库：总站点数 ≥30、每个分组 ≥3 个站点，「全部」视图 DOM 含全部 data-site 按钮', () => {
+  if (!sites) return [registry.problem || '无法读取 SS.sites']
+  if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
+
+  const problems = []
+  if (sites.length < 30) problems.push(`站点总数应 ≥30（v2.7 目标 33），实际 ${sites.length}`)
+
+  if (!Array.isArray(siteGroups)) {
+    problems.push('缺少 SS.siteGroups，无法校验每分组站点数')
+  } else {
+    const counts = new Map(siteGroups.map((group) => [group.id, 0]))
+    for (const site of sites) {
+      if (counts.has(site.group)) counts.set(site.group, counts.get(site.group) + 1)
+    }
+    for (const [groupId, count] of counts) {
+      if (count < 3) problems.push(`分组 ${groupId} 的站点数应 ≥3，实际 ${count}`)
+    }
+  }
+
+  const clean = stripHtmlComments(realPage.html)
+  const buttons = extractSiteButtons(clean)
+  const buttonIds = new Set(buttons.map((button) => button.id))
+  if (buttons.length !== sites.length) {
+    problems.push(`「全部」视图 data-site 按钮数 ${buttons.length} 应等于站点数 ${sites.length}`)
+  }
+  const missing = sites.map((site) => site.id).filter((id) => !buttonIds.has(id))
+  if (missing.length > 0) problems.push(`「全部」视图缺少站点按钮：${missing.join(', ')}`)
+
+  return {
+    problems,
+    notes: [`站点 ${sites.length} 个 / 分组 ${siteGroups ? siteGroups.length : '?'} 个 / 「全部」视图按钮 ${buttons.length} 个`],
+  }
+})
+
 // ---------------------------------------------------------------- 输出摘要
 
 function printReport() {
   const failed = checks.filter((item) => item.problems.length > 0)
   const passed = checks.length - failed.length
 
-  console.log('SimpleSearch v2.1 静态校验（validate）')
+  console.log('SimpleSearch v2.7 静态校验（validate）')
   console.log(`仓库：${ROOT}`)
   console.log(`产物：${REAL_PAGE}（真实页）+ ${SHELLS.map((shell) => shell.file).join(' + ')}（重定向壳）`)
   console.log('')

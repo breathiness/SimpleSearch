@@ -74,6 +74,14 @@ function escapeHtml(value) {
     .replace(/"/g, '&quot;')
 }
 
+// 站点图标解析顺序：SITE_ICONS[site.id] → site.icon 指向的已有 symbol → 首字符 monogram
+function resolveSiteIconId(site, icons) {
+  if (icons[site.id]) return site.id
+  const want = typeof site.icon === 'string' ? site.icon.replace(/^i-/, '') : ''
+  if (want && (icons[want] || UI_ICONS[want])) return want
+  return null
+}
+
 function renderSiteButtons(sites, icons) {
   return sites
     .map((site) => {
@@ -81,8 +89,9 @@ function renderSiteButtons(sites, icons) {
         ? ` data-keywords="${escapeHtml(site.keywords.join(' '))}"`
         : ''
       const group = site.group ? ` data-group="${escapeHtml(site.group)}"` : ' data-group=""'
-      const icon = icons[site.id]
-        ? `<svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-${escapeHtml(site.id)}"></use></svg>`
+      const iconId = resolveSiteIconId(site, icons)
+      const icon = iconId
+        ? `<svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-${escapeHtml(iconId)}"></use></svg>`
         : `<span class="button-icon button-icon-text" aria-hidden="true">${escapeHtml(monogram(site.label))}</span>`
       return `      <button class="button" type="button" data-site="${escapeHtml(site.id)}"${group}${keywords}>${icon}<span class="button-label">${escapeHtml(site.label)}</span></button>`
     })

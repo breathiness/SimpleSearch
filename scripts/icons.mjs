@@ -92,3 +92,40 @@ Object.assign(UI_ICONS, {
     body: '<path d="M4 8.5h3.4L9 6.5h6l1.6 2H20v10H4z"/><circle cx="12" cy="13.5" r="3"/>',
   },
 })
+
+// v2.7：新增站点的专属图标（通用几何符号，非商标复制）
+Object.assign(SITE_ICONS, {
+  stackoverflow: {
+    body: '<path d="M12 4 4 8l8 4 8-4z"/><path d="M4 12l8 4 8-4"/><path d="M4 16l8 4 8-4"/>',
+  },
+  npm: {
+    body: '<rect x="4" y="7" width="16" height="10" rx="1"/><path d="M8.5 7v6M12 7v6M15.5 7v6"/>',
+  },
+  douban: {
+    body: '<rect x="4" y="5" width="16" height="14" rx="1"/><path d="M8 5v14M16 5v14M4 9.5h16M4 14.5h16"/>',
+  },
+  weibo: {
+    body: '<circle cx="12" cy="12" r="3"/><path d="M5.6 8.6a9 9 0 0 0 0 6.8M18.4 8.6a9 9 0 0 1 0 6.8"/>',
+  },
+  reddit: {
+    body: '<path d="M4 6h16v9.5H9.2L4.5 19v-3.5H4z"/><path d="M12 13.2V9.6M10.1 11l1.9-1.9 1.9 1.9"/>',
+  },
+  youtube: {
+    body: '<rect x="3.5" y="6" width="17" height="12" rx="3"/><path d="M10.2 9.6 14.8 12l-4.6 2.4z"/>',
+  },
+  twitch: {
+    body: '<path d="M5 4h15v11l-4 4h-3l-3 2v-2H5z"/><path d="M11 8v4M15 8v4"/>',
+  },
+  tmall: {
+    body: '<path d="M4 12.5 12.5 4H20v7.5L11.5 20z"/><circle cx="16.6" cy="7.4" r="1.2" fill="currentColor" stroke="none"/>',
+  },
+  amazon: {
+    body: '<path d="M3 5.5h2.4l2.2 9h9.1l2.1-6.6H6"/><circle cx="9.4" cy="18" r="1.4"/><circle cx="16.4" cy="18" r="1.4"/>',
+  },
+  pexels: {
+    body: '<rect x="4" y="5" width="16" height="14" rx="1"/><circle cx="9" cy="10" r="1.5"/><path d="M5 17l4-4 3 3 3-3 4 4"/>',
+  },
+  pixabay: {
+    body: '<path d="M3 18.5 9 9l4.2 6H17l4 3.5z"/><circle cx="16.5" cy="7" r="1.6"/>',
+  },
+})
