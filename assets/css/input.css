@@ -1,0 +1,282 @@
+/* input.css — MDUI 1（Material Design 1 自研复刻）风格搜索输入区：
+ * filled textfield + 下划线动画、icon button（清除）、raised button（搜索）、menu（联想下拉）。
+ * 配色/尺寸用 tokens.css 变量；骨架与涟漪宿主在 base.css；不使用强制覆盖写法；
+ * 显隐只用 hidden，自带 display 的控件写成 `.x:not([hidden])`。
+ */
+
+/* ------------------------------------------------ 输入框：MD1 filled textfield */
+.search-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.search-field::before,
+.search-field::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+.search-field::before {
+  height: 1px;
+  background: var(--underline);
+}
+
+.search-field::after {
+  height: 2px;
+  background: var(--primary);
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform var(--transition-base) var(--ease);
+}
+
+.search-field:focus-within::after {
+  transform: scaleX(1);
+}
+
+#search-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: var(--textfield-height);
+  margin: 0;
+  padding: 0 52px 0 16px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  caret-color: var(--primary);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+#search-input::placeholder {
+  color: var(--text-secondary);
+  opacity: 1;
+}
+
+/* -------------------------------------------- 清除按钮：MD1 icon button（圆形） */
+#clear-button {
+  box-sizing: border-box;
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  width: var(--control-height);
+  height: var(--control-height);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(-50%);
+  cursor: pointer;
+  transition: background-color var(--transition-fast) var(--ease),
+    color var(--transition-fast) var(--ease);
+}
+
+#clear-button:not([hidden]) {
+  display: inline-flex;
+}
+
+#clear-button:hover {
+  background: var(--overlay-active);
+  color: var(--danger);
+}
+
+#clear-button:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+/* ---------------------------------------- 搜索按钮：MD1 raised button（主色） */
+#search-submit {
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  height: var(--control-height);
+  margin: 0;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--primary-bg);
+  color: var(--on-primary);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: var(--elevation-2);
+  transition: background-color var(--transition-fast) var(--ease),
+    box-shadow var(--transition-fast) var(--ease);
+}
+
+#search-submit:hover {
+  background: var(--primary-bg-hover);
+  box-shadow: var(--elevation-4);
+}
+
+#search-submit:active {
+  box-shadow: var(--elevation-8);
+}
+
+#search-submit[aria-disabled='true'] {
+  cursor: default;
+}
+
+/* ------------------------------------------------ 联想下拉：MD1 menu */
+#suggest-list {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: 0;
+  z-index: var(--z-dropdown);
+  max-height: 264px;
+  margin: 0;
+  padding: 8px 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--elevation-8);
+  scrollbar-width: thin;
+}
+
+#suggest-list:not([hidden]) {
+  display: block;
+}
+
+.suggest-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--control-height-lg);
+  padding: 0 16px;
+  color: var(--text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-tight);
+  cursor: pointer;
+  user-select: none;
+  transition: background-color var(--transition-fast) var(--ease);
+}
+
+@media (hover: hover) {
+  .suggest-item:hover {
+    background: var(--overlay-hover);
+  }
+}
+
+.suggest-item[aria-selected='true'] {
+  background: var(--overlay-hover);
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+
+.suggest-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.suggest-sublabel {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: var(--line-height-tight);
+  white-space: nowrap;
+}
+
+.suggest-item[data-type='remote'] .suggest-sublabel {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.suggest-item-history .suggest-label {
+  padding-left: 12px;
+}
+
+.suggest-item-history .suggest-label::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 16px;
+  width: 2px;
+  height: 14px;
+  border-radius: 1px;
+  background: var(--text-secondary);
+  opacity: 0.6;
+  transform: translateY(-50%);
+}
+
+.suggest-delete {
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin: 0 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color var(--transition-fast) var(--ease),
+    color var(--transition-fast) var(--ease);
+}
+
+.suggest-delete:hover {
+  background: var(--overlay-active);
+  color: var(--danger);
+}
+
+.suggest-delete:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+/* ------------------------------------------------------------ 小屏适配 */
+@media (max-width: 480px) {
+  #search-input {
+    padding-right: 56px;
+  }
+
+  #clear-button {
+    right: 4px;
+    width: var(--control-height-lg);
+    height: var(--control-height-lg);
+  }
+
+  #search-submit {
+    height: var(--control-height-lg);
+    padding: 0 20px;
+    font-size: var(--font-size-md);
+  }
+
+  #suggest-list {
+    max-height: min(264px, 45vh);
+  }
+}

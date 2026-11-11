@@ -1,0 +1,18 @@
+{
+  "name": "simple-search",
+  "version": "2.8.0",
+  "private": true,
+  "type": "module",
+  "description": "简单搜索 - 极简聚合搜索页，纯静态、零运行时依赖",
+  "license": "MIT",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test \"tests/**/*.test.mjs\"",
+    "validate": "node scripts/validate.mjs",
+    "check": "npm run build && npm test && npm run validate",
+    "e2e": "node scripts/e2e.mjs --shots",
+    "check:sites": "node scripts/check-sites.mjs",
+    "coverage": "node --test --experimental-test-coverage --test-coverage-lines=90 --test-coverage-branches=75 --test-coverage-functions=80 \"tests/**/*.test.mjs\"",
+    "serve": "node scripts/serve.mjs"
+  }
+}

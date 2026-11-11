@@ -1,0 +1,3711 @@
+<!DOCTYPE html>
+<!-- 单文件便携版：CSS/JS/图标全部内联，零外部请求；PWA 安装/离线请用 index.html + assets -->
+<!-- 由 scripts/build.mjs 从 templates/page.html 生成，请勿手改 -->
+<html lang="zh-CN" data-theme="light" data-theme-default="auto" data-color="indigo">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>简单搜索</title>
+  <meta name="description" content="一款超简单的聚合搜索网站：输入关键词，点击网站即可在该站内搜索；不输入则直接打开网站。自动跟随系统深浅色，也可一键切换。">
+  <meta name="theme-color" content="#f5f5f5">
+  <meta property="og:title" content="简单搜索">
+  <meta property="og:description" content="一款超简单的聚合搜索网站：输入关键词，点击网站即可在该站内搜索；不输入则直接打开网站。自动跟随系统深浅色，也可一键切换。">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%20width%3D%2232%22%20height%3D%2232%22%20role%3D%22img%22%20aria-label%3D%22%E7%AE%80%E5%8D%95%E6%90%9C%E7%B4%A2%22%3E%0A%20%20%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%227%22%20fill%3D%22%233f51b5%22%2F%3E%0A%20%20%3Ccircle%20cx%3D%2214%22%20cy%3D%2214%22%20r%3D%226.25%22%20fill%3D%22none%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%222.8%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M18.6%2018.6%2024.6%2024.6%22%20fill%3D%22none%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%223%22%20stroke-linecap%3D%22round%22%2F%3E%0A%3C%2Fsvg%3E%0A">
+  <script>
+    // 防闪烁：样式表生效前确定主题。优先级与 theme.js 一致：
+    // ?theme= 参数 → localStorage ss.theme → 系统深色偏好 → 浅色
+    (function () {
+      var el = document.documentElement
+      var theme = null
+      try {
+        var matched = /[?&]theme=(light|dark)(?:&|$)/.exec(location.search || '')
+        if (matched) theme = matched[1]
+      } catch (e) {}
+      if (!theme) {
+        try {
+          var stored = localStorage.getItem('ss.theme')
+          if (stored === 'light' || stored === 'dark') theme = stored
+        } catch (e) {}
+      }
+      if (!theme) {
+        try {
+          if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) theme = 'dark'
+        } catch (e) {}
+      }
+      el.setAttribute('data-theme', theme || 'light')
+      // 主题色：在样式表生效前贴到 <html>，避免闪一下默认色
+      var color = null
+      try { color = localStorage.getItem('ss.color') } catch (e) {}
+      // 只接受形如 indigo / deep-purple 的合法 id，其余落回默认色
+      if (!/^[a-z][a-z-]{2,11}$/.test(color || '')) color = 'indigo'
+      el.setAttribute('data-color', color)
+    })()
+  </script>
+  <style>
+/* assets/css/tokens.css */
+/* tokens.css — 设计变量（MDUI 1 / Material Design 1 自研复刻，零第三方依赖）
+ * 只放 CSS 变量；布局见 base.css，输入区见 input.css；主题靠 <html data-theme> 切换。
+ * MDUI 1 官方色表：primary #3F51B5 / #303F9F（深色文字 #9FA8DA），accent #FF4081。
+ */
+:root {
+  --font-sans: Roboto, 'Helvetica Neue', Arial, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-size-base: 14px;--font-size-sm: 14px;--font-size-md: 16px;--font-size-lg: 18px;--font-size-xl: 20px;
+  --line-height: 1.5;--line-height-tight: 1.25;--font-weight-medium: 500;--font-weight-bold: 700;--letter-spacing: .5px;
+  --space-1: 4px;--space-2: 8px;--space-3: 12px;--space-4: 16px;--space-5: 24px;--space-6: 32px;--space-7: 48px;--space-8: 64px;
+  --radius-sm: 2px;--radius-md: 2px;--radius-lg: 2px;--radius-full: 50%;--radius-pill: 999px;
+  --elevation-2: 0 1px 3px rgba(0, 0, 0, .12), 0 1px 2px rgba(0, 0, 0, .24);
+  --elevation-4: 0 2px 4px -1px rgba(0, 0, 0, .2), 0 4px 5px 0 rgba(0, 0, 0, .14), 0 1px 10px 0 rgba(0, 0, 0, .12);
+  --elevation-8: 0 5px 5px -3px rgba(0, 0, 0, .2), 0 8px 10px 1px rgba(0, 0, 0, .14), 0 3px 14px 2px rgba(0, 0, 0, .12);
+  --ease: cubic-bezier(.4, 0, .2, 1);--transition-fast: 120ms;--transition-base: 200ms;--ripple-duration: 600ms;
+  --content-max-width: 720px;--buttons-max-width: 1180px;--z-dropdown: 20;--z-scrim: 50;--z-drawer: 60;--z-panel: 70;--z-dialog: 80;--z-skip-link: 100;
+  --control-height: 36px;--control-height-lg: 44px;--textfield-height: 48px;--focus-ring-width: 2px;
+  /* 主题色：一层色值（--c-*）+ 一层语义变量；19 组覆盖见文件末尾，默认 indigo */
+  --c-500: #3f51b5;--c-700: #303f9f;--c-200: #9fa8da;--c-on: #fff;
+  --primary-bg: var(--c-500);--primary-bg-hover: var(--c-700);
+  --primary: var(--c-700);--primary-dark: var(--c-700);--focus-ring: var(--c-700);--on-primary: var(--c-on);
+}
+
+/* 浅色主题 */
+:root[data-theme='light'] {
+  --bg: #f5f5f5;--surface: #fff;
+  --text: rgba(0, 0, 0, .87);--text-secondary: rgba(0, 0, 0, .54);--text-disabled: rgba(0, 0, 0, .38);
+  --divider: rgba(0, 0, 0, .12);--underline: rgba(0, 0, 0, .42);
+  --accent: #ff4081;--accent-contrast: #fff;--danger: #d32f2f;
+  --overlay-hover: rgba(0, 0, 0, .04);--overlay-active: rgba(0, 0, 0, .08);
+  --button-bg: #fff;--button-bg-hover: #f0f0f0;--button-text: rgba(0, 0, 0, .87);--color-scheme: light;
+}
+
+/* 深色主题 */
+:root[data-theme='dark'] {
+  --bg: #303030;--surface: #424242;
+  --text: rgba(255, 255, 255, .87);--text-secondary: rgba(255, 255, 255, .7);--text-disabled: rgba(255, 255, 255, .5);
+  --divider: rgba(255, 255, 255, .12);--underline: rgba(255, 255, 255, .42);
+  --accent: #ff4081;--accent-contrast: #fff;--danger: #ef9a9a;
+  --overlay-hover: rgba(255, 255, 255, .08);--overlay-active: rgba(255, 255, 255, .12);
+  --button-bg: #424242;--button-bg-hover: #4f4f4f;--button-text: rgba(255, 255, 255, .87);--color-scheme: dark;
+}
+
+/* 深色主题：主色文字/焦点环改用 200 档（浅底上 700 才够对比，深底上 200 才够亮） */
+:root[data-theme='dark'] { --primary: var(--c-200); --focus-ring: var(--c-200); }
+
+/* 19 组 MDUI 主题色：只覆盖一层色值，语义变量自动跟随（浅色 primary=700 / 深色=200） */
+:root[data-color='red'] { --c-500: #f44336; --c-700: #d32f2f; --c-200: #ef9a9a; --c-on: #fff; }
+:root[data-color='pink'] { --c-500: #e91e63; --c-700: #c2185b; --c-200: #f48fb1; --c-on: #fff; }
+:root[data-color='purple'] { --c-500: #9c27b0; --c-700: #7b1fa2; --c-200: #ce93d8; --c-on: #fff; }
+:root[data-color='deep-purple'] { --c-500: #673ab7; --c-700: #512da8; --c-200: #b39ddb; --c-on: #fff; }
+:root[data-color='indigo'] { --c-500: #3f51b5; --c-700: #303f9f; --c-200: #9fa8da; --c-on: #fff; }
+:root[data-color='blue'] { --c-500: #2196f3; --c-700: #1976d2; --c-200: #90caf9; --c-on: #fff; }
+:root[data-color='light-blue'] { --c-500: #03a9f4; --c-700: #0288d1; --c-200: #81d4fa; --c-on: #fff; }
+:root[data-color='cyan'] { --c-500: #00bcd4; --c-700: #0097a7; --c-200: #80deea; --c-on: rgba(0, 0, 0, .87); }
+:root[data-color='teal'] { --c-500: #009688; --c-700: #00796b; --c-200: #80cbc4; --c-on: #fff; }
+:root[data-color='green'] { --c-500: #4caf50; --c-700: #388e3c; --c-200: #a5d6a7; --c-on: #fff; }
+:root[data-color='light-green'] { --c-500: #8bc34a; --c-700: #689f38; --c-200: #c5e1a5; --c-on: rgba(0, 0, 0, .87); }
+:root[data-color='lime'] { --c-500: #cddc39; --c-700: #afb42b; --c-200: #e6ee9c; --c-on: rgba(0, 0, 0, .87); }
+:root[data-color='yellow'] { --c-500: #ffeb3b; --c-700: #fbc02d; --c-200: #fff59d; --c-on: rgba(0, 0, 0, .87); }
+:root[data-color='amber'] { --c-500: #ffc107; --c-700: #ffa000; --c-200: #ffe082; --c-on: rgba(0, 0, 0, .87); }
+:root[data-color='orange'] { --c-500: #ff9800; --c-700: #f57c00; --c-200: #ffcc80; --c-on: rgba(0, 0, 0, .87); }
+:root[data-color='deep-orange'] { --c-500: #ff5722; --c-700: #e64a19; --c-200: #ffab91; --c-on: #fff; }
+:root[data-color='brown'] { --c-500: #795548; --c-700: #5d4037; --c-200: #bcaaa4; --c-on: #fff; }
+:root[data-color='grey'] { --c-500: #9e9e9e; --c-700: #616161; --c-200: #e0e0e0; --c-on: rgba(0, 0, 0, .87); }
+:root[data-color='blue-grey'] { --c-500: #607d8b; --c-700: #455a64; --c-200: #b0bec5; --c-on: #fff; }
+
+/* hidden 必须真隐藏（契约 §6）；自带 display 的组件用 .x:not([hidden]) 写法。 */
+[hidden] { display: none; }
+
+</style>
+  <style>
+/* assets/css/base.css */
+/* base.css — MDUI 1 文档站式骨架（v2.3）：顶栏 + 左侧分组导航 + 内容卡片 + 右侧设置抽屉。
+ * 变量见 tokens.css，输入控件见 input.css。禁止 !important；[hidden] 靠属性本身生效。
+ */
+*,*::before,*::after{box-sizing:border-box}
+html{color-scheme:var(--color-scheme)}
+body{min-height:100vh;min-height:100dvh;margin:0;display:flex;flex-direction:column;background-color:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:var(--font-size-base);line-height:var(--line-height);transition:background-color var(--transition-base) var(--ease),color var(--transition-base) var(--ease)}
+/* [hidden] 必须能压过组件自带的 display（如 .button{display:inline-flex}）：
+   用 :root 提高特异性到 (0,1,1)，避免在禁用 !important 的前提下失效。 */
+:root [hidden]{display:none}
+
+/* 涟漪（MDUI 招牌反馈）：JS 只注入 span.ripple 并写内联尺寸/位置 */
+.ripple{position:absolute;border-radius:50%;transform:scale(0);animation:ripple var(--ripple-duration) linear;background:currentColor;opacity:.24;pointer-events:none}
+@keyframes ripple{to{transform:scale(1);opacity:0}}
+.button,.nav-item,.appbar-icon,.panel-close,.switch-row,.segmented-item,.text-button,#search-submit,.icon-button,.suggest-item{position:relative;overflow:hidden}
+
+/* ------------------------------------------------------------ 顶栏 */
+.appbar{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:var(--space-2);height:64px;padding:0 var(--space-2);background-color:var(--primary-bg);color:var(--on-primary);box-shadow:var(--elevation-2)}
+.appbar-title{flex:1;min-width:0;font-size:var(--font-size-lg);font-weight:var(--font-weight-medium);letter-spacing:var(--letter-spacing);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.appbar-logo{display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center;width:32px;height:32px;margin-right:var(--space-1);border-radius:var(--radius-full);background-color:rgba(255,255,255,.18)}
+.appbar-logo-svg{width:20px;height:20px;fill:none;stroke:var(--on-primary);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.appbar-icon{display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center;width:40px;height:40px;padding:0;border:0;border-radius:var(--radius-full);background-color:transparent;color:var(--on-primary);cursor:pointer;transition:background-color var(--transition-fast) var(--ease)}
+@media (hover:hover){.appbar-icon:hover{background-color:rgba(255,255,255,.12)}}
+.appbar-icon:active{background-color:rgba(255,255,255,.2)}
+.appbar-icon:focus-visible{outline:var(--focus-ring-width) solid var(--on-primary)}
+.appbar-icon-svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#nav-toggle{display:none}
+.panel-close{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;padding:0;border:0;border-radius:var(--radius-full);background-color:transparent;color:var(--text-secondary);cursor:pointer;transition:background-color var(--transition-fast) var(--ease)}
+@media (hover:hover){.panel-close:hover{background-color:var(--overlay-hover)}}
+.panel-close-svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* ------------------------------------------------------------ 骨架 + 左侧导航 */
+.shell{display:flex;flex:1 0 auto;align-items:flex-start;min-height:calc(100vh - 64px)}
+.site-nav{flex:0 0 auto;width:240px;min-height:calc(100vh - 64px);padding:var(--space-4) 0;background-color:var(--surface);border-right:1px solid var(--divider);position:sticky;top:64px}
+.nav-group-title{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);margin:0 0 var(--space-2);padding:0 var(--space-5);font-size:12px;font-weight:var(--font-weight-medium);letter-spacing:1px;color:var(--text-secondary);text-transform:uppercase}
+.nav-list{display:flex;flex-direction:column;margin:0;padding:0;list-style:none}
+.nav-item{display:flex;align-items:center;width:100%;min-height:44px;padding:0 var(--space-5);border:0;background-color:transparent;color:var(--text);font-family:var(--font-sans);font-size:var(--font-size-sm);font-weight:var(--font-weight-medium);line-height:var(--line-height-tight);text-align:left;cursor:pointer;box-shadow:inset 0 0 0 transparent;transition:background-color var(--transition-fast) var(--ease),color var(--transition-fast) var(--ease),box-shadow var(--transition-fast) var(--ease)}
+@media (hover:hover){.nav-item:hover{background-color:var(--overlay-hover)}}
+.nav-item[aria-current='true']{background-color:var(--overlay-active);color:var(--primary);box-shadow:inset 3px 0 0 var(--primary)}
+.nav-icon{flex:0 0 auto;width:18px;height:18px;margin-right:var(--space-3);fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.nav-label{flex:1;text-align:left}
+
+/* ------------------------------------------------------------ 内容区卡片 */
+#main-content{flex:1;min-width:0;padding:var(--space-5)}
+.card{background-color:var(--surface);border-radius:var(--radius-sm);box-shadow:var(--elevation-2);padding:var(--space-5)}
+.card + .card{margin-top:var(--space-4)}
+.card-title{margin:0 0 var(--space-4);font-size:var(--font-size-md);font-weight:var(--font-weight-medium);color:var(--text)}
+
+/* 搜索表单（控件样式见 input.css） */
+#search-form{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:var(--space-2);width:100%;max-width:var(--content-max-width);margin:0 auto}
+#search-form .search-field{flex:1 1 320px;min-width:0}
+
+/* 站点按钮墙 + MD1 raised button */
+#buttons-container{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px;width:100%}
+.button{display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center;gap:6px;min-height:var(--control-height);padding:0 var(--space-3);border:0;border-radius:var(--radius-sm);background-color:var(--button-bg);color:var(--button-text);font-size:var(--font-size-sm);font-weight:var(--font-weight-medium);letter-spacing:var(--letter-spacing);line-height:var(--line-height-tight);text-align:center;text-transform:uppercase;white-space:nowrap;cursor:pointer;box-shadow:var(--elevation-2);transition:box-shadow var(--transition-fast) var(--ease),background-color var(--transition-fast) var(--ease)}
+@media (hover:hover){.button:hover{background-color:var(--button-bg-hover);box-shadow:var(--elevation-4)}}
+.button:active{box-shadow:var(--elevation-8)}
+
+/* 内联 SVG 图标（build 生成隐藏 sprite）与无图标站点的 monogram 兜底 */
+.icon-sprite{position:absolute;width:0;height:0;overflow:hidden}
+.button-icon{flex:0 0 auto;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.button-icon-text{display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;background-color:var(--overlay-hover);color:var(--text-secondary);font-size:11px;font-weight:var(--font-weight-medium);line-height:1}
+
+/* ------------------------------------------------------------ 右侧设置抽屉 */
+#settings-panel{position:fixed;top:0;right:0;bottom:0;width:320px;max-width:86vw;overflow-y:auto;background-color:var(--surface);box-shadow:var(--elevation-8);z-index:var(--z-panel);transform:translateX(100%);transition:transform 250ms var(--ease)}
+body.panel-open #settings-panel{transform:none}
+.panel-header{display:flex;align-items:center;justify-content:space-between;padding:16px 16px 8px 24px}
+.panel-title{margin:0;font-size:20px;font-weight:var(--font-weight-medium);color:var(--text)}
+.panel-body{display:flex;flex-direction:column;gap:8px;padding:8px 16px 24px}
+.panel-link{display:flex;align-items:center;min-height:48px;padding:0 8px;border-top:1px solid var(--divider);margin-top:8px;color:var(--primary);font-size:var(--font-size-sm);font-weight:var(--font-weight-medium);text-decoration:none}
+@media (hover:hover){.panel-link:hover{background-color:var(--overlay-hover)}}
+
+/* 设置里的「主题色」行与 MDUI 色块 */
+.settings-row{display:flex;flex-direction:column;gap:var(--space-2);padding:var(--space-2) var(--space-2) var(--space-1)}
+.settings-label{font-size:13px;color:var(--text-secondary)}
+.swatches{display:flex;flex-wrap:wrap;gap:var(--space-2)}
+.swatch{width:28px;height:28px;padding:0;border:0;border-radius:var(--radius-full);cursor:pointer;transition:transform var(--transition-fast) var(--ease),box-shadow var(--transition-fast) var(--ease)}
+@media (hover:hover){.swatch:hover{transform:scale(1.12)}}
+.swatch:active{transform:scale(.96)}
+.swatch[aria-pressed='true']{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--primary-bg)}
+.swatch:focus-visible{outline:var(--focus-ring-width) solid var(--focus-ring);outline-offset:2px}
+
+/* 主题模式分段控件（MD1 segmented control） */
+.segmented{display:inline-flex;align-self:flex-start;overflow:hidden;border:1px solid var(--divider);border-radius:var(--radius-sm)}
+.segmented-item{height:36px;padding:0 var(--space-3);border:0;background-color:transparent;color:var(--text-secondary);font-family:var(--font-sans);font-size:13px;font-weight:var(--font-weight-medium);line-height:1;white-space:nowrap;cursor:pointer;transition:background-color var(--transition-fast) var(--ease),color var(--transition-fast) var(--ease)}
+.segmented-item + .segmented-item{border-left:1px solid var(--divider)}
+.segmented-item[aria-pressed='true']{background-color:var(--primary-bg);color:var(--on-primary)}
+@media (hover:hover){.segmented-item[aria-pressed='false']:hover{background-color:var(--overlay-hover)}}
+.segmented-item:focus-visible{outline:var(--focus-ring-width) solid var(--focus-ring);outline-offset:-2px}
+/* 搜索引擎 4 段：窄屏允许换行，避免 320px 面板横向溢出 */
+#engine-mode{flex-wrap:wrap;max-width:100%}
+
+/* 设置行：左标签 + 右侧值/按钮（搜索历史等） */
+.settings-row-inline{flex-direction:row;align-items:center;justify-content:space-between;min-height:48px}
+.settings-value{margin-left:var(--space-1);font-size:13px;color:var(--text-secondary)}
+.text-button{display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 var(--space-3);border:0;border-radius:var(--radius-sm);background-color:transparent;color:var(--primary);font-family:var(--font-sans);font-size:13px;font-weight:var(--font-weight-medium);line-height:1;white-space:nowrap;cursor:pointer;transition:background-color var(--transition-fast) var(--ease)}
+@media (hover:hover){.text-button:hover{background-color:var(--overlay-hover)}}
+.text-button[disabled]{color:var(--text-secondary);cursor:default;background-color:transparent}
+.panel-version{margin:16px 8px 0;font-size:12px;color:var(--text-secondary)}
+
+/* MD1 switch：文字在左，::after 轨道 / ::before 滑块，只靠 aria-pressed 切换 */
+.switch-row{display:flex;align-items:center;width:100%;min-height:56px;padding:0 56px 0 8px;border:0;border-radius:var(--radius-sm);background-color:transparent;color:var(--text);font-family:var(--font-sans);font-size:15px;font-weight:var(--font-weight-medium);line-height:var(--line-height-tight);text-align:left;cursor:pointer;transition:background-color var(--transition-fast) var(--ease)}
+@media (hover:hover){.switch-row:hover{background-color:var(--overlay-hover)}}
+.switch-row::after{content:'';position:absolute;top:50%;right:8px;width:34px;height:14px;margin-top:-7px;border-radius:7px;background-color:rgba(0,0,0,.38);transition:background-color var(--transition-base) var(--ease)}
+.switch-row::before{content:'';position:absolute;top:50%;right:26px;z-index:1;width:20px;height:20px;margin-top:-10px;border-radius:50%;background-color:var(--surface);box-shadow:var(--elevation-2);transition:transform var(--transition-base) var(--ease),background-color var(--transition-base) var(--ease)}
+.switch-row[aria-pressed='true']::after{background-color:var(--primary-bg);opacity:.5}
+.switch-row[aria-pressed='true']::before{transform:translateX(18px);background-color:var(--primary-bg)}
+:root[data-theme='dark'] .switch-row[aria-pressed='false']::after{background-color:rgba(255,255,255,.5)}
+:root[data-theme='dark'] .switch-row[aria-pressed='false']::before{background-color:rgba(255,255,255,.87)}
+
+/* ------------------------------------------------------------ 遮罩 */
+#scrim{position:fixed;inset:0;background-color:rgba(0,0,0,.5);z-index:var(--z-scrim)}
+
+/* ------------------------------------------------------------ MD1 快捷键对话框（与 #scrim 共用遮罩） */
+.dialog{position:fixed;left:50%;top:50%;z-index:var(--z-dialog);transform:translate(-50%,-50%);width:min(480px,90vw);max-height:80vh;overflow:auto;background-color:var(--surface);border-radius:var(--radius-sm);box-shadow:0 11px 15px -7px rgba(0,0,0,.2),0 24px 38px 3px rgba(0,0,0,.14),0 9px 46px 8px rgba(0,0,0,.12);overscroll-behavior:contain}
+.dialog-header{display:flex;align-items:center;justify-content:space-between;padding:16px 16px 8px 24px}
+.dialog-title{margin:0;font-size:20px;font-weight:var(--font-weight-medium);color:var(--text)}
+.dialog-close{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;padding:0;border:0;border-radius:var(--radius-full);background-color:transparent;color:var(--text-secondary);font-size:16px;line-height:1;cursor:pointer;transition:background-color var(--transition-fast) var(--ease)}
+@media (hover:hover){.dialog-close:hover{background-color:var(--overlay-hover)}}
+.shortcut-list{display:flex;flex-direction:column;gap:2px;margin:0;padding:8px 24px 24px}
+.shortcut-list > div{display:flex;align-items:center;gap:12px;min-height:36px}
+.shortcut-list dt{display:flex;flex:0 0 96px;flex-wrap:wrap;align-items:center;gap:4px;min-width:96px}
+.shortcut-list dd{margin:0;color:var(--text-secondary);font-size:14px}
+kbd{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:22px;padding:0 6px;border:1px solid var(--divider);border-radius:3px;background-color:var(--bg);color:var(--text);font-family:inherit;font-size:12px;font-weight:500;line-height:1}
+
+/* ------------------------------------------------------------ skip-link / 焦点 / 兜底 */
+.skip-link{position:fixed;top:var(--space-2);left:var(--space-2);z-index:var(--z-skip-link);padding:var(--space-2) var(--space-4);border-radius:var(--radius-sm);background-color:var(--primary-bg);color:var(--on-primary);font-size:var(--font-size-sm);font-weight:var(--font-weight-medium);text-decoration:none;box-shadow:var(--elevation-2);transform:translateY(calc(-100% - var(--space-4)));transition:transform var(--transition-base) var(--ease)}
+.skip-link:focus{transform:translateY(0)}
+:focus-visible{outline:var(--focus-ring-width) solid var(--focus-ring);outline-offset:2px}
+:focus:not(:focus-visible){outline:none}
+.noscript-hint{margin:0;color:var(--text);font-size:var(--font-size-sm);text-align:center}
+
+/* ------------------------------------------------------------ 响应式：<960 侧边栏变抽屉 */
+@media (max-width:959px){
+#nav-toggle{display:inline-flex}
+.shell{display:block}
+.site-nav{position:fixed;top:64px;bottom:0;left:0;z-index:var(--z-drawer);width:80%;max-width:300px;min-height:0;overflow-y:auto;transform:translateX(-100%);transition:transform 250ms var(--ease);box-shadow:var(--elevation-4)}
+body.nav-open .site-nav{transform:none}
+#main-content{padding:var(--space-4)}
+}
+@media (max-width:480px){
+.appbar{height:56px;padding:0 var(--space-1)}
+.appbar-logo{width:28px;height:28px}
+.appbar-logo-svg{width:18px;height:18px}
+.site-nav{top:56px}
+.card,#main-content{padding:var(--space-4)}
+/* 窄屏：输入框与搜索按钮同一行，站点按钮触控 ≥44px */
+#search-form .search-field{flex:1 1 0}
+.button{min-height:var(--control-height-lg)}
+/* 窄屏：对话框与引擎分段压缩内边距 */
+.dialog{width:min(480px,92vw);max-height:78vh}
+.shortcut-list{padding:8px 16px 16px}
+#engine-mode .segmented-item{padding:0 10px}
+}
+
+/* reduced motion：关闭涟漪与过渡 */
+@media (prefers-reduced-motion:reduce){
+:root{--transition-fast:0ms;--transition-base:0ms;--ripple-duration:0ms}
+*,*::before,*::after{animation-duration:.01ms;animation-iteration-count:1;transition-duration:.01ms;scroll-behavior:auto}
+.ripple{animation:none}
+}
+
+</style>
+  <style>
+/* assets/css/input.css */
+/* input.css — MDUI 1（Material Design 1 自研复刻）风格搜索输入区：
+ * filled textfield + 下划线动画、icon button（清除）、raised button（搜索）、menu（联想下拉）。
+ * 配色/尺寸用 tokens.css 变量；骨架与涟漪宿主在 base.css；不使用强制覆盖写法；
+ * 显隐只用 hidden，自带 display 的控件写成 `.x:not([hidden])`。
+ */
+
+/* ------------------------------------------------ 输入框：MD1 filled textfield */
+.search-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.search-field::before,
+.search-field::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+.search-field::before {
+  height: 1px;
+  background: var(--underline);
+}
+
+.search-field::after {
+  height: 2px;
+  background: var(--primary);
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform var(--transition-base) var(--ease);
+}
+
+.search-field:focus-within::after {
+  transform: scaleX(1);
+}
+
+#search-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: var(--textfield-height);
+  margin: 0;
+  padding: 0 52px 0 16px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  caret-color: var(--primary);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+#search-input::placeholder {
+  color: var(--text-secondary);
+  opacity: 1;
+}
+
+/* -------------------------------------------- 清除按钮：MD1 icon button（圆形） */
+#clear-button {
+  box-sizing: border-box;
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  width: var(--control-height);
+  height: var(--control-height);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(-50%);
+  cursor: pointer;
+  transition: background-color var(--transition-fast) var(--ease),
+    color var(--transition-fast) var(--ease);
+}
+
+#clear-button:not([hidden]) {
+  display: inline-flex;
+}
+
+#clear-button:hover {
+  background: var(--overlay-active);
+  color: var(--danger);
+}
+
+#clear-button:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+/* ---------------------------------------- 搜索按钮：MD1 raised button（主色） */
+#search-submit {
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  height: var(--control-height);
+  margin: 0;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--primary-bg);
+  color: var(--on-primary);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: var(--elevation-2);
+  transition: background-color var(--transition-fast) var(--ease),
+    box-shadow var(--transition-fast) var(--ease);
+}
+
+#search-submit:hover {
+  background: var(--primary-bg-hover);
+  box-shadow: var(--elevation-4);
+}
+
+#search-submit:active {
+  box-shadow: var(--elevation-8);
+}
+
+#search-submit[aria-disabled='true'] {
+  cursor: default;
+}
+
+/* ------------------------------------------------ 联想下拉：MD1 menu */
+#suggest-list {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: 0;
+  z-index: var(--z-dropdown);
+  max-height: 264px;
+  margin: 0;
+  padding: 8px 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--elevation-8);
+  scrollbar-width: thin;
+}
+
+#suggest-list:not([hidden]) {
+  display: block;
+}
+
+.suggest-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--control-height-lg);
+  padding: 0 16px;
+  color: var(--text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-tight);
+  cursor: pointer;
+  user-select: none;
+  transition: background-color var(--transition-fast) var(--ease);
+}
+
+@media (hover: hover) {
+  .suggest-item:hover {
+    background: var(--overlay-hover);
+  }
+}
+
+.suggest-item[aria-selected='true'] {
+  background: var(--overlay-hover);
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+
+.suggest-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.suggest-sublabel {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: var(--line-height-tight);
+  white-space: nowrap;
+}
+
+.suggest-item[data-type='remote'] .suggest-sublabel {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.suggest-item-history .suggest-label {
+  padding-left: 12px;
+}
+
+.suggest-item-history .suggest-label::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 16px;
+  width: 2px;
+  height: 14px;
+  border-radius: 1px;
+  background: var(--text-secondary);
+  opacity: 0.6;
+  transform: translateY(-50%);
+}
+
+.suggest-delete {
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin: 0 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color var(--transition-fast) var(--ease),
+    color var(--transition-fast) var(--ease);
+}
+
+.suggest-delete:hover {
+  background: var(--overlay-active);
+  color: var(--danger);
+}
+
+.suggest-delete:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: 0;
+}
+
+/* ------------------------------------------------------------ 小屏适配 */
+@media (max-width: 480px) {
+  #search-input {
+    padding-right: 56px;
+  }
+
+  #clear-button {
+    right: 4px;
+    width: var(--control-height-lg);
+    height: var(--control-height-lg);
+  }
+
+  #search-submit {
+    height: var(--control-height-lg);
+    padding: 0 20px;
+    font-size: var(--font-size-md);
+  }
+
+  #suggest-list {
+    max-height: min(264px, 45vh);
+  }
+}
+
+</style>
+</head>
+<body>
+  <svg class="icon-sprite" aria-hidden="true" focusable="false" width="0" height="0" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="i-github" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 6.5 3.8 12l4.7 5.5"/><path d="M15.5 6.5l4.7 5.5-4.7 5.5"/><path d="M6 20h12"/></symbol>
+    <symbol id="i-unsplash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5h3.4L9 6.5h6l1.6 2H20v10H4z"/><circle cx="12" cy="13.5" r="3"/></symbol>
+    <symbol id="i-bilibili" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="7.5" width="17" height="11" rx="2.5"/><path d="M8.5 4.5 11 7.5M15.5 4.5 13 7.5"/><path d="M10.5 11v4l3.5-2z"/></symbol>
+    <symbol id="i-sspai" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13.6 3.5 6.4 14.1h4.6l-1 6.4 7.6-10.9h-4.6z"/></symbol>
+    <symbol id="i-moegirl" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7c-1.8-1.5-4.2-1.9-7.5-1.6V18c3.3-.3 5.7.1 7.5 1.6 1.8-1.5 4.2-1.9 7.5-1.6V5.4C16.2 5.1 13.8 5.5 12 7z"/><path d="M12 7v12.6"/></symbol>
+    <symbol id="i-zhihu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5h16v10.5H10L5.5 19v-3H4z"/><circle cx="9" cy="10.8" r="1" fill="currentColor" stroke="none"/><circle cx="12.5" cy="10.8" r="1" fill="currentColor" stroke="none"/><circle cx="16" cy="10.8" r="1" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-tieba" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 5.5h11v7.5H9.2L6.4 15.6V13H3.5z"/><path d="M8.7 9.8h11.8v7.4h-2.3v2.6l-2.9-2.6H8.7z"/></symbol>
+    <symbol id="i-taobao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5.6 8h12.8l-1.2 11.5H6.8z"/><path d="M9 8V6.4a3 3 0 0 1 6 0V8"/></symbol>
+    <symbol id="i-jd" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 20 8v8l-8 4-8-4V8z"/><path d="M4 8l8 4.2L20 8"/><path d="M12 12.2V20"/></symbol>
+    <symbol id="i-steam" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="9" width="17" height="8.6" rx="4.3"/><path d="M8.4 11.8v3.2M6.8 13.4h3.2"/><circle cx="15.6" cy="13.4" r="1" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-archwiki" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M7 9.5l3 2.8-3 2.8"/><path d="M12.5 16h4"/></symbol>
+    <symbol id="i-stackoverflow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 4 8l8 4 8-4z"/><path d="M4 12l8 4 8-4"/><path d="M4 16l8 4 8-4"/></symbol>
+    <symbol id="i-npm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7" width="16" height="10" rx="1"/><path d="M8.5 7v6M12 7v6M15.5 7v6"/></symbol>
+    <symbol id="i-douban" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="1"/><path d="M8 5v14M16 5v14M4 9.5h16M4 14.5h16"/></symbol>
+    <symbol id="i-weibo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M5.6 8.6a9 9 0 0 0 0 6.8M18.4 8.6a9 9 0 0 1 0 6.8"/></symbol>
+    <symbol id="i-reddit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16v9.5H9.2L4.5 19v-3.5H4z"/><path d="M12 13.2V9.6M10.1 11l1.9-1.9 1.9 1.9"/></symbol>
+    <symbol id="i-youtube" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="6" width="17" height="12" rx="3"/><path d="M10.2 9.6 14.8 12l-4.6 2.4z"/></symbol>
+    <symbol id="i-twitch" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h15v11l-4 4h-3l-3 2v-2H5z"/><path d="M11 8v4M15 8v4"/></symbol>
+    <symbol id="i-tmall" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 12.5 4H20v7.5L11.5 20z"/><circle cx="16.6" cy="7.4" r="1.2" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-amazon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5.5h2.4l2.2 9h9.1l2.1-6.6H6"/><circle cx="9.4" cy="18" r="1.4"/><circle cx="16.4" cy="18" r="1.4"/></symbol>
+    <symbol id="i-pexels" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="1"/><circle cx="9" cy="10" r="1.5"/><path d="M5 17l4-4 3 3 3-3 4 4"/></symbol>
+    <symbol id="i-pixabay" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18.5 9 9l4.2 6H17l4 3.5z"/><circle cx="16.5" cy="7" r="1.6"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h9M19 7h1M4 12h3M13 12h7M4 17h7M17 17h3"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="14" cy="17" r="2"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="i-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="10.6" cy="10.6" r="3.6"/><path d="M13.4 13.4 16.6 16.6"/></symbol>
+    <symbol id="i-cat-all" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="6.4" height="6.4" rx="1"/><rect x="13.6" y="4" width="6.4" height="6.4" rx="1"/><rect x="4" y="13.6" width="6.4" height="6.4" rx="1"/><rect x="13.6" y="13.6" width="6.4" height="6.4" rx="1"/></symbol>
+    <symbol id="i-cat-tech" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M7 9.5l3 2.8-3 2.8"/><path d="M12.5 16h4"/></symbol>
+    <symbol id="i-cat-community" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 5.5h11v7.5H9.2L6.4 15.6V13H3.5z"/><path d="M8.7 9.8h11.8v7.4h-2.3v2.6l-2.9-2.6H8.7z"/></symbol>
+    <symbol id="i-cat-media" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="7.5" width="17" height="11" rx="2.5"/><path d="M8.5 4.5 11 7.5M15.5 4.5 13 7.5"/><path d="M10.5 11v4l3.5-2z"/></symbol>
+    <symbol id="i-cat-shopping" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5.6 8h12.8l-1.2 11.5H6.8z"/><path d="M9 8V6.4a3 3 0 0 1 6 0V8"/></symbol>
+    <symbol id="i-cat-content" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5h3.4L9 6.5h6l1.6 2H20v10H4z"/><circle cx="12" cy="13.5" r="3"/></symbol>
+  </svg>
+  <a class="skip-link" href="#search-input">跳到搜索框</a>
+
+  <header class="appbar">
+    <button id="nav-toggle" class="appbar-icon" type="button" aria-label="打开站点分类"
+            aria-expanded="false" aria-controls="site-nav">
+      <svg class="appbar-icon-svg" aria-hidden="true" focusable="false"><use href="#i-menu"></use></svg>
+    </button>
+    <span class="appbar-logo" aria-hidden="true"><svg class="appbar-logo-svg" focusable="false"><use href="#i-logo"></use></svg></span>
+    <span class="appbar-title">简单搜索</span>
+    <button id="settings-toggle" class="appbar-icon" type="button" aria-label="设置"
+            aria-expanded="false" aria-controls="settings-panel">
+      <svg class="appbar-icon-svg" aria-hidden="true" focusable="false"><use href="#i-settings"></use></svg>
+    </button>
+  </header>
+
+  <div class="shell">
+    <aside id="site-nav" class="site-nav" aria-label="站点分类">
+      <p class="nav-group-title">站点分类</p>
+      <nav id="group-chips" class="nav-list" aria-label="按分类筛选站点">
+        <button class="nav-item" type="button" data-group="all" aria-current="true"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-all"></use></svg><span class="nav-label">常用</span></button>
+        <button class="nav-item" type="button" data-group="tech" aria-current="false"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-tech"></use></svg><span class="nav-label">技术开发</span></button>
+        <button class="nav-item" type="button" data-group="community" aria-current="false"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-community"></use></svg><span class="nav-label">社区问答</span></button>
+        <button class="nav-item" type="button" data-group="media" aria-current="false"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-media"></use></svg><span class="nav-label">影音游戏</span></button>
+        <button class="nav-item" type="button" data-group="shopping" aria-current="false"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-shopping"></use></svg><span class="nav-label">购物</span></button>
+        <button class="nav-item" type="button" data-group="content" aria-current="false"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-content"></use></svg><span class="nav-label">素材资讯</span></button>
+      </nav>
+    </aside>
+
+    <main id="main-content">
+      <section class="card card-search" aria-label="搜索">
+        <form id="search-form" role="search" action="https://www.bing.com/search" method="get" autocomplete="off">
+          <div class="search-field">
+            <input id="search-input" name="q" type="text" placeholder="搜索…" aria-label="搜索关键词"
+                   aria-autocomplete="list" aria-controls="suggest-list" aria-expanded="false"
+                   enterkeyhint="search" autocomplete="off" spellcheck="false" maxlength="512">
+            <button id="clear-button" class="icon-button" type="button" aria-label="清除输入内容" hidden>✕</button>
+            <ul id="suggest-list" class="suggest-list" role="listbox" aria-label="搜索建议" hidden></ul>
+          </div>
+          <button id="search-submit" class="submit-button" type="submit">搜索</button>
+        </form>
+        <noscript>
+          <p class="noscript-hint">JavaScript 未启用：直接在输入框回车仍可用 Bing 搜索。</p>
+        </noscript>
+      </section>
+
+      <section class="card card-sites" aria-label="常用网站">
+        <h2 class="card-title">常用网站</h2>
+        <nav id="buttons-container" aria-label="站点快捷按钮">
+      <button class="button" type="button" data-site="github" data-group="tech" data-keywords="gh git 代码 开源" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-github"></use></svg><span class="button-label">GitHub</span></button>
+      <button class="button" type="button" data-site="unsplash" data-group="content" data-keywords="图片 壁纸 摄影 photo wallpaper" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-unsplash"></use></svg><span class="button-label">Unsplash</span></button>
+      <button class="button" type="button" data-site="bilibili" data-group="media" data-keywords="b站 哔哩 视频 弹幕 bilibili" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-bilibili"></use></svg><span class="button-label">哔哩哔哩</span></button>
+      <button class="button" type="button" data-site="sspai" data-group="content" data-keywords="少数派 效率 数码 sspai" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-sspai"></use></svg><span class="button-label">少数派</span></button>
+      <button class="button" type="button" data-site="moegirl" data-group="media" data-keywords="萌娘 百科 二次元 moe acg" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-moegirl"></use></svg><span class="button-label">萌娘百科</span></button>
+      <button class="button" type="button" data-site="zhihu" data-group="community" data-keywords="知乎 问答 zhihu qa" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-zhihu"></use></svg><span class="button-label">知乎</span></button>
+      <button class="button" type="button" data-site="tieba" data-group="community" data-keywords="贴吧 百度 tieba forum" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-tieba"></use></svg><span class="button-label">百度贴吧</span></button>
+      <button class="button" type="button" data-site="taobao" data-group="shopping" data-keywords="淘宝 购物 taobao shop" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-taobao"></use></svg><span class="button-label">淘宝</span></button>
+      <button class="button" type="button" data-site="jd" data-group="shopping" data-keywords="京东 购物 jd jd.com" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-jd"></use></svg><span class="button-label">京东</span></button>
+      <button class="button" type="button" data-site="steam" data-group="media" data-keywords="steam 蒸汽 游戏 game" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-steam"></use></svg><span class="button-label">Steam</span></button>
+      <button class="button" type="button" data-site="archwiki" data-group="tech" data-keywords="arch linux wiki 文档" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-archwiki"></use></svg><span class="button-label">ArchWiki</span></button>
+      <button class="button" type="button" data-site="stackoverflow" data-group="tech" data-keywords="so stack 问答" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-stackoverflow"></use></svg><span class="button-label">StackOverflow</span></button>
+      <button class="button" type="button" data-site="mdn" data-group="tech" data-keywords="mdn 文档 web 前端" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-tech"></use></svg><span class="button-label">MDN</span></button>
+      <button class="button" type="button" data-site="gitee" data-group="tech" data-keywords="码云 gitee 国内git" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-tech"></use></svg><span class="button-label">Gitee</span></button>
+      <button class="button" type="button" data-site="npm" data-group="tech" data-keywords="npm 包 node" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-npm"></use></svg><span class="button-label">npm</span></button>
+      <button class="button" type="button" data-site="juejin" data-group="tech" data-keywords="掘金 juejin 前端" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-tech"></use></svg><span class="button-label">掘金</span></button>
+      <button class="button" type="button" data-site="douban" data-group="community" data-keywords="豆瓣 电影 书评" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-douban"></use></svg><span class="button-label">豆瓣</span></button>
+      <button class="button" type="button" data-site="weibo" data-group="community" data-keywords="微博 热搜 weibo" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-weibo"></use></svg><span class="button-label">微博</span></button>
+      <button class="button" type="button" data-site="v2ex" data-group="community" data-keywords="v2ex 社区 程序员" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-community"></use></svg><span class="button-label">V2EX</span></button>
+      <button class="button" type="button" data-site="reddit" data-group="community" data-keywords="reddit forum" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-reddit"></use></svg><span class="button-label">Reddit</span></button>
+      <button class="button" type="button" data-site="youtube" data-group="media" data-keywords="油管 youtube 视频" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-youtube"></use></svg><span class="button-label">YouTube</span></button>
+      <button class="button" type="button" data-site="douyin" data-group="media" data-keywords="抖音 短视频 tiktok" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-media"></use></svg><span class="button-label">抖音</span></button>
+      <button class="button" type="button" data-site="iqiyi" data-group="media" data-keywords="爱奇艺 剧集 iqiyi" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-media"></use></svg><span class="button-label">爱奇艺</span></button>
+      <button class="button" type="button" data-site="vqq" data-group="media" data-keywords="腾讯视频 剧 vqq" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-media"></use></svg><span class="button-label">腾讯视频</span></button>
+      <button class="button" type="button" data-site="twitch" data-group="media" data-keywords="twitch 直播 游戏" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-twitch"></use></svg><span class="button-label">Twitch</span></button>
+      <button class="button" type="button" data-site="tmall" data-group="shopping" data-keywords="天猫 tmall 购物" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-tmall"></use></svg><span class="button-label">天猫</span></button>
+      <button class="button" type="button" data-site="pinduoduo" data-group="shopping" data-keywords="拼多多 pdd 百亿补贴" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-shopping"></use></svg><span class="button-label">拼多多</span></button>
+      <button class="button" type="button" data-site="goofish" data-group="shopping" data-keywords="闲鱼 二手 goofish" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-shopping"></use></svg><span class="button-label">闲鱼</span></button>
+      <button class="button" type="button" data-site="amazon" data-group="shopping" data-keywords="亚马逊 amazon 海淘" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-amazon"></use></svg><span class="button-label">亚马逊</span></button>
+      <button class="button" type="button" data-site="pexels" data-group="content" data-keywords="pexels 图片 素材" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-pexels"></use></svg><span class="button-label">Pexels</span></button>
+      <button class="button" type="button" data-site="pixabay" data-group="content" data-keywords="pixabay 图库 素材" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-pixabay"></use></svg><span class="button-label">Pixabay</span></button>
+      <button class="button" type="button" data-site="36kr" data-group="content" data-keywords="36氪 科技 融资" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-content"></use></svg><span class="button-label">36氪</span></button>
+      <button class="button" type="button" data-site="zcool" data-group="content" data-keywords="站酷 设计 zcool" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-content"></use></svg><span class="button-label">站酷</span></button>
+        </nav>
+      </section>
+    </main>
+  </div>
+
+  <div id="scrim" class="scrim" hidden></div>
+
+  <aside id="settings-panel" class="settings-panel" role="dialog" aria-modal="true"
+         aria-labelledby="settings-title" hidden>
+    <div class="panel-header">
+      <h2 id="settings-title" class="panel-title">设置</h2>
+      <button id="settings-close" class="icon-button panel-close" type="button" aria-label="关闭设置">
+        <svg class="panel-close-svg" aria-hidden="true" focusable="false"><use href="#i-close"></use></svg>
+      </button>
+    </div>
+    <div class="panel-body">
+      <div class="settings-row">
+        <span class="settings-label">主题模式</span>
+        <div id="theme-mode" class="segmented" role="group" aria-label="主题模式">
+          <button class="segmented-item" type="button" data-mode="auto" aria-pressed="true">跟随系统</button>
+          <button class="segmented-item" type="button" data-mode="light" aria-pressed="false">浅色</button>
+          <button class="segmented-item" type="button" data-mode="dark" aria-pressed="false">深色</button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <span class="settings-label">主题色</span>
+        <div id="color-swatches" class="swatches" role="group" aria-label="主题色"></div>
+      </div>
+      <div class="settings-row">
+        <span class="settings-label">搜索引擎</span>
+        <div id="engine-mode" class="segmented" role="group" aria-label="搜索引擎">
+          <button class="segmented-item" type="button" data-engine="bing" aria-pressed="true">Bing</button>
+          <button class="segmented-item" type="button" data-engine="google" aria-pressed="false">Google</button>
+          <button class="segmented-item" type="button" data-engine="ddg" aria-pressed="false">DDG</button>
+          <button class="segmented-item" type="button" data-engine="baidu" aria-pressed="false">百度</button>
+        </div>
+      </div>
+      <button id="suggest-source-toggle" class="switch-row" type="button" aria-pressed="true">联网联想</button>
+      <div class="settings-row settings-row-inline">
+        <span class="settings-label">搜索历史 <span id="history-count" class="settings-value">0 条</span></span>
+        <button id="history-clear" class="text-button" type="button" disabled>清空</button>
+      </div>
+      <a class="panel-link" href="https://github.com/breathiness/SimpleSearch">GitHub 仓库 · 关于</a>
+      <div class="settings-row settings-row-inline">
+        <span class="settings-label">键盘快捷键</span>
+        <button id="shortcuts-open" class="text-button" type="button">查看</button>
+      </div>
+      <p class="panel-version">简单搜索 v2.8.0</p>
+    </div>
+  </aside>
+
+  <section id="shortcuts-dialog" class="dialog" role="dialog" aria-modal="true"
+           aria-labelledby="shortcuts-title" hidden>
+    <div class="dialog-header">
+      <h2 id="shortcuts-title" class="dialog-title">键盘快捷键</h2>
+      <button id="shortcuts-close" class="icon-button dialog-close" type="button" aria-label="关闭">✕</button>
+    </div>
+    <dl class="shortcut-list">
+      <div><dt><kbd>/</kbd></dt><dd>聚焦搜索框</dd></div>
+      <div><dt><kbd>↑</kbd><kbd>↓</kbd></dt><dd>在联想列表里移动</dd></div>
+      <div><dt><kbd>Enter</kbd></dt><dd>采用高亮项或提交搜索</dd></div>
+      <div><dt><kbd>Esc</kbd></dt><dd>关闭联想、抽屉或对话框</dd></div>
+      <div><dt><kbd>Tab</kbd></dt><dd>移出搜索框（自动收起联想）</dd></div>
+      <div><dt><kbd>Delete</kbd></dt><dd>删除高亮的历史项</dd></div>
+      <div><dt><kbd>?</kbd></dt><dd>打开这个快捷键说明</dd></div>
+      <div><dt><kbd>!</kbd></dt><dd>站点快捷搜索，例如 !gh rust</dd></div>
+      <div><dt><kbd>Ctrl</kbd><kbd>⌘</kbd></dt><dd>按住再点击站点按钮：新标签页打开</dd></div>
+    </dl>
+  </section>
+
+  <script>window.__SS_SINGLE_FILE = true;</script>
+  <script>
+/* assets/js/sites.js */
+// 站点注册表：v2 的唯一数据源。页面按钮与分组 chip 都由 scripts/build.mjs 从这里生成。
+// 经典脚本（无 import/export）：浏览器挂到 window，Node 里 import 后读 globalThis.SimpleSearch。
+;(function (root) {
+  'use strict'
+
+  const SS = (root.SimpleSearch = root.SimpleSearch || {})
+
+  // 顺序即按钮渲染顺序，两个主题完全一致（原项目 Dark 缺 Unsplash，v2 已修复）
+  // 字段：id 唯一 id / group 分类 id / label 按钮文字 / home 空词直达 /
+  //       search 站内搜索（必须含 {q}）/ keywords 联想关键词
+  SS.sites = [
+    {
+      id: 'github',
+      group: 'tech',
+      featured: true,
+      label: 'GitHub',
+      home: 'https://github.com',
+      search: 'https://github.com/search?q={q}',
+      keywords: ['gh', 'git', '代码', '开源'],
+    },
+    {
+      id: 'unsplash',
+      group: 'content',
+      featured: true,
+      label: 'Unsplash',
+      home: 'https://unsplash.com/',
+      // 原 search?q= 已失效，v2 改用 /s/photos/ 路径
+      search: 'https://unsplash.com/s/photos/{q}',
+      keywords: ['图片', '壁纸', '摄影', 'photo', 'wallpaper'],
+    },
+    {
+      id: 'bilibili',
+      group: 'media',
+      featured: true,
+      label: '哔哩哔哩',
+      home: 'https://www.bilibili.com',
+      search: 'https://search.bilibili.com/all?keyword={q}',
+      keywords: ['b站', '哔哩', '视频', '弹幕', 'bilibili'],
+    },
+    {
+      id: 'sspai',
+      group: 'content',
+      featured: true,
+      label: '少数派',
+      home: 'https://sspai.com',
+      search: 'https://sspai.com/search/post/{q}',
+      keywords: ['少数派', '效率', '数码', 'sspai'],
+    },
+    {
+      id: 'moegirl',
+      group: 'media',
+      featured: true,
+      label: '萌娘百科',
+      home: 'https://zh.moegirl.org.cn',
+      search: 'https://zh.moegirl.org.cn/index.php?search={q}',
+      keywords: ['萌娘', '百科', '二次元', 'moe', 'acg'],
+    },
+    {
+      id: 'zhihu',
+      group: 'community',
+      featured: true,
+      label: '知乎',
+      home: 'https://www.zhihu.com',
+      search: 'https://www.zhihu.com/search?type=content&q={q}',
+      keywords: ['知乎', '问答', 'zhihu', 'qa'],
+    },
+    {
+      id: 'tieba',
+      group: 'community',
+      featured: true,
+      label: '百度贴吧',
+      home: 'https://tieba.baidu.com',
+      search: 'https://tieba.baidu.com/f/search/res?qw={q}',
+      keywords: ['贴吧', '百度', 'tieba', 'forum'],
+    },
+    {
+      id: 'taobao',
+      group: 'shopping',
+      featured: true,
+      label: '淘宝',
+      home: 'https://www.taobao.com',
+      search: 'https://s.taobao.com/search?q={q}',
+      keywords: ['淘宝', '购物', 'taobao', 'shop'],
+    },
+    {
+      id: 'jd',
+      group: 'shopping',
+      featured: true,
+      label: '京东',
+      home: 'https://www.jd.com',
+      search: 'https://search.jd.com/Search?keyword={q}',
+      keywords: ['京东', '购物', 'jd', 'jd.com'],
+    },
+    {
+      id: 'steam',
+      group: 'media',
+      featured: true,
+      label: 'Steam',
+      home: 'https://store.steampowered.com',
+      search: 'https://store.steampowered.com/search/?term={q}',
+      keywords: ['steam', '蒸汽', '游戏', 'game'],
+    },
+    {
+      id: 'archwiki',
+      group: 'tech',
+      featured: true,
+      label: 'ArchWiki',
+      home: 'https://wiki.archlinux.org',
+      search: 'https://wiki.archlinux.org/index.php?search={q}',
+      keywords: ['arch', 'linux', 'wiki', '文档'],
+    },
+
+    // v2.7：分类扩站，22 个新站点追加在内置 11 站之后（数组顺序 = 「全部」视图按钮顺序）
+    // icon 为可选字段：sprite 里对应 symbol 名（cat-<group> 复用分类图标）；
+    // 没写 icon 的站点由 build 用 scripts/icons.mjs 里的专属图标（按 site.id 匹配），再兜底首字符。
+    // ---- tech ----
+    {
+      id: 'stackoverflow',
+      group: 'tech',
+      label: 'StackOverflow',
+      home: 'https://stackoverflow.com',
+      search: 'https://stackoverflow.com/search?q={q}',
+      keywords: ['so', 'stack', '问答'],
+    },
+    {
+      id: 'mdn',
+      group: 'tech',
+      label: 'MDN',
+      home: 'https://developer.mozilla.org',
+      search: 'https://developer.mozilla.org/zh-CN/search?q={q}',
+      keywords: ['mdn', '文档', 'web', '前端'],
+      icon: 'cat-tech',
+    },
+    {
+      id: 'gitee',
+      group: 'tech',
+      label: 'Gitee',
+      home: 'https://gitee.com',
+      search: 'https://search.gitee.com/?q={q}&type=repository',
+      keywords: ['码云', 'gitee', '国内git'],
+      icon: 'cat-tech',
+    },
+    {
+      id: 'npm',
+      group: 'tech',
+      label: 'npm',
+      home: 'https://www.npmjs.com',
+      search: 'https://www.npmjs.com/search?q={q}',
+      keywords: ['npm', '包', 'node'],
+    },
+    {
+      id: 'juejin',
+      group: 'tech',
+      label: '掘金',
+      home: 'https://juejin.cn',
+      search: 'https://juejin.cn/search?query={q}',
+      keywords: ['掘金', 'juejin', '前端'],
+      icon: 'cat-tech',
+    },
+    // ---- community ----
+    {
+      id: 'douban',
+      group: 'community',
+      label: '豆瓣',
+      home: 'https://www.douban.com',
+      search: 'https://www.douban.com/search?q={q}',
+      keywords: ['豆瓣', '电影', '书评'],
+    },
+    {
+      id: 'weibo',
+      group: 'community',
+      label: '微博',
+      home: 'https://weibo.com',
+      search: 'https://s.weibo.com/weibo?q={q}',
+      keywords: ['微博', '热搜', 'weibo'],
+    },
+    {
+      id: 'v2ex',
+      group: 'community',
+      label: 'V2EX',
+      home: 'https://www.v2ex.com',
+      search: 'https://www.v2ex.com/search?q={q}',
+      keywords: ['v2ex', '社区', '程序员'],
+      icon: 'cat-community',
+    },
+    {
+      id: 'reddit',
+      group: 'community',
+      label: 'Reddit',
+      home: 'https://www.reddit.com',
+      search: 'https://www.reddit.com/search/?q={q}',
+      keywords: ['reddit', 'forum'],
+    },
+    // ---- media ----
+    {
+      id: 'youtube',
+      group: 'media',
+      label: 'YouTube',
+      home: 'https://www.youtube.com',
+      search: 'https://www.youtube.com/results?search_query={q}',
+      keywords: ['油管', 'youtube', '视频'],
+    },
+    {
+      id: 'douyin',
+      group: 'media',
+      label: '抖音',
+      home: 'https://www.douyin.com',
+      search: 'https://www.douyin.com/search/{q}',
+      keywords: ['抖音', '短视频', 'tiktok'],
+      icon: 'cat-media',
+    },
+    {
+      id: 'iqiyi',
+      group: 'media',
+      label: '爱奇艺',
+      home: 'https://www.iqiyi.com',
+      search: 'https://so.iqiyi.com/so/q_{q}',
+      keywords: ['爱奇艺', '剧集', 'iqiyi'],
+      icon: 'cat-media',
+    },
+    {
+      id: 'vqq',
+      group: 'media',
+      label: '腾讯视频',
+      home: 'https://v.qq.com',
+      search: 'https://v.qq.com/x/search/?q={q}',
+      keywords: ['腾讯视频', '剧', 'vqq'],
+      icon: 'cat-media',
+    },
+    {
+      id: 'twitch',
+      group: 'media',
+      label: 'Twitch',
+      home: 'https://www.twitch.tv',
+      search: 'https://www.twitch.tv/search?term={q}',
+      keywords: ['twitch', '直播', '游戏'],
+    },
+    // ---- shopping ----
+    {
+      id: 'tmall',
+      group: 'shopping',
+      label: '天猫',
+      home: 'https://www.tmall.com',
+      search: 'https://list.tmall.com/search_product.htm?q={q}',
+      keywords: ['天猫', 'tmall', '购物'],
+    },
+    {
+      id: 'pinduoduo',
+      group: 'shopping',
+      label: '拼多多',
+      home: 'https://www.pinduoduo.com',
+      search: 'https://mobile.yangkeduo.com/search_result.html?search_key={q}',
+      keywords: ['拼多多', 'pdd', '百亿补贴'],
+      icon: 'cat-shopping',
+    },
+    {
+      id: 'goofish',
+      group: 'shopping',
+      label: '闲鱼',
+      home: 'https://www.goofish.com',
+      search: 'https://www.goofish.com/search?q={q}',
+      keywords: ['闲鱼', '二手', 'goofish'],
+      icon: 'cat-shopping',
+    },
+    {
+      id: 'amazon',
+      group: 'shopping',
+      label: '亚马逊',
+      home: 'https://www.amazon.com',
+      search: 'https://www.amazon.com/s?k={q}',
+      keywords: ['亚马逊', 'amazon', '海淘'],
+    },
+    // ---- content ----
+    {
+      id: 'pexels',
+      group: 'content',
+      label: 'Pexels',
+      home: 'https://www.pexels.com',
+      search: 'https://www.pexels.com/search/{q}/',
+      keywords: ['pexels', '图片', '素材'],
+    },
+    {
+      id: 'pixabay',
+      group: 'content',
+      label: 'Pixabay',
+      home: 'https://pixabay.com',
+      search: 'https://pixabay.com/images/search/{q}/',
+      keywords: ['pixabay', '图库', '素材'],
+    },
+    {
+      id: '36kr',
+      group: 'content',
+      label: '36氪',
+      home: 'https://36kr.com',
+      search: 'https://36kr.com/search/articles/{q}',
+      keywords: ['36氪', '科技', '融资'],
+      icon: 'cat-content',
+    },
+    {
+      id: 'zcool',
+      group: 'content',
+      label: '站酷',
+      home: 'https://www.zcool.com.cn',
+      search: 'https://www.zcool.com.cn/search/content?word={q}',
+      keywords: ['站酷', '设计', 'zcool'],
+      icon: 'cat-content',
+    },
+  ]
+
+  // 分组表：顺序即 chip 渲染顺序；site.group 必须存在于本表，且每个分组至少有一个站点
+  SS.siteGroups = [
+    { id: 'tech', label: '技术开发' },
+    { id: 'community', label: '社区问答' },
+    { id: 'media', label: '影音游戏' },
+    { id: 'shopping', label: '购物' },
+    { id: 'content', label: '素材资讯' },
+  ]
+
+  // 搜索引擎表（v3.0 起 4 个）：param 是该引擎查询参数名，app.js 切换引擎时同步
+  // 表单 action 与 #search-input 的 name；SS.search.resolveDefault 使用 search 模板。
+  SS.engines = {
+    bing: {
+      id: 'bing',
+      label: 'Bing',
+      search: 'https://www.bing.com/search?q={q}',
+      param: 'q',
+    },
+    google: {
+      id: 'google',
+      label: 'Google',
+      search: 'https://www.google.com/search?q={q}',
+      param: 'q',
+    },
+    ddg: {
+      id: 'ddg',
+      label: 'DuckDuckGo',
+      search: 'https://duckduckgo.com/?q={q}',
+      param: 'q',
+    },
+    baidu: {
+      id: 'baidu',
+      label: '百度',
+      search: 'https://www.baidu.com/s?wd={q}',
+      param: 'wd',
+    },
+  }
+
+  SS.defaultEngine = 'bing'
+})(typeof globalThis !== 'undefined' ? globalThis : this)
+
+</script>
+  <script>
+/* assets/js/search.js */
+// 搜索核心：查询词规范化、URL 构建与站点/引擎决策，以及 !bang 快捷搜索解析。
+// 全部是纯函数：不碰 DOM、不碰 localStorage、不发网络请求，Node 里可直接 import 做单测。
+;(function (root) {
+  'use strict'
+
+  const SS = (root.SimpleSearch = root.SimpleSearch || {})
+
+  // 默认引擎，与 SS.defaultEngine 对应
+  const DEFAULT_ENGINE = 'bing'
+
+  // 兜底引擎：search.js 被单独加载（或引擎表缺失）时仍能工作
+  const FALLBACK_ENGINE = {
+    id: 'bing',
+    label: 'Bing',
+    search: 'https://www.bing.com/search?q={q}',
+    param: 'q',
+  }
+  const BING_HOME = 'https://www.bing.com'
+
+  // !bang 前缀：站点快捷搜索，如 !gh rust
+  const BANG = '!'
+
+  // 查询词规范化：非字符串按空串；去首尾空白；连续空白折叠为一个空格
+  function normalizeQuery(raw) {
+    if (typeof raw !== 'string') return ''
+    return raw.trim().replace(/\s+/g, ' ')
+  }
+
+  // 用 {q} 模板构建 URL，查询词内部 encodeURIComponent 编码（& # + % 空格 中文 emoji 都不会断链）
+  function buildUrl(template, query) {
+    if (typeof template !== 'string' || template.indexOf('{q}') === -1) {
+      throw new TypeError('buildUrl: template 必须是包含 {q} 占位符的字符串')
+    }
+    const encoded = encodeURIComponent(normalizeQuery(query))
+    return template.split('{q}').join(encoded)
+  }
+
+  // 从注册表里按 id 找站点（每次调用时读取，便于测试注入 SS.sites）
+  function findSite(siteId) {
+    if (typeof siteId !== 'string' || siteId === '') return null
+    const sites = Array.isArray(SS.sites) ? SS.sites : []
+    for (const site of sites) {
+      if (site && site.id === siteId) return site
+    }
+    return null
+  }
+
+  // !bang 的 token 匹配：先比站点 id，再比 keywords（都转小写后精确比较，按注册表顺序取第一个命中的站点）
+  function findBangSite(token) {
+    const sites = Array.isArray(SS.sites) ? SS.sites : []
+    const needle = token.toLowerCase()
+    for (const site of sites) {
+      if (!site) continue
+      if (typeof site.id === 'string' && site.id.toLowerCase() === needle) return site
+      if (!Array.isArray(site.keywords)) continue
+      for (const keyword of site.keywords) {
+        if (typeof keyword === 'string' && keyword.toLowerCase() === needle) return site
+      }
+    }
+    return null
+  }
+
+  // 当前默认引擎：SS.defaultEngine 与 SS.engines 均可用时优先，否则回退 bing
+  function currentEngine() {
+    const engines = SS.engines && typeof SS.engines === 'object' ? SS.engines : {}
+    const preferred = typeof SS.defaultEngine === 'string' ? SS.defaultEngine : DEFAULT_ENGINE
+    const engine = engines[preferred] || engines[DEFAULT_ENGINE]
+    if (engine && typeof engine.search === 'string' && engine.search.indexOf('{q}') !== -1) {
+      return engine
+    }
+    return FALLBACK_ENGINE
+  }
+
+  // 站点决策：空词直达首页（kind: 'nav'），有词站内搜索（kind: 'search'），未知 id 返回 null
+  function resolveSite(siteId, rawQuery) {
+    const site = findSite(siteId)
+    if (!site) return null
+    const query = normalizeQuery(rawQuery)
+    if (query === '') {
+      return { kind: 'nav', url: site.home, siteId: site.id, query }
+    }
+    return { kind: 'search', url: buildUrl(site.search, query), siteId: site.id, query }
+  }
+
+  // !bang 解析：`!<token> [搜索词]`，token 按小写匹配站点 id 或 keywords。
+  // 命中返回 { siteId, term, url, kind, token }（url/kind 复用 resolveSite，无词即 nav 首页）；
+  // 未命中或非法（! 单独、!!x、! 后紧跟空白等）返回 null，绝不抛错。
+  function resolveBang(raw) {
+    const query = normalizeQuery(raw)
+    if (query === '' || query.charAt(0) !== BANG) return null
+
+    // token 必须紧跟 ! 且不含空白；term 是其后剩余部分（可为空）
+    const body = query.slice(BANG.length)
+    const matched = /^(\S+)(?:\s+([\s\S]*))?$/.exec(body)
+    if (!matched) return null
+
+    const token = matched[1]
+    // !!x 这类以 ! 开头的 token 视为非法
+    if (token.charAt(0) === BANG) return null
+
+    const site = findBangSite(token)
+    if (!site) return null
+
+    const term = normalizeQuery(matched[2] || '')
+    const decision = resolveSite(site.id, term)
+    if (!decision) return null
+
+    return {
+      siteId: decision.siteId,
+      term: decision.query,
+      url: decision.url,
+      kind: decision.kind,
+      token: token.toLowerCase(),
+    }
+  }
+
+  // 默认引擎决策：空词去 Bing 首页，有词用当前默认引擎搜索
+  function resolveDefault(rawQuery) {
+    const query = normalizeQuery(rawQuery)
+    if (query === '') {
+      return { kind: 'nav', url: BING_HOME, query }
+    }
+    return { kind: 'search', url: buildUrl(currentEngine().search, query), query }
+  }
+
+  SS.search = {
+    DEFAULT_ENGINE,
+    BANG,
+    normalizeQuery,
+    buildUrl,
+    resolveSite,
+    resolveBang,
+    resolveDefault,
+  }
+})(typeof globalThis !== 'undefined' ? globalThis : this)
+
+</script>
+  <script>
+/* assets/js/suggest.js */
+// 关键词联想：纯函数，不读 DOM、不发任何网络请求。
+// 数据来源：SS.history（只读）+ SS.sites + SS.engines，全部可通过 opts 注入，便于单测。
+// 默认完全离线可用；网络联想（如需）由 input.js 自行决定，不在本模块内。
+;(function (root) {
+  'use strict'
+
+  const SS = (root.SimpleSearch = root.SimpleSearch || {})
+
+  const MAX_ITEMS = 8
+  const DEFAULT_ENGINE = 'bing'
+  const FALLBACK_ENGINE_LABEL = 'Bing'
+
+  // 查询词规范化：非字符串按空串；去首尾空白；连续空白折叠为一个空格
+  function normalize(raw) {
+    if (typeof raw !== 'string') return ''
+    return raw.trim().replace(/\s+/g, ' ')
+  }
+
+  function lower(value) {
+    return String(value == null ? '' : value).toLowerCase()
+  }
+
+  function resolveMax(opts) {
+    if (opts.max === undefined || opts.max === null) return MAX_ITEMS
+    const number = Number(opts.max)
+    if (!Number.isFinite(number) || number < 0) return MAX_ITEMS
+    return Math.floor(number)
+  }
+
+  function resolveSites(opts) {
+    const source = Array.isArray(opts.sites) ? opts.sites : SS.sites
+    if (!Array.isArray(source)) return []
+    return source.filter((site) => site &&
+      typeof site === 'object' &&
+      typeof site.id === 'string' && site.id !== '' &&
+      typeof site.label === 'string' && site.label !== '')
+  }
+
+  function resolveHistory(opts) {
+    if (Array.isArray(opts.history)) return opts.history
+    // 读取真实历史（只读）；history.js 未加载时按无历史处理
+    try {
+      if (SS.history && typeof SS.history.list === 'function') {
+        const list = SS.history.list()
+        return Array.isArray(list) ? list : []
+      }
+    } catch (e) {
+      /* 历史读取失败不影响联想 */
+    }
+    return []
+  }
+
+  // 当前默认引擎（id + 展示名）：优先 opts，其次 SS.defaultEngine / SS.engines，缺失回退 Bing
+  function resolveEngine(opts) {
+    const fallback = { id: DEFAULT_ENGINE, label: FALLBACK_ENGINE_LABEL }
+    const engines = opts.engines && typeof opts.engines === 'object' ? opts.engines : SS.engines
+    if (!engines || typeof engines !== 'object') return fallback
+
+    const preferred = typeof opts.defaultEngine === 'string'
+      ? opts.defaultEngine
+      : (typeof SS.defaultEngine === 'string' ? SS.defaultEngine : DEFAULT_ENGINE)
+    const ids = [preferred, DEFAULT_ENGINE].concat(Object.keys(engines))
+    for (const id of ids) {
+      const engine = engines[id]
+      if (!engine || typeof engine.label !== 'string' || engine.label.trim() === '') continue
+      return {
+        id: typeof engine.id === 'string' && engine.id !== '' ? engine.id : id,
+        label: engine.label.trim(),
+      }
+    }
+    return fallback
+  }
+
+  // 去重器：同一个 siteId 或同一个 label（不区分大小写）只保留第一条
+  function createDeduper() {
+    const seen = new Set()
+    return function keep(item) {
+      const keys = []
+      if (item.siteId) keys.push('site:' + item.siteId)
+      keys.push('label:' + lower(item.label).trim())
+      for (const key of keys) {
+        if (seen.has(key)) return false
+      }
+      for (const key of keys) seen.add(key)
+      return true
+    }
+  }
+
+  // 站点与查询词的匹配强度：3 = 完全相同，2 = 前缀，1 = 包含，0 = 不匹配。
+  // 参与匹配的字段：label、id、keywords（大小写不敏感）。
+  function matchSite(site, needle) {
+    if (needle === '') return 0
+    const fields = [site.label, site.id]
+    if (Array.isArray(site.keywords)) {
+      for (const keyword of site.keywords) fields.push(keyword)
+    }
+
+    let best = 0
+    for (const field of fields) {
+      const value = lower(field).trim()
+      if (value === '') continue
+      if (value === needle) return 3
+      if (value.startsWith(needle)) {
+        if (best < 2) best = 2
+      } else if (value.includes(needle)) {
+        if (best < 1) best = 1
+      }
+    }
+    return best
+  }
+
+  // 空 query：历史（新的在前）+ 注册表顺序的站点，共用一个全局上限
+  function emptyQueryItems(opts) {
+    const max = resolveMax(opts)
+    const sites = resolveSites(opts)
+    const history = resolveHistory(opts)
+    const items = []
+    const keep = createDeduper()
+
+    for (const term of history) {
+      if (items.length >= max) break
+      const label = normalize(term)
+      if (label === '') continue
+      const item = { type: 'history', label, sublabel: '历史搜索' }
+      if (keep(item)) items.push(item)
+    }
+
+    for (const site of sites) {
+      if (items.length >= max) break
+      const item = { type: 'site', label: site.label, sublabel: '站内搜索', siteId: site.id }
+      if (keep(item)) items.push(item)
+    }
+
+    return items
+  }
+
+  // 非空 query：固定「用 <引擎> 搜索：<词>」+ 命中的站点（相关度优先）+ 历史匹配
+  function queryItems(query, opts) {
+    const max = resolveMax(opts)
+    const sites = resolveSites(opts)
+    const history = resolveHistory(opts)
+    const needle = lower(query)
+    const items = []
+    const keep = createDeduper()
+
+    function push(item) {
+      if (items.length >= max) return
+      if (keep(item)) items.push(item)
+    }
+
+    const engine = resolveEngine(opts)
+    push({
+      type: 'engine',
+      label: '用 ' + engine.label + ' 搜索：' + query,
+      sublabel: '搜索引擎',
+      engineId: engine.id,
+    })
+
+    // 站点命中：相关度高的在前，同相关度保持注册表顺序
+    const matched = []
+    sites.forEach((site, index) => {
+      const rank = matchSite(site, needle)
+      if (rank > 0) matched.push({ site, rank, index })
+    })
+    matched.sort((a, b) => (b.rank - a.rank) || (a.index - b.index))
+    for (const entry of matched) {
+      push({ type: 'site', label: entry.site.label, sublabel: '站内搜索', siteId: entry.site.id })
+    }
+
+    // 历史命中：历史词包含当前输入
+    for (const term of history) {
+      if (items.length >= max) break
+      const label = normalize(term)
+      if (label === '' || !lower(label).includes(needle)) continue
+      push({ type: 'history', label, sublabel: '历史搜索' })
+    }
+
+    return items
+  }
+
+  // 主入口：纯函数。返回最多 max（默认 8）条 { type, label, sublabel, siteId? }
+  function getItems(rawQuery, opts) {
+    const options = opts && typeof opts === 'object' ? opts : {}
+    const max = resolveMax(options)
+    if (max === 0) return []
+
+    const query = normalize(rawQuery)
+    if (query === '') return emptyQueryItems(options)
+    return queryItems(query, options)
+  }
+
+  SS.suggest = {
+    MAX_ITEMS,
+    getItems,
+  }
+})(typeof globalThis !== 'undefined' ? globalThis : this)
+
+</script>
+  <script>
+/* assets/js/history.js */
+// 搜索历史：纯工厂（storage 由调用方注入，便于单测）+ 基于真实 localStorage 的便利封装。
+// 契约：key 固定 'ss.history'，最多 10 条，新的在前，去重置顶；storage 读写异常一律吞掉，绝不抛出。
+// 写历史只由 app.js 触发；suggest.js / input.js 只读。
+;(function (root) {
+  'use strict'
+
+  const SS = (root.SimpleSearch = root.SimpleSearch || {})
+
+  const KEY = 'ss.history'
+  const MAX = 10
+
+  // 内存兜底 storage：localStorage 不可用（隐私模式、禁用存储、Node 环境）时使用，
+  // 保证本模块在任何环境下都能工作而不会抛错。
+  function createMemoryStorage() {
+    const map = new Map()
+    return {
+      getItem(key) {
+        return map.has(key) ? map.get(key) : null
+      },
+      setItem(key, value) {
+        map.set(key, String(value))
+      },
+      removeItem(key) {
+        map.delete(key)
+      },
+    }
+  }
+
+  // 契约只要求 getItem/setItem；这里放宽到「有这两个方法即可」
+  function isUsableStorage(storage) {
+    return Boolean(storage) &&
+      typeof storage.getItem === 'function' &&
+      typeof storage.setItem === 'function'
+  }
+
+  // 查询词规范化：非字符串按空串；去首尾空白；连续空白折叠为一个空格
+  function normalize(raw) {
+    if (typeof raw !== 'string') return ''
+    return raw.trim().replace(/\s+/g, ' ')
+  }
+
+  // 读取并清洗：只接受字符串数组，非空、去重（保留先出现的顺序），截断到上限
+  function read(storage) {
+    let raw = null
+    try {
+      raw = storage.getItem(KEY)
+    } catch (e) {
+      return []
+    }
+    if (typeof raw !== 'string' || raw === '') return []
+
+    let parsed = null
+    try {
+      parsed = JSON.parse(raw)
+    } catch (e) {
+      // 存储被手工改坏 / 旧格式：按空历史处理，不抛错
+      return []
+    }
+    if (!Array.isArray(parsed)) return []
+
+    const seen = new Set()
+    const result = []
+    for (const value of parsed) {
+      const term = normalize(value)
+      if (term === '' || seen.has(term)) continue
+      seen.add(term)
+      result.push(term)
+      if (result.length >= MAX) break
+    }
+    return result
+  }
+
+  // 写入失败（隐私模式、配额满）静默忽略
+  function write(storage, list) {
+    try {
+      storage.setItem(KEY, JSON.stringify(list))
+    } catch (e) {
+      /* 忽略：存储不可用时降级为「会话内有效」 */
+    }
+  }
+
+  // 纯工厂：storage 只需 getItem/setItem；不合法时自动降级为内存存储
+  function create(storage) {
+    const target = isUsableStorage(storage) ? storage : createMemoryStorage()
+
+    function list() {
+      return read(target)
+    }
+
+    function add(raw) {
+      const term = normalize(raw)
+      if (term === '') return list()
+      // 去重后置顶，再截断
+      const next = list().filter((item) => item !== term)
+      next.unshift(term)
+      const trimmed = next.slice(0, MAX)
+      write(target, trimmed)
+      return trimmed
+    }
+
+    function remove(raw) {
+      const term = normalize(raw)
+      if (term === '') return list()
+      const next = list().filter((item) => item !== term)
+      write(target, next)
+      return next
+    }
+
+    function clear() {
+      // 优先 removeItem；storage 只有 getItem/setItem 时退化为写空数组
+      if (typeof target.removeItem === 'function') {
+        try {
+          target.removeItem(KEY)
+          return
+        } catch (e) {
+          /* 继续尝试写空数组 */
+        }
+      }
+      write(target, [])
+    }
+
+    return { list, add, remove, clear }
+  }
+
+  // 便利封装的懒实例：首次调用时才访问 localStorage，访问本身也可能抛错
+  let cachedInstance = null
+  let memoryStorage = null
+
+  function getInstance() {
+    if (cachedInstance) return cachedInstance
+    let storage = null
+    try {
+      const candidate = root.localStorage
+      if (isUsableStorage(candidate)) storage = candidate
+    } catch (e) {
+      storage = null
+    }
+    if (!storage) {
+      if (!memoryStorage) memoryStorage = createMemoryStorage()
+      storage = memoryStorage
+    }
+    cachedInstance = create(storage)
+    return cachedInstance
+  }
+
+  SS.history = {
+    KEY,
+    MAX,
+    create,
+    record(raw) {
+      return getInstance().add(raw)
+    },
+    list() {
+      return getInstance().list()
+    },
+    remove(raw) {
+      return getInstance().remove(raw)
+    },
+    clear() {
+      getInstance().clear()
+    },
+  }
+})(typeof globalThis !== 'undefined' ? globalThis : this)
+
+</script>
+  <script>
+/* assets/js/theme.js */
+// 主题（单页模式，契约 §12.1）：?theme= → localStorage ss.theme → 系统偏好 → 浅色。
+// 首屏防闪烁由 templates/page.html 的内联脚本负责（同一解析顺序）；本模块只做
+// 交互、持久化、切换按钮 / meta theme-color 同步，以及未显式选择时跟随系统偏好。
+;(function (root) {
+  'use strict'
+
+  const SS = (root.SimpleSearch = root.SimpleSearch || {})
+
+  const KEY = 'ss.theme'
+  const LIGHT = 'light'
+  const DARK = 'dark'
+  const AUTO = 'auto'
+
+  // 与 tokens.css 的 --bg 保持一致；仅当无法读取 CSS 变量时兜底
+  const THEME_COLORS = { light: '#f5f5f5', dark: '#303030' }
+
+  // 主题色（MDUI 19 组主色，顺序与契约 §15.1 一致）
+  const COLOR_KEY = 'ss.color'
+  const DEFAULT_COLOR = 'indigo'
+  const COLORS = [
+    { id: 'red', label: '红' },
+    { id: 'pink', label: '粉' },
+    { id: 'purple', label: '紫' },
+    { id: 'deep-purple', label: '深紫' },
+    { id: 'indigo', label: '靛蓝' },
+    { id: 'blue', label: '蓝' },
+    { id: 'light-blue', label: '浅蓝' },
+    { id: 'cyan', label: '青' },
+    { id: 'teal', label: '蓝绿' },
+    { id: 'green', label: '绿' },
+    { id: 'light-green', label: '浅绿' },
+    { id: 'lime', label: '黄绿' },
+    { id: 'yellow', label: '黄' },
+    { id: 'amber', label: '琥珀' },
+    { id: 'orange', label: '橙' },
+    { id: 'deep-orange', label: '深橙' },
+    { id: 'brown', label: '棕' },
+    { id: 'grey', label: '灰' },
+    { id: 'blue-grey', label: '蓝灰' },
+  ]
+  // 色块背景用各色 500 档（与 tokens.css 的 --c-500 一致）
+  const COLOR_500 = {
+    red: '#f44336',
+    pink: '#e91e63',
+    purple: '#9c27b0',
+    'deep-purple': '#673ab7',
+    indigo: '#3f51b5',
+    blue: '#2196f3',
+    'light-blue': '#03a9f4',
+    cyan: '#00bcd4',
+    teal: '#009688',
+    green: '#4caf50',
+    'light-green': '#8bc34a',
+    lime: '#cddc39',
+    yellow: '#ffeb3b',
+    amber: '#ffc107',
+    orange: '#ff9800',
+    'deep-orange': '#ff5722',
+    brown: '#795548',
+    grey: '#9e9e9e',
+    'blue-grey': '#607d8b',
+  }
+
+  // 把任意值收敛为 'light' | 'dark' | null
+  function normalize(theme) {
+    return theme === LIGHT || theme === DARK ? theme : null
+  }
+
+  function getDoc() {
+    return root.document || null
+  }
+
+  // 只读存储：隐私模式 / 禁用 localStorage 时静默返回 null
+  function get() {
+    try {
+      const storage = root.localStorage
+      if (!storage) return null
+      return normalize(storage.getItem(KEY))
+    } catch (error) {
+      return null
+    }
+  }
+
+  function save(theme) {
+    try {
+      const storage = root.localStorage
+      if (storage) storage.setItem(KEY, theme)
+    } catch (error) {
+      // 存储失败不影响本次切换
+    }
+  }
+
+  // 删除主题存储（auto 模式跟随系统，不保留显式选择）
+  function clearTheme() {
+    try {
+      const storage = root.localStorage
+      if (!storage) return
+      if (typeof storage.removeItem === 'function') storage.removeItem(KEY)
+      else storage.setItem(KEY, '')
+    } catch (error) {
+      // 存储不可用就算了
+    }
+  }
+
+  // ---------------------------------------------------------------- 主题色
+
+  function normalizeColor(id) {
+    for (const color of COLORS) {
+      if (color.id === id) return id
+    }
+    return DEFAULT_COLOR
+  }
+
+  // 读主题色存储：缺省 / 非法值都回退 indigo
+  function getColor() {
+    try {
+      const storage = root.localStorage
+      if (!storage) return DEFAULT_COLOR
+      return normalizeColor(storage.getItem(COLOR_KEY))
+    } catch (error) {
+      return DEFAULT_COLOR
+    }
+  }
+
+  function saveColor(id) {
+    try {
+      const storage = root.localStorage
+      if (storage) storage.setItem(COLOR_KEY, id)
+    } catch (error) {
+      // 存储失败不影响本次换色
+    }
+  }
+
+  // 同步色块选中态（色块可能尚未渲染 / 测试环境无 querySelectorAll）
+  function syncSwatches(doc, active) {
+    if (typeof doc.querySelectorAll !== 'function') return
+    const swatches = doc.querySelectorAll('#color-swatches .swatch')
+    for (let i = 0; i < swatches.length; i++) {
+      const item = swatches[i]
+      if (!item || typeof item.getAttribute !== 'function') continue
+      item.setAttribute('aria-pressed', item.getAttribute('data-color') === active ? 'true' : 'false')
+    }
+  }
+
+  // 应用主题色：只写 <html data-color>，CSS 由 tokens.css 的语义变量接管
+  function applyColor(id) {
+    const next = normalizeColor(id)
+    const doc = getDoc()
+    const el = doc && doc.documentElement
+    if (!el) return next
+    el.setAttribute('data-color', next)
+    syncSwatches(doc, next)
+    return next
+  }
+
+  // 渲染色块（只渲一次）+ 应用存储里的主题色
+  function initColor() {
+    const doc = getDoc()
+    if (!doc) return
+    const color = getColor()
+    applyColor(color)
+
+    if (typeof doc.getElementById !== 'function') return
+    const container = doc.getElementById('color-swatches')
+    if (!container || typeof doc.createElement !== 'function') return
+    const existing =
+      typeof container.querySelectorAll === 'function' ? container.querySelectorAll('.swatch').length : 0
+    if (existing >= COLORS.length) {
+      syncSwatches(doc, color)
+      return
+    }
+
+    for (const item of COLORS) {
+      const button = doc.createElement('button')
+      button.type = 'button'
+      button.className = 'swatch'
+      button.setAttribute('data-color', item.id)
+      button.setAttribute('aria-pressed', item.id === color ? 'true' : 'false')
+      button.setAttribute('title', item.label)
+      button.setAttribute('aria-label', item.label)
+      if (button.style) button.style.backgroundColor = COLOR_500[item.id]
+      if (typeof button.addEventListener === 'function') {
+        button.addEventListener('click', function () {
+          saveColor(item.id)
+          applyColor(item.id)
+        })
+      }
+      if (typeof container.appendChild === 'function') container.appendChild(button)
+    }
+  }
+
+  // 与内联脚本同一正则：只认 ?theme=light|dark（其他参数保持原样）
+  function readUrlTheme() {
+    try {
+      const location = root.location
+      if (!location || typeof location.search !== 'string') return null
+      const matched = /[?&]theme=(light|dark)(?:&|$)/.exec(location.search)
+      return matched ? matched[1] : null
+    } catch (error) {
+      return null
+    }
+  }
+
+  // 去掉地址栏的 theme 参数（分享出去的地址不再固定主题）；受限环境失败静默
+  function stripUrlTheme() {
+    try {
+      const location = root.location
+      const history = root.history
+      if (!location || !history || typeof history.replaceState !== 'function') return
+      const search = typeof location.search === 'string' ? location.search : ''
+      if (/[?&]theme=/.test(search) === false) return
+      const params = search
+        .replace(/^\?/, '')
+        .split('&')
+        .filter((pair) => pair && /^theme=(light|dark)$/.test(pair) === false)
+      const query = params.length ? '?' + params.join('&') : ''
+      const pathname = typeof location.pathname === 'string' ? location.pathname : ''
+      const hash = typeof location.hash === 'string' ? location.hash : ''
+      history.replaceState(history.state, '', pathname + query + hash)
+    } catch (error) {
+      // 忽略：清理失败不影响主题
+    }
+  }
+
+  // 系统偏好：无 matchMedia（或调用失败）时返回 null，由浅色兜底
+  function systemTheme() {
+    try {
+      if (typeof root.matchMedia !== 'function') return null
+      const media = root.matchMedia('(prefers-color-scheme: dark)')
+      if (!media) return null
+      return media.matches ? DARK : LIGHT
+    } catch (error) {
+      return null
+    }
+  }
+
+  // 让浏览器地址栏颜色跟随页面底色：优先读 CSS 变量，读不到用兜底表
+  function themeColor(theme) {
+    try {
+      const doc = getDoc()
+      if (doc && typeof root.getComputedStyle === 'function') {
+        const styles = root.getComputedStyle(doc.documentElement)
+        const value = styles && styles.getPropertyValue('--bg')
+        if (value && value.trim()) return value.trim()
+      }
+    } catch (error) {
+      // 忽略：部分测试环境没有 getComputedStyle
+    }
+    return THEME_COLORS[theme] || THEME_COLORS[LIGHT]
+  }
+
+  function syncThemeColor(doc, theme) {
+    if (typeof doc.querySelector !== 'function') return
+    const meta = doc.querySelector('meta[name="theme-color"]')
+    if (!meta || typeof meta.setAttribute !== 'function') return
+    meta.setAttribute('content', themeColor(theme))
+  }
+
+  // 应用主题：只改 DOM（不写存储），非法值直接忽略
+  function apply(theme) {
+    const next = normalize(theme)
+    if (!next) return
+    const doc = getDoc()
+    const el = doc && doc.documentElement
+    if (!el) return
+    el.setAttribute('data-theme', next)
+    syncThemeColor(doc, next)
+  }
+
+  // 当前生效主题：以 <html data-theme> 为准，其次按解析顺序兜底
+  function currentTheme() {
+    const doc = getDoc()
+    const el = doc && doc.documentElement
+    const fromDom = el ? normalize(el.getAttribute('data-theme')) : null
+    if (fromDom) return fromDom
+    return resolve(null)
+  }
+
+  // 解析：?theme= > 存储 > 旧入口的显式默认值 > 系统偏好 > 浅色
+  function resolve(pageDefault) {
+    const fromUrl = readUrlTheme()
+    if (fromUrl) return fromUrl
+    const stored = get()
+    if (stored) return stored
+    const explicit = normalize(pageDefault)
+    if (explicit) return explicit
+    return systemTheme() || LIGHT
+  }
+
+  // ---------------------------------------------------------------- 主题三态
+
+  function normalizeMode(mode) {
+    return mode === AUTO || mode === LIGHT || mode === DARK ? mode : null
+  }
+
+  // auto / light / dark：ss.theme 有合法值即显式模式，否则 auto
+  function getMode() {
+    return get() || AUTO
+  }
+
+  // 同步分段控件的 aria-pressed（#theme-mode 不存在时静默）
+  function applyMode() {
+    const doc = getDoc()
+    const mode = getMode()
+    if (!doc || typeof doc.querySelectorAll !== 'function') return mode
+    const items = doc.querySelectorAll('#theme-mode [data-mode]')
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+      if (!item || typeof item.getAttribute !== 'function') continue
+      item.setAttribute('aria-pressed', item.getAttribute('data-mode') === mode ? 'true' : 'false')
+    }
+    return mode
+  }
+
+  // 设置主题模式：auto 删除 ss.theme 并跟随系统；light/dark 写入并应用
+  function setMode(mode) {
+    const next = normalizeMode(mode)
+    if (!next) return getMode()
+    if (next === AUTO) {
+      clearTheme()
+      apply(resolve(null))
+      followSystem()
+    } else {
+      save(next)
+      apply(next)
+    }
+    applyMode()
+    return next
+  }
+
+  let modeBound = false
+
+  // 绑定分段控件（每个 segmented-item 各绑一次，重复 init 不重复绑定）
+  function bindMode() {
+    if (modeBound) return
+    const doc = getDoc()
+    if (!doc || typeof doc.querySelectorAll !== 'function') return
+    const items = doc.querySelectorAll('#theme-mode [data-mode]')
+    if (!items.length) return
+    modeBound = true
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+      if (!item || typeof item.addEventListener !== 'function') continue
+      item.addEventListener('click', function (event) {
+        const target = event && event.target
+        const button = target && typeof target.closest === 'function' ? target.closest('[data-mode]') : item
+        if (button) setMode(button.getAttribute('data-mode'))
+      })
+    }
+  }
+
+  // 切换并持久化：保留给内部/测试用（现在等价于在 light/dark 间切）
+  function toggle() {
+    const next = currentTheme() === DARK ? LIGHT : DARK
+    setMode(next)
+    return next
+  }
+
+  let following = false
+
+  // 仅 auto 模式下实时跟随系统；显式 light/dark 时 onChange 会忽略
+  function followSystem() {
+    if (following) return
+    try {
+      if (typeof root.matchMedia !== 'function') return
+      const media = root.matchMedia('(prefers-color-scheme: dark)')
+      if (!media) return
+      const onChange = function () {
+        if (get()) return
+        apply(media.matches ? DARK : LIGHT)
+        applyMode()
+      }
+      if (typeof media.addEventListener === 'function') media.addEventListener('change', onChange)
+      else if (typeof media.addListener === 'function') media.addListener(onChange)
+      else return
+      following = true
+    } catch (error) {
+      // 环境不支持就静默
+    }
+  }
+
+  // 由 app.js 在 DOMContentLoaded 后调用
+  function init() {
+    const doc = getDoc()
+    const el = doc && doc.documentElement
+    if (!el) return
+
+    // 1) ?theme= 深链优先（老链接语义：等价 setMode 并持久化），处理完清理地址栏
+    const fromUrl = readUrlTheme()
+    if (fromUrl) {
+      setMode(fromUrl)
+      stripUrlTheme()
+    } else {
+      // 2) 否则按当前模式应用：auto 跟随系统，light/dark 用存储值
+      setMode(getMode())
+    }
+
+    // 3) 主题色：读取/应用存储色，并渲染设置面板的 19 个色块
+    initColor()
+
+    // 4) 绑定主题模式分段控件（#theme-mode）；重复 init 不重复绑定
+    bindMode()
+  }
+
+  SS.theme = {
+    KEY,
+    COLOR_KEY,
+    COLORS,
+    get,
+    resolve,
+    apply,
+    toggle,
+    init,
+    readUrlTheme,
+    getColor,
+    applyColor,
+    initColor,
+    getMode,
+    setMode,
+    applyMode,
+    bindMode,
+  }
+})(typeof globalThis !== 'undefined' ? globalThis : this)
+
+</script>
+  <script>
+/* assets/js/remote.js */
+// 联网联想：百度联想 JSONP（无 CORS，file:// 可用）。
+// 契约 §5.6：永不 reject；关闭/空词/超时/失败一律 resolve([])。
+;(function (root) {
+  'use strict'
+
+  const SS = (root.SimpleSearch = root.SimpleSearch || {})
+
+  const KEY = 'ss.remote'
+  const DEFAULT_TIMEOUT_MS = 700
+  const DEFAULT_LIMIT = 5
+  const MAX_WORD_LENGTH = 100
+  const CACHE_TTL_MS = 10 * 60 * 1000
+  const CACHE_MAX_ENTRIES = 100
+  const MAX_REQUEST_WORDS = 10
+  const CALLBACK_PREFIX = 'ss_suggest_'
+
+  let callbackSeq = 0
+  let requestSeq = 0
+  const cache = new Map()
+  const inFlight = new Map()
+  let sessionEnabled = null
+
+  function normalize(raw) {
+    if (typeof raw !== 'string') return ''
+    return raw.trim().replace(/\s+/g, ' ')
+  }
+
+  function normalizeTimeout(value) {
+    const number = Number(value)
+    if (!Number.isFinite(number) || number <= 0) return DEFAULT_TIMEOUT_MS
+    return Math.max(100, Math.min(5000, Math.floor(number)))
+  }
+
+  function normalizeLimit(value) {
+    if (value === undefined || value === null) return DEFAULT_LIMIT
+    const number = Number(value)
+    if (!Number.isFinite(number) || number < 0) return DEFAULT_LIMIT
+    return Math.max(0, Math.min(20, Math.floor(number)))
+  }
+
+  function normalizeWords(words, limit) {
+    const result = []
+    const seen = new Set()
+    const source = Array.isArray(words) ? words : []
+    for (const value of source) {
+      if (typeof value !== 'string') continue
+      const word = value.trim()
+      if (word === '' || word.length > MAX_WORD_LENGTH) continue
+      const dedupeKey = word.toLowerCase()
+      if (seen.has(dedupeKey)) continue
+      seen.add(dedupeKey)
+      result.push(word)
+      if (result.length >= limit) break
+    }
+    return result
+  }
+
+  function readStorage() {
+    try {
+      const storage = root.localStorage
+      if (storage && typeof storage.getItem === 'function') return storage
+    } catch (e) {
+      /* 存储被禁用 */
+    }
+    return null
+  }
+
+  function enabled() {
+    if (sessionEnabled !== null) return sessionEnabled
+    const storage = readStorage()
+    if (!storage) return true
+    try {
+      const stored = storage.getItem(KEY)
+      if (stored === 'off') return false
+      if (stored === 'on') return true
+    } catch (e) {
+      /* 读取异常回落默认开启 */
+    }
+    return true
+  }
+
+  function setEnabled(value) {
+    const on = Boolean(value)
+    const storage = readStorage()
+    if (storage && typeof storage.setItem === 'function') {
+      try {
+        storage.setItem(KEY, on ? 'on' : 'off')
+        if (typeof storage.getItem === 'function' && storage.getItem(KEY) === (on ? 'on' : 'off')) {
+          sessionEnabled = null
+          return on
+        }
+      } catch (e) {
+        /* 写失败退化为会话内生效 */
+      }
+    }
+    sessionEnabled = on
+    return on
+  }
+
+  // ---------------------------------------------------------------- 缓存
+
+  function readCache(cacheKey) {
+    const entry = cache.get(cacheKey)
+    if (!entry) return null
+    if (Date.now() - entry.time > CACHE_TTL_MS) {
+      cache.delete(cacheKey)
+      return null
+    }
+    cache.delete(cacheKey)
+    cache.set(cacheKey, entry)
+    return entry.words.slice()
+  }
+
+  function writeCache(cacheKey, words) {
+    if (!words || words.length === 0) return
+    cache.delete(cacheKey)
+    cache.set(cacheKey, { time: Date.now(), words: words.slice() })
+    while (cache.size > CACHE_MAX_ENTRIES) {
+      const oldest = cache.keys().next()
+      if (oldest.done) break
+      cache.delete(oldest.value)
+    }
+  }
+
+  // ---------------------------------------------------------------- provider
+
+  function buildBaiduUrl(query, callbackName) {
+    return 'https://suggestion.baidu.com/su?wd=' + encodeURIComponent(query) +
+      '&cb=' + encodeURIComponent(callbackName)
+  }
+
+  function parseJsonpBody(text) {
+    let body = text.trim()
+    if (body === '') return null
+    const open = body.indexOf('(')
+    const close = body.lastIndexOf(')')
+    if (open !== -1 && close > open) body = body.slice(open + 1, close).trim()
+    body = body.replace(/;\s*$/, '')
+    try {
+      return JSON.parse(body)
+    } catch (e) {
+      /* 继续尝试 */
+    }
+    const quoted = body.replace(/([,{]\s*)([A-Za-z_$][A-Za-z0-9_$]*)\s*:/g, '$1"$2":')
+    try {
+      return JSON.parse(quoted)
+    } catch (e) {
+      return null
+    }
+  }
+
+  function parseBaiduSuggestion(input) {
+    let payload = input
+    if (typeof payload === 'string') payload = parseJsonpBody(payload)
+    if (!payload || typeof payload !== 'object') return []
+
+    const source = Array.isArray(payload.s)
+      ? payload.s
+      : (Array.isArray(payload) ? payload : [])
+    const words = []
+    for (const value of source) {
+      if (typeof value !== 'string') continue
+      const word = value.trim()
+      if (word === '' || word.length > MAX_WORD_LENGTH) continue
+      words.push(word)
+    }
+    return words
+  }
+
+  const baiduProvider = {
+    id: 'baidu',
+    label: '百度',
+    buildUrl: buildBaiduUrl,
+    parse: parseBaiduSuggestion,
+  }
+
+  function currentProvider() {
+    const candidate = SS.remote && SS.remote.provider
+    if (candidate &&
+      typeof candidate.buildUrl === 'function' &&
+      typeof candidate.parse === 'function') {
+      return candidate
+    }
+    return baiduProvider
+  }
+
+  // ---------------------------------------------------------------- JSONP
+
+  function requestJsonp(query, options) {
+    return new Promise((resolve) => {
+      const doc = root.document
+      const provider = currentProvider()
+      if (!doc || typeof doc.createElement !== 'function') {
+        resolve([])
+        return
+      }
+
+      const timeout = normalizeTimeout(options.timeout)
+      const callbackName = CALLBACK_PREFIX + (callbackSeq += 1)
+      let script = null
+      let timer = 0
+      let settled = false
+      let abortHandler = null
+
+      function cleanup() {
+        if (timer) {
+          root.clearTimeout(timer)
+          timer = 0
+        }
+        if (abortHandler && options.signal &&
+          typeof options.signal.removeEventListener === 'function') {
+          try {
+            options.signal.removeEventListener('abort', abortHandler)
+          } catch (e) {
+            /* 忽略 */
+          }
+        }
+        abortHandler = null
+        if (script) {
+          try {
+            if (script.parentNode) script.parentNode.removeChild(script)
+          } catch (e) {
+            /* 忽略 */
+          }
+          script.onerror = null
+          script.onload = null
+          script = null
+        }
+        try {
+          delete root[callbackName]
+        } catch (e) {
+          root[callbackName] = undefined
+        }
+      }
+
+      function finish(words) {
+        if (settled) return
+        settled = true
+        cleanup()
+        resolve(Array.isArray(words) ? words : [])
+      }
+
+      root[callbackName] = function (payload) {
+        let words = []
+        try {
+          words = provider.parse(payload)
+        } catch (e) {
+          words = []
+        }
+        finish(words)
+      }
+
+      if (options.signal) {
+        if (options.signal.aborted) {
+          finish([])
+          return
+        }
+        abortHandler = () => finish([])
+        try {
+          options.signal.addEventListener('abort', abortHandler, { once: true })
+        } catch (e) {
+          abortHandler = null
+        }
+      }
+
+      timer = root.setTimeout(() => finish([]), timeout)
+
+      try {
+        script = doc.createElement('script')
+        script.async = true
+        script.onerror = () => finish([])
+        script.src = provider.buildUrl(query, callbackName)
+        const parent = doc.head || doc.body || doc.documentElement
+        if (!parent) {
+          finish([])
+          return
+        }
+        parent.appendChild(script)
+      } catch (e) {
+        finish([])
+      }
+    })
+  }
+
+  // ---------------------------------------------------------------- fetch
+
+  function fetchWords(rawQuery, opts) {
+    const options = opts && typeof opts === 'object' ? opts : {}
+    const query = normalize(rawQuery)
+    const limit = normalizeLimit(options.limit)
+
+    if (query === '' || limit === 0) return Promise.resolve([])
+    if (!enabled()) return Promise.resolve([])
+    if (!root.document) return Promise.resolve([])
+
+    const cacheKey = query.toLowerCase()
+
+    const cached = readCache(cacheKey)
+    if (cached) return Promise.resolve(cached.slice(0, limit))
+
+    const pending = inFlight.get(cacheKey)
+    if (pending) {
+      return pending.then((words) => words.slice(0, limit)).catch(() => [])
+    }
+
+    const seq = (requestSeq += 1)
+    const promise = requestJsonp(query, {
+      timeout: options.timeout,
+      signal: options.signal,
+    })
+      .then((words) => {
+        const normalized = normalizeWords(words, MAX_REQUEST_WORDS)
+        if (normalized.length > 0) writeCache(cacheKey, normalized)
+        if (seq !== requestSeq) return []
+        return normalized
+      })
+      .catch(() => [])
+      .then((words) => {
+        inFlight.delete(cacheKey)
+        return words
+      })
+
+    inFlight.set(cacheKey, promise)
+    return promise.then((words) => words.slice(0, limit))
+  }
+
+  SS.remote = {
+    KEY,
+    enabled,
+    setEnabled,
+    fetch: fetchWords,
+    provider: baiduProvider,
+  }
+})(typeof globalThis !== 'undefined' ? globalThis : this)
+
+</script>
+  <script>
+/* assets/js/input.js */
+// 输入体验：清除按钮、搜索按钮可用态、联想列表与键盘/鼠标交互。
+// 契约 §5.5/§5.6/§12.2：历史只由 app.js 写；本地联想先渲染，联网结果回来合并；关闭开关零第三方请求。
+// 经典脚本：只注册 SS.input，顶层不碰 DOM，由 app.js 在 DOMContentLoaded 后调用 init()。
+;(function (root) {
+  'use strict'
+
+  const SS = (root.SimpleSearch = root.SimpleSearch || {})
+
+  const DEBOUNCE_MS = 140
+  const BLUR_CLOSE_MS = 160
+  const OPTION_ID_PREFIX = 'suggest-option-'
+  const DEFAULT_ENGINE_SEARCH = 'https://www.bing.com/search?q='
+  const KEY_SLASH = '/'
+
+  const SITE_MAX = 3
+  const REMOTE_MAX = 5
+  const HISTORY_MAX = 2
+  const TOTAL_MAX = 8
+  const LOCAL_ITEM_CAP = 24
+  const REMOTE_WORD_MAX_LENGTH = 100
+
+  function normalize(raw) {
+    if (typeof raw !== 'string') return ''
+    return raw.trim().replace(/\s+/g, ' ')
+  }
+
+  function optionId(index) {
+    return OPTION_ID_PREFIX + index
+  }
+
+  let initialized = false
+
+  function init() {
+    if (initialized) return
+    const doc = root.document
+    if (!doc) return
+
+    const $ = (id) => doc.getElementById(id)
+
+    const input = $('search-input')
+    if (!input) return
+
+    const form = $('search-form')
+    const clearButton = $('clear-button')
+    const submitButton = $('search-submit')
+    const list = $('suggest-list')
+    const remoteToggle = $('suggest-source-toggle')
+    const historyCount = $('history-count')
+    const historyClear = $('history-clear')
+
+    let items = []
+    let activeIndex = -1
+    let lastRenderedValue = null
+    let debounceTimer = 0
+    let blurTimer = 0
+    let composing = false
+    let remoteToken = 0
+    let remoteController = null
+    let lastRemoteWords = []
+
+    // ------------------------------------------------------------ 状态同步
+
+    function syncFieldState() {
+      const value = input.value
+      if (clearButton) clearButton.hidden = value.length === 0
+      if (submitButton) {
+        if (normalize(value) === '') submitButton.setAttribute('aria-disabled', 'true')
+        else submitButton.removeAttribute('aria-disabled')
+      }
+    }
+
+    function scheduleSuggestions() {
+      if (debounceTimer) {
+        root.clearTimeout(debounceTimer)
+        debounceTimer = 0
+      }
+      debounceTimer = root.setTimeout(() => {
+        debounceTimer = 0
+        updateSuggestions()
+      }, DEBOUNCE_MS)
+    }
+
+    function cancelBlurClose() {
+      if (blurTimer) {
+        root.clearTimeout(blurTimer)
+        blurTimer = 0
+      }
+    }
+
+    // ------------------------------------------------------------ 远程联想
+
+    function remoteEnabled() {
+      return Boolean(SS.remote &&
+        typeof SS.remote.enabled === 'function' &&
+        SS.remote.enabled())
+    }
+
+    function createAbortController() {
+      try {
+        if (typeof root.AbortController === 'function') return new root.AbortController()
+      } catch (e) {
+        /* 老浏览器退化为只用令牌守卫 */
+      }
+      return null
+    }
+
+    // 作废当前远程请求的「采用权」：令牌自增，但不 abort 在途 JSONP。
+    // 让脚本自然执行完回调再清理，避免回调已删除却仍有脚本迟到执行（ReferenceError）。
+    function invalidateRemote() {
+      remoteToken += 1
+      remoteController = null
+    }
+
+    // 明确中止在途请求（只在关闭联网联想开关时使用，契约要求立即 abort）
+    function abortRemote() {
+      const controller = remoteController
+      remoteToken += 1
+      remoteController = null
+      if (controller) {
+        try {
+          controller.abort()
+        } catch (e) {
+          /* 忽略 */
+        }
+      }
+    }
+
+    // 关闭列表时作废远程请求：立即失效令牌（结果一定被丢弃），
+    // 并把 abort 推迟到下一个任务——让已加载的 JSONP 脚本先执行完自己的回调，
+    // 避免「回调已删除、脚本迟到执行」产生 ss_suggest_N is not defined。
+    function settleRemoteOnClose() {
+      const controller = remoteController
+      invalidateRemote()
+      if (!controller) return
+      root.setTimeout(() => {
+        try {
+          controller.abort()
+        } catch (e) {
+          /* 忽略 */
+        }
+      }, 0)
+    }
+
+    function syncRemoteToggle() {
+      if (!remoteToggle || !SS.remote) return
+      const on = remoteEnabled()
+      remoteToggle.setAttribute('aria-pressed', on ? 'true' : 'false')
+    }
+
+    // ------------------------------------------------------------ 搜索历史管理
+
+    function historyList() {
+      try {
+        if (SS.history && typeof SS.history.list === 'function') {
+          const list = SS.history.list()
+          return Array.isArray(list) ? list : []
+        }
+      } catch (e) {
+        /* 历史读取失败不影响输入 */
+      }
+      return []
+    }
+
+    function refreshHistoryCount() {
+      const count = historyList().length
+      if (historyCount) historyCount.textContent = count + ' 条'
+      if (historyClear) historyClear.disabled = count === 0
+      return count
+    }
+
+    function rerenderForHistory() {
+      const raw = input.value
+      if (normalize(raw) === '') return
+      if (!list || list.hidden || items.length === 0) return
+      const preserveKey = currentActiveKey()
+      lastRenderedValue = raw
+      renderItems(buildItems(raw, lastRemoteWords), preserveKey)
+    }
+
+    function removeHistoryItem(label, keepActive) {
+      if (!SS.history || typeof SS.history.remove !== 'function') return
+      const wasActiveIndex = activeIndex
+      try {
+        SS.history.remove(label)
+      } catch (e) {
+        /* 存储异常忽略 */
+      }
+      refreshHistoryCount()
+      rerenderForHistory()
+      if (keepActive && activeIndex === -1 && items.length > 0) {
+        setActive(Math.min(Math.max(wasActiveIndex, 0), items.length - 1))
+      }
+    }
+
+    // ------------------------------------------------------------ 本地 + 合并
+
+    function collectLocal(raw) {
+      let source = []
+      if (SS.suggest && typeof SS.suggest.getItems === 'function') {
+        try {
+          const result = SS.suggest.getItems(raw, { max: LOCAL_ITEM_CAP })
+          source = Array.isArray(result) ? result : []
+        } catch (e) {
+          source = []
+        }
+      }
+
+      const engine = []
+      const sites = []
+      const history = []
+      for (const item of source) {
+        if (!item || typeof item !== 'object') continue
+        if (item.type === 'engine' && engine.length === 0) engine.push(item)
+        else if (item.type === 'site' && sites.length < SITE_MAX) sites.push(item)
+        else if (item.type === 'history' && history.length < HISTORY_MAX) history.push(item)
+      }
+      return { engine, sites, history }
+    }
+
+    // ------------------------------------------------------------ !bang 站内搜索
+
+    // 解析「!token [词]」：返回 { token, term }；不是合法 bang 语法时返回 null
+    function bangToken(raw) {
+      const match = normalize(raw).match(/^!([a-z0-9][a-z0-9-]*)(?:\s+([\s\S]*))?$/)
+      if (!match) return null
+      return { token: match[1], term: normalize(match[2] || '') }
+    }
+
+    function siteLabelById(siteId) {
+      if (Array.isArray(SS.sites)) {
+        for (const site of SS.sites) {
+          if (site && site.id === siteId) {
+            return typeof site.label === 'string' && site.label !== '' ? site.label : siteId
+          }
+        }
+      }
+      return siteId || ''
+    }
+
+    // 合法 !bang 且 SS.search.resolveBang 命中时返回首项；未落地/未命中返回 null（行为不变）
+    function buildBangItem(raw) {
+      const parsed = bangToken(raw)
+      if (!parsed) return null
+      if (!SS.search || typeof SS.search.resolveBang !== 'function') return null
+
+      let decision = null
+      try {
+        decision = SS.search.resolveBang(raw)
+      } catch (e) {
+        decision = null
+      }
+      if (!decision || typeof decision.url !== 'string' || decision.url === '') return null
+
+      const siteLabel = siteLabelById(decision.siteId)
+      const term = typeof decision.term === 'string' && decision.term !== '' ? decision.term : parsed.term
+      return {
+        type: 'bang',
+        label: term === '' ? '打开 ' + siteLabel : '在 ' + siteLabel + ' 搜索：' + term,
+        sublabel: '!' + parsed.token,
+        siteId: decision.siteId,
+        url: decision.url,
+        kind: decision.kind,
+      }
+    }
+
+    // 采用 !bang 项：直接跳转，不记历史、不走表单提交
+    function adoptBang(item) {
+      let decision = null
+      try {
+        decision = SS.search && typeof SS.search.resolveBang === 'function'
+          ? SS.search.resolveBang(normalize(input.value))
+          : null
+      } catch (e) {
+        decision = null
+      }
+      const url = decision && decision.url ? decision.url : item.url
+      if (url) navigate(url)
+      else input.focus()
+    }
+
+    function buildItems(raw, remoteWords) {
+      const bangItem = buildBangItem(raw)
+      const local = collectLocal(raw)
+      const seen = new Set()
+      const remember = (value) => {
+        if (typeof value === 'string' && value.trim() !== '') seen.add(value.trim().toLowerCase())
+      }
+      if (bangItem) remember(bangItem.label)
+      for (const item of local.engine) remember(item.label)
+      for (const item of local.sites) remember(item.label)
+      for (const item of local.history) remember(item.label)
+      const query = normalize(raw).toLowerCase()
+      if (query !== '') seen.add(query)
+
+      const remoteItems = []
+      const words = Array.isArray(remoteWords) ? remoteWords : []
+      const providerLabel =
+        SS.remote && SS.remote.provider && typeof SS.remote.provider.label === 'string'
+          ? SS.remote.provider.label
+          : '联网'
+      for (const value of words) {
+        if (typeof value !== 'string') continue
+        const label = value.trim()
+        if (label === '' || label.length > REMOTE_WORD_MAX_LENGTH) continue
+        const dedupeKey = label.toLowerCase()
+        if (seen.has(dedupeKey)) continue
+        seen.add(dedupeKey)
+        remoteItems.push({ type: 'remote', label, sublabel: providerLabel })
+        if (remoteItems.length >= REMOTE_MAX) break
+      }
+
+      const localCount = local.engine.length + local.sites.length + local.history.length
+      const bangCount = bangItem ? 1 : 0
+      const remoteSlots = Math.max(0, Math.min(REMOTE_MAX, TOTAL_MAX - localCount - bangCount))
+      const head = bangItem ? [bangItem] : []
+      return head
+        .concat(local.engine, local.sites, remoteItems.slice(0, remoteSlots), local.history)
+        .slice(0, TOTAL_MAX)
+    }
+
+    function currentActiveKey() {
+      if (activeIndex < 0) return null
+      const item = items[activeIndex]
+      if (!item) return null
+      return item.type + '|' + String(item.label).toLowerCase()
+    }
+
+    function requestRemote(raw) {
+      invalidateRemote()
+      const query = normalize(raw)
+      if (query === '' || !remoteEnabled()) return
+      // !bang 是本地站内快捷搜索，不需要联网联想
+      if (bangToken(raw)) return
+      if (!list || list.hidden) return
+      if (!SS.remote || typeof SS.remote.fetch !== 'function') return
+
+      const token = remoteToken
+      const controller = createAbortController()
+      remoteController = controller
+      const requestOptions = { limit: REMOTE_MAX }
+      if (controller) requestOptions.signal = controller.signal
+
+      let pending = null
+      try {
+        pending = SS.remote.fetch(raw, requestOptions)
+      } catch (e) {
+        remoteController = null
+        return
+      }
+      if (!pending || typeof pending.then !== 'function') {
+        remoteController = null
+        return
+      }
+
+      pending.then((words) => {
+        if (token !== remoteToken) return
+        if (remoteController === controller) remoteController = null
+        const remoteWords = Array.isArray(words) ? words : []
+        if (normalize(input.value) !== query) return
+        // 列表必须仍处于打开状态，否则丢弃结果（不重渲染、也不自动打开）
+        if (!list || list.hidden || items.length === 0) return
+        if (input.getAttribute('aria-expanded') !== 'true') return
+        if (remoteWords.length === 0) return
+
+        const preserveKey = currentActiveKey()
+        lastRenderedValue = input.value
+        lastRemoteWords = remoteWords.slice()
+        renderItems(buildItems(input.value, remoteWords), preserveKey)
+      }).catch(() => {
+        /* fetch 永不 reject；再兜一层，绝不影响本地联想 */
+      })
+    }
+
+    // ------------------------------------------------------------ 列表渲染
+
+    function clearActive() {
+      activeIndex = -1
+      if (list) {
+        const options = list.querySelectorAll('[role="option"]')
+        for (const option of options) {
+          option.classList.remove('is-active')
+          option.setAttribute('aria-selected', 'false')
+        }
+      }
+      input.removeAttribute('aria-activedescendant')
+    }
+
+    function closeList() {
+      // 取消待触发的防抖：否则「输入后立刻 Esc」会让防抖晚到，重新渲染并弹回列表
+      if (debounceTimer) {
+        root.clearTimeout(debounceTimer)
+        debounceTimer = 0
+      }
+      settleRemoteOnClose()
+      clearActive()
+      items = []
+      lastRenderedValue = null
+      lastRemoteWords = []
+      if (list) {
+        list.hidden = true
+        list.textContent = ''
+      }
+      input.setAttribute('aria-expanded', 'false')
+      input.removeAttribute('aria-activedescendant')
+    }
+
+    function setActive(index) {
+      if (!list || items.length === 0) return
+      const count = items.length
+      let next = index
+      if (next < 0) next = count - 1
+      if (next >= count) next = 0
+      activeIndex = next
+
+      const options = list.querySelectorAll('[role="option"]')
+      for (let i = 0; i < options.length; i += 1) {
+        const option = options[i]
+        const active = i === next
+        option.classList.toggle('is-active', active)
+        option.setAttribute('aria-selected', active ? 'true' : 'false')
+      }
+
+      if (next >= 0) {
+        input.setAttribute('aria-activedescendant', optionId(next))
+        const activeOption = options[next]
+        if (activeOption && typeof activeOption.scrollIntoView === 'function') {
+          try {
+            activeOption.scrollIntoView({ block: 'nearest' })
+          } catch (e) {
+            /* 老浏览器忽略 */
+          }
+        }
+      }
+    }
+
+    function renderItems(nextItems, preserveKey) {
+      if (!list) return
+      items = nextItems
+      activeIndex = -1
+      if (items.length === 0) {
+        closeList()
+        return
+      }
+
+      list.textContent = ''
+      const fragment = doc.createDocumentFragment()
+      items.forEach((item, index) => {
+        const option = doc.createElement('li')
+        option.className = item.type === 'history' ? 'suggest-item suggest-item-history' : 'suggest-item'
+        option.id = optionId(index)
+        option.dataset.index = String(index)
+        option.dataset.type = item.type
+        if (item.siteId) option.dataset.siteId = item.siteId
+        option.setAttribute('role', 'option')
+        option.setAttribute('aria-selected', 'false')
+
+        const label = doc.createElement('span')
+        label.className = 'suggest-label'
+        label.textContent = item.label
+        option.appendChild(label)
+
+        if (item.sublabel) {
+          const sublabel = doc.createElement('span')
+          sublabel.className = 'suggest-sublabel'
+          sublabel.textContent = item.sublabel
+          option.appendChild(sublabel)
+        }
+
+        if (item.type === 'history') {
+          const remove = doc.createElement('button')
+          remove.className = 'suggest-delete'
+          remove.type = 'button'
+          remove.tabIndex = -1
+          remove.setAttribute('aria-label', '删除这条历史')
+          remove.title = '删除'
+          remove.textContent = '✕'
+          option.appendChild(remove)
+        }
+        fragment.appendChild(option)
+      })
+      list.appendChild(fragment)
+      list.hidden = false
+      input.setAttribute('aria-expanded', 'true')
+      input.removeAttribute('aria-activedescendant')
+
+      if (preserveKey) {
+        const index = items.findIndex((item) =>
+          item.type + '|' + String(item.label).toLowerCase() === preserveKey)
+        if (index !== -1) setActive(index)
+      }
+    }
+
+    function renderSuggestions(raw) {
+      lastRenderedValue = raw
+      lastRemoteWords = []
+      renderItems(buildItems(raw, []))
+      requestRemote(raw)
+    }
+
+    function updateSuggestions() {
+      const raw = input.value
+      if (normalize(raw) === '') {
+        closeList()
+        return
+      }
+      if (list && !list.hidden && lastRenderedValue === raw && items.length > 0) return
+      renderSuggestions(raw)
+    }
+
+    function ensureSuggestions() {
+      const raw = input.value
+      if (normalize(raw) === '') {
+        closeList()
+        return false
+      }
+      if (!list) return false
+      if (list.hidden || items.length === 0 || lastRenderedValue !== raw) renderSuggestions(raw)
+      return items.length > 0
+    }
+
+    // ------------------------------------------------------------ 采用建议项
+
+    function navigate(url) {
+      if (!url) return
+      try {
+        root.location.href = url
+      } catch (e) {
+        try {
+          root.location.assign(url)
+        } catch (err) {
+          /* 静默 */
+        }
+      }
+    }
+
+    function searchWithDefaultEngine() {
+      const query = normalize(input.value)
+      if (query === '') {
+        input.focus()
+        return
+      }
+
+      if (form && typeof form.requestSubmit === 'function') {
+        try {
+          form.requestSubmit()
+          return
+        } catch (e) {
+          /* 落 URL 兜底 */
+        }
+      }
+
+      let url = ''
+      if (SS.search && typeof SS.search.resolveDefault === 'function') {
+        const decision = SS.search.resolveDefault(query)
+        if (decision && decision.url) url = decision.url
+      }
+      if (!url) url = DEFAULT_ENGINE_SEARCH + encodeURIComponent(query)
+      navigate(url)
+    }
+
+    function adoptSite(siteId) {
+      const decision = SS.search && typeof SS.search.resolveSite === 'function'
+        ? SS.search.resolveSite(siteId, input.value)
+        : null
+      if (decision && decision.url) {
+        navigate(decision.url)
+        return
+      }
+      input.focus()
+    }
+
+    function adopt(item) {
+      if (!item) return
+      cancelBlurClose()
+      closeList()
+
+      if (item.type === 'bang') {
+        adoptBang(item)
+        return
+      }
+      if (item.type === 'site') {
+        adoptSite(item.siteId)
+        return
+      }
+      if (item.type === 'history' || item.type === 'remote') {
+        input.value = item.label
+        syncFieldState()
+        searchWithDefaultEngine()
+        return
+      }
+      searchWithDefaultEngine()
+    }
+
+    // ------------------------------------------------------------ 事件绑定
+
+    input.addEventListener('input', () => {
+      syncFieldState()
+      if (composing) return
+      if (normalize(input.value) === '') {
+        if (debounceTimer) {
+          root.clearTimeout(debounceTimer)
+          debounceTimer = 0
+        }
+        closeList()
+        return
+      }
+      scheduleSuggestions()
+    })
+
+    input.addEventListener('compositionstart', () => {
+      composing = true
+    })
+
+    input.addEventListener('compositionend', () => {
+      composing = false
+      syncFieldState()
+      scheduleSuggestions()
+    })
+
+    input.addEventListener('focus', () => {
+      cancelBlurClose()
+    })
+
+    input.addEventListener('blur', () => {
+      cancelBlurClose()
+      // 失焦后不再补渲染：立即取消待触发的防抖，避免关闭后又被防抖弹回
+      if (debounceTimer) {
+        root.clearTimeout(debounceTimer)
+        debounceTimer = 0
+      }
+      blurTimer = root.setTimeout(() => {
+        blurTimer = 0
+        closeList()
+      }, BLUR_CLOSE_MS)
+    })
+
+    input.addEventListener('keydown', (event) => {
+      if (event.isComposing || composing) return
+
+      const key = event.key
+
+      if (key === 'ArrowDown') {
+        if (!ensureSuggestions()) return
+        event.preventDefault()
+        if (activeIndex === -1) setActive(0)
+        else setActive(activeIndex + 1)
+        return
+      }
+
+      if (key === 'ArrowUp') {
+        if (!ensureSuggestions()) return
+        event.preventDefault()
+        if (activeIndex <= 0) setActive(items.length - 1)
+        else setActive(activeIndex - 1)
+        return
+      }
+
+      if (key === 'Delete') {
+        if (list && !list.hidden && activeIndex >= 0 && items[activeIndex] &&
+          items[activeIndex].type === 'history') {
+          event.preventDefault()
+          removeHistoryItem(items[activeIndex].label, true)
+        }
+        return
+      }
+
+      if (key === 'Enter') {
+        if (list && !list.hidden && activeIndex >= 0 && items[activeIndex]) {
+          event.preventDefault()
+          adopt(items[activeIndex])
+        }
+        return
+      }
+
+      if (key === 'Escape' || key === 'Esc') {
+        // 列表已打开时接管 Esc（阻止默认）；但无论是否已渲染，都要走关闭清理：
+        // 输入后防抖未触发时按 Esc，也必须取消待触发的联想/远程，否则稍后列表会自己弹出来。
+        if (list && !list.hidden) event.preventDefault()
+        closeList()
+        return
+      }
+
+      if (key === 'Tab') {
+        closeList()
+      }
+    })
+
+    if (list) {
+      list.addEventListener('mousedown', (event) => {
+        const target = event.target
+        const deleteButton = target && typeof target.closest === 'function'
+          ? target.closest('.suggest-delete')
+          : null
+        if (deleteButton && list.contains(deleteButton)) {
+          event.preventDefault()
+          return
+        }
+        const option = target && typeof target.closest === 'function'
+          ? target.closest('[role="option"]')
+          : null
+        if (!option || !list.contains(option)) return
+        event.preventDefault()
+        const index = Number(option.dataset.index)
+        const item = items[index]
+        if (item) adopt(item)
+      })
+
+      list.addEventListener('click', (event) => {
+        const target = event.target
+        const deleteButton = target && typeof target.closest === 'function'
+          ? target.closest('.suggest-delete')
+          : null
+        if (!deleteButton || !list.contains(deleteButton)) return
+        event.preventDefault()
+        event.stopPropagation()
+        const option = deleteButton.closest('[role="option"]')
+        if (!option) return
+        const index = Number(option.dataset.index)
+        const item = items[index]
+        if (item && item.type === 'history') removeHistoryItem(item.label, false)
+      })
+    }
+
+    if (clearButton) {
+      clearButton.addEventListener('mousedown', (event) => {
+        event.preventDefault()
+      })
+      clearButton.addEventListener('click', () => {
+        input.value = ''
+        syncFieldState()
+        closeList()
+        input.focus()
+      })
+    }
+
+    if (remoteToggle && SS.remote) {
+      remoteToggle.addEventListener('click', () => {
+        const next = !remoteEnabled()
+        if (typeof SS.remote.setEnabled === 'function') SS.remote.setEnabled(next)
+        syncRemoteToggle()
+
+        const raw = input.value
+        const query = normalize(raw)
+        if (next) {
+          if (query !== '' && list && !list.hidden) requestRemote(raw)
+          return
+        }
+
+        // 关闭：中止在途请求并移除已有远程项
+        abortRemote()
+        if (query !== '' && list && !list.hidden) {
+          const preserveKey = currentActiveKey()
+          lastRenderedValue = raw
+          lastRemoteWords = []
+          renderItems(buildItems(raw, []), preserveKey)
+        }
+      })
+      syncRemoteToggle()
+    }
+
+    refreshHistoryCount()
+    if (historyClear) {
+      historyClear.addEventListener('click', () => {
+        if (!SS.history || typeof SS.history.clear !== 'function') return
+        try {
+          SS.history.clear()
+        } catch (e) {
+          /* 存储异常忽略 */
+        }
+        refreshHistoryCount()
+        closeList()
+      })
+    }
+    doc.addEventListener('ss:history-changed', () => {
+      refreshHistoryCount()
+      rerenderForHistory()
+    })
+    root.addEventListener('focus', refreshHistoryCount)
+
+    // 引擎切换（设置面板）后刷新已打开的联想列表，让首项「用 <引擎> 搜索」文案立即跟随；
+    // 切换本身由 app.js 负责，这里只同步已渲染列表。
+    doc.addEventListener('click', (event) => {
+      const target = event.target
+      const engineButton = target && typeof target.closest === 'function'
+        ? target.closest('#engine-mode [data-engine]')
+        : null
+      if (!engineButton) return
+      const raw = input.value
+      if (normalize(raw) === '' || !list || list.hidden || items.length === 0) return
+      const preserveKey = currentActiveKey()
+      lastRenderedValue = raw
+      renderItems(buildItems(raw, lastRemoteWords), preserveKey)
+    })
+
+    doc.addEventListener('keydown', (event) => {
+      if (event.defaultPrevented) return
+      if (event.ctrlKey || event.metaKey || event.altKey) return
+      if (event.key !== KEY_SLASH) return
+
+      const target = event.target
+      if (target && target.nodeType === 1) {
+        const tag = target.tagName
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+        if (target.isContentEditable) return
+      }
+      event.preventDefault()
+      input.focus()
+      if (typeof input.select === 'function') input.select()
+    })
+
+    syncFieldState()
+    input.setAttribute('aria-expanded', 'false')
+    initialized = true
+  }
+
+  SS.input = { init }
+})(typeof globalThis !== 'undefined' ? globalThis : this)
+
+</script>
+  <script>
+/* assets/js/app.js */
+// 应用装配层：只负责把各模块接到 DOM 上，不含业务逻辑。
+//
+// v2.3 页面骨架 = MDUI 文档站式：主色顶栏 + 左侧分类导航（窄屏变抽屉）+ 内容卡片
+// + 右侧设置抽屉（MD1 开关行）。
+;(function (root) {
+  'use strict'
+
+  const SS = (root.SimpleSearch = root.SimpleSearch || {})
+
+  const $ = (id) => document.getElementById(id)
+  const MOBILE_NAV = '(max-width: 959px)'
+
+  function currentQuery() {
+    const input = $('search-input')
+    return input ? input.value : ''
+  }
+
+  function openInNewTab(url) {
+    const win = window.open(url, '_blank', 'noopener')
+    if (win) win.opener = null
+  }
+
+  // 站点按钮：空词直达站点，有词走站内搜索
+  function handleSiteClick(siteId, event) {
+    const query = currentQuery()
+    const decision = SS.search && SS.search.resolveSite ? SS.search.resolveSite(siteId, query) : null
+    if (!decision) return
+
+    if (decision.kind === 'search' && SS.history && SS.history.record) {
+      SS.history.record(query)
+      notifyHistoryChanged()
+    }
+
+    const newTab = Boolean(event && (event.ctrlKey || event.metaKey || event.altKey))
+    if (newTab) openInNewTab(decision.url)
+    else window.location.href = decision.url
+  }
+
+  function bindSiteButtons() {
+    const container = $('buttons-container')
+    if (!container) return
+    container.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-site]')
+      if (!button || !container.contains(button)) return
+      handleSiteClick(button.getAttribute('data-site'), event)
+    })
+  }
+
+  function bindSearchForm() {
+    const form = $('search-form')
+    const input = $('search-input')
+    if (!form || !input) return
+
+    form.addEventListener('submit', (event) => {
+      const query = (input.value || '').trim()
+      if (query === '') {
+        // 空词不提交空搜索，回到输入框
+        event.preventDefault()
+        input.focus()
+        return
+      }
+
+      // !bang 快捷搜索：!gh rust → 直接在 GitHub 里搜 rust
+      const bang = SS.search && SS.search.resolveBang ? SS.search.resolveBang(query) : null
+      if (bang) {
+        event.preventDefault()
+        if (SS.history && SS.history.record && bang.term) {
+          SS.history.record(bang.term)
+          notifyHistoryChanged()
+        }
+        window.location.href = bang.url
+        return
+      }
+
+      if (SS.history && SS.history.record) {
+        SS.history.record(query)
+        notifyHistoryChanged()
+      }
+      // 非空交给浏览器原生 GET 提交，表单编码天然安全
+    })
+  }
+
+  // ---------------------------------------------------------------- 分类导航
+  // 历史写入后通知输入模块刷新设置面板里的计数/清空按钮
+  function notifyHistoryChanged() {
+    try {
+      document.dispatchEvent(new CustomEvent('ss:history-changed'))
+    } catch (error) {
+      // 老浏览器不支持 CustomEvent 构造时忽略（计数只是辅助信息）
+    }
+  }
+
+  // 分类选择同步到地址栏（可收藏/分享分类视图）；'all' 时不带参数
+  function syncCategoryUrl(group) {
+    try {
+      const url = new URL(window.location.href)
+      if (group === 'all') url.searchParams.delete('cat')
+      else url.searchParams.set('cat', group)
+      const next = url.pathname + (url.search || '') + (url.hash || '')
+      window.history.replaceState(window.history.state, '', next)
+    } catch (error) {
+      // file:// 或受限环境 replaceState 失败时忽略，不影响筛选
+    }
+  }
+
+  function applyGroupFilter(group) {
+    const nav = $('group-chips')
+    const isAll = group === 'all'
+    let label = ''
+    if (nav) {
+      for (const item of nav.querySelectorAll('[data-group]')) {
+        const active = item.getAttribute('data-group') === group
+        item.setAttribute('aria-current', active ? 'true' : 'false')
+        if (active) {
+          const text = item.querySelector('.nav-label')
+          label = text ? text.textContent.trim() : item.textContent.trim()
+        }
+      }
+    }
+    const buttons = document.querySelectorAll('#buttons-container [data-site]')
+    for (const button of buttons) {
+      // 常用视图只显示 featured；分类视图显示该分类全部站点
+      const match = isAll
+        ? button.getAttribute('data-featured') === 'true'
+        : button.getAttribute('data-group') === group
+      button.hidden = !match
+    }
+    // 卡片标题跟随当前视图
+    const title = document.querySelector('.card-title')
+    if (title) title.textContent = isAll ? '常用网站' : label || '常用网站'
+    syncCategoryUrl(group)
+  }
+
+  function isMobileNav() {
+    return Boolean(window.matchMedia && window.matchMedia(MOBILE_NAV).matches)
+  }
+
+  function bindGroupNav() {
+    const nav = $('group-chips')
+    if (!nav) return
+    nav.addEventListener('click', (event) => {
+      const item = event.target.closest('[data-group]')
+      if (!item || !nav.contains(item)) return
+      applyGroupFilter(item.getAttribute('data-group'))
+      // 窄屏抽屉里选完分类自动收起
+      if (isMobileNav()) closeNav(false)
+    })
+  }
+
+  // ---------------------------------------------------------------- 抽屉 / 遮罩
+  // 判"是否有覆盖层打开"时看真实状态（#settings-panel 的 hidden / body.nav-open），
+  // 不要只看 body class —— openSettings 要等 rAF 才加 class，早一步判断会漏掉。
+  function anyOverlayOpen() {
+    const panel = $('settings-panel')
+    const dialog = $('shortcuts-dialog')
+    const panelOpen = Boolean(panel && !panel.hidden)
+    const dialogOpen = Boolean(dialog && !dialog.hidden)
+    return panelOpen || dialogOpen || document.body.classList.contains('nav-open')
+  }
+
+  function syncScrim() {
+    const scrim = $('scrim')
+    if (!scrim) return
+    scrim.hidden = !anyOverlayOpen()
+  }
+
+  function openNav() {
+    closeShortcuts(false)
+    closeSettings(false)
+    document.body.classList.add('nav-open')
+    const toggle = $('nav-toggle')
+    if (toggle) toggle.setAttribute('aria-expanded', 'true')
+    syncScrim()
+  }
+
+  function closeNav(restoreFocus = true) {
+    document.body.classList.remove('nav-open')
+    const toggle = $('nav-toggle')
+    if (toggle) toggle.setAttribute('aria-expanded', 'false')
+    syncScrim()
+    if (restoreFocus && toggle && !toggle.hidden) toggle.focus()
+  }
+
+  function openSettings() {
+    closeShortcuts(false)
+    closeNav(false)
+    const panel = $('settings-panel')
+    const toggle = $('settings-toggle')
+    if (!panel || !toggle) return
+    panel.hidden = false
+    requestAnimationFrame(() => document.body.classList.add('panel-open'))
+    toggle.setAttribute('aria-expanded', 'true')
+    syncScrim()
+    const first = panel.querySelector('.switch-row')
+    if (first && typeof first.focus === 'function') first.focus()
+  }
+
+  function closeSettings(restoreFocus = true) {
+    const panel = $('settings-panel')
+    const toggle = $('settings-toggle')
+    document.body.classList.remove('panel-open')
+    if (panel) panel.hidden = true
+    if (toggle) toggle.setAttribute('aria-expanded', 'false')
+    syncScrim()
+    if (restoreFocus && toggle) toggle.focus()
+  }
+
+  function isScrimVisible() {
+    return anyOverlayOpen()
+  }
+
+  // ---------------------------------------------------------------- 快捷键对话框
+  let shortcutsTrigger = null
+
+  function openShortcuts(trigger) {
+    closeSettings(false)
+    closeNav(false)
+    const dialog = $('shortcuts-dialog')
+    if (!dialog) return
+    shortcutsTrigger = trigger || null
+    dialog.hidden = false
+    syncScrim()
+    const close = $('shortcuts-close')
+    if (close && typeof close.focus === 'function') close.focus()
+  }
+
+  function closeShortcuts(restoreFocus = true) {
+    const dialog = $('shortcuts-dialog')
+    if (!dialog || dialog.hidden) return
+    dialog.hidden = true
+    syncScrim()
+    const target = shortcutsTrigger
+    shortcutsTrigger = null
+    if (restoreFocus && target && typeof target.focus === 'function') target.focus()
+  }
+
+  function bindDrawers() {
+    const scrim = $('scrim')
+    const navToggle = $('nav-toggle')
+    const settingsToggle = $('settings-toggle')
+    const settingsClose = $('settings-close')
+    const panel = $('settings-panel')
+
+    if (navToggle) {
+      navToggle.addEventListener('click', () => {
+        if (document.body.classList.contains('nav-open')) closeNav()
+        else openNav()
+      })
+    }
+    if (settingsToggle) {
+      settingsToggle.addEventListener('click', () => {
+        if (panel && !panel.hidden) closeSettings()
+        else openSettings()
+      })
+    }
+    if (settingsClose) settingsClose.addEventListener('click', () => closeSettings())
+    if (scrim) {
+      scrim.addEventListener('click', () => {
+        const dialog = $('shortcuts-dialog')
+        if (dialog && !dialog.hidden) closeShortcuts()
+        else if (panel && !panel.hidden) closeSettings()
+        else if (document.body.classList.contains('nav-open')) closeNav()
+      })
+    }
+    const shortcutsOpen = $('shortcuts-open')
+    if (shortcutsOpen) {
+      shortcutsOpen.addEventListener('click', () => openShortcuts(shortcutsOpen))
+    }
+    const shortcutsClose = $('shortcuts-close')
+    if (shortcutsClose) shortcutsClose.addEventListener('click', () => closeShortcuts())
+    document.addEventListener('keydown', (event) => {
+      // ? 打开快捷键说明（输入框里打 ? 不拦截）
+      if ((event.key === '?' || (event.key === '/' && event.shiftKey)) && !event.metaKey && !event.ctrlKey && !event.altKey) {
+        const active = document.activeElement
+        const typing = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)
+        const dialog = $('shortcuts-dialog')
+        if (!typing && dialog && dialog.hidden) {
+          event.preventDefault()
+          openShortcuts(active)
+        }
+      }
+    })
+    document.addEventListener('keydown', (event) => {
+      const dialog = $('shortcuts-dialog')
+      const trap = dialog && !dialog.hidden ? dialog : panel && !panel.hidden ? panel : null
+      // aria-modal 覆盖层：Tab 在内部循环，不跑到背后的页面
+      if (event.key === 'Tab' && trap) {
+        const focusables = trap.querySelectorAll('button, a[href]')
+        if (focusables.length > 0) {
+          const first = focusables[0]
+          const last = focusables[focusables.length - 1]
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault()
+            last.focus()
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault()
+            first.focus()
+          }
+        }
+        return
+      }
+      if (event.key !== 'Escape' || !isScrimVisible()) return
+      if (dialog && !dialog.hidden) closeShortcuts()
+      else if (panel && !panel.hidden) closeSettings()
+      else closeNav()
+      event.preventDefault()
+    })
+  }
+
+  // ---------------------------------------------------------------- 搜索引擎
+  const ENGINE_KEY = 'ss.engine'
+  const FALLBACK_ENGINE = 'bing'
+
+  function knownEngines() {
+    return SS.engines && typeof SS.engines === 'object' ? SS.engines : {}
+  }
+
+  function getStoredEngine() {
+    try {
+      const stored = window.localStorage ? window.localStorage.getItem(ENGINE_KEY) : null
+      return knownEngines()[stored] ? stored : FALLBACK_ENGINE
+    } catch (error) {
+      return FALLBACK_ENGINE
+    }
+  }
+
+  function saveEngine(id) {
+    try {
+      if (window.localStorage) window.localStorage.setItem(ENGINE_KEY, id)
+    } catch (error) {
+      // 存储不可用时仅当次生效
+    }
+  }
+
+  // 切换搜索引擎：更新 SS.defaultEngine、表单 action 与参数名、分段控件状态
+  function applyEngine(id, options) {
+    const engine = knownEngines()[id]
+    if (!engine || typeof engine.search !== 'string') return
+    SS.defaultEngine = id
+    const form = $('search-form')
+    const input = $('search-input')
+    if (form) form.setAttribute('action', engine.search.split('?')[0])
+    if (input) input.setAttribute('name', engine.param || 'q')
+    const group = $('engine-mode')
+    if (group) {
+      for (const item of group.querySelectorAll('[data-engine]')) {
+        item.setAttribute('aria-pressed', item.getAttribute('data-engine') === id ? 'true' : 'false')
+      }
+    }
+    if (!options || options.persist !== false) saveEngine(id)
+  }
+
+  function bindEngines() {
+    const group = $('engine-mode')
+    if (group) {
+      group.addEventListener('click', (event) => {
+        const item = event.target.closest('[data-engine]')
+        if (!item || !group.contains(item)) return
+        applyEngine(item.getAttribute('data-engine'))
+      })
+    }
+    applyEngine(getStoredEngine(), { persist: false })
+  }
+
+  // ---------------------------------------------------------------- PWA
+  function registerServiceWorker() {
+    try {
+      // 单文件便携版没有 sw.js / manifest，不注册
+      if (window.__SS_SINGLE_FILE) return
+      if (!('serviceWorker' in navigator)) return
+      // file:// 下不注册（本地双击场景不需要也不支持）
+      if (window.location.protocol !== 'http:' && window.location.protocol !== 'https:') return
+      navigator.serviceWorker.register('sw.js').catch(() => undefined)
+    } catch (error) {
+      // 注册失败不影响页面功能
+    }
+  }
+
+  // ---------------------------------------------------------------- 其它
+  function initTheme() {
+    if (SS.theme && typeof SS.theme.init === 'function') SS.theme.init()
+  }
+
+  function initInput() {
+    if (SS.input && typeof SS.input.init === 'function') SS.input.init()
+  }
+
+  // MDUI 1 风格的涟漪反馈：点击时在宿主元素内插入一个扩散圆
+  const RIPPLE_TARGETS =
+    '.button, .nav-item, .appbar-icon, .icon-button, #search-submit, .switch-row, .panel-link, .suggest-item, .segmented-item, .text-button'
+
+  function prefersReducedMotion() {
+    return Boolean(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+  }
+
+  function bindRipple() {
+    document.addEventListener(
+      'pointerdown',
+      (event) => {
+        if (prefersReducedMotion()) return
+        const host = event.target && event.target.closest ? event.target.closest(RIPPLE_TARGETS) : null
+        if (!host || host.hasAttribute('disabled')) return
+
+        const rect = host.getBoundingClientRect()
+        if (!rect.width || !rect.height) return
+        const size = Math.max(rect.width, rect.height) * 2
+        const span = document.createElement('span')
+        span.className = 'ripple'
+        span.style.width = `${size}px`
+        span.style.height = `${size}px`
+        span.style.left = `${event.clientX - rect.left - size / 2}px`
+        span.style.top = `${event.clientY - rect.top - size / 2}px`
+        host.appendChild(span)
+        window.setTimeout(() => span.remove(), 700)
+      },
+      { passive: true }
+    )
+  }
+
+  // ---------------------------------------------------------------- 深链
+  // 只预填/预选，不自动跳转（用户明确不要「?q= 自动提交」的默认搜索引擎模式）
+  function applyDeepLinks() {
+    let params
+    try {
+      params = new URLSearchParams(window.location.search)
+    } catch (error) {
+      return null
+    }
+    if (!params.toString()) return null
+    let appliedGroup = null
+
+    const nav = $('group-chips')
+    const knownGroups = new Set(
+      nav ? [...nav.querySelectorAll('[data-group]')].map((el) => el.getAttribute('data-group')) : []
+    )
+
+    const cat = params.get('cat')
+    if (cat && knownGroups.has(cat)) {
+      applyGroupFilter(cat)
+      appliedGroup = cat
+    }
+
+    const siteId = params.get('site')
+    if (siteId && Array.isArray(SS.sites)) {
+      const site = SS.sites.find((item) => item && item.id === siteId)
+      if (site && site.group && knownGroups.has(site.group)) {
+        applyGroupFilter(site.group)
+        appliedGroup = site.group
+        const button = document.querySelector(`#buttons-container [data-site="${siteId}"]`)
+        if (button && typeof button.focus === 'function') button.focus()
+      }
+    }
+
+    const query = params.get('q')
+    const input = $('search-input')
+    if (query && input) {
+      input.value = query
+      input.focus()
+      try {
+        input.setSelectionRange(query.length, query.length)
+      } catch (error) {
+        // 某些输入类型不支持 setSelectionRange，忽略
+      }
+      // 让清除按钮/联想等监听 input 的逻辑同步状态
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    }
+
+    return appliedGroup
+  }
+
+  function boot() {
+    initTheme()
+    initInput()
+    bindGroupNav()
+    bindSiteButtons()
+    bindSearchForm()
+    bindDrawers()
+    bindRipple()
+    bindEngines()
+    // 深链优先（?cat= / ?site=），否则默认「常用」视图；两种情况下都要跑一次过滤
+    const deepGroup = applyDeepLinks()
+    applyGroupFilter(deepGroup || 'all')
+    registerServiceWorker()
+    // 供 E2E/调试判断"装配完成"（脚本 defer 执行完 ≠ 已绑定事件）
+    document.documentElement.setAttribute('data-app-ready', '1')
+  }
+
+  SS.app = {
+    boot,
+    handleSiteClick,
+    applyGroupFilter,
+    openSettings,
+    closeSettings,
+    openNav,
+    closeNav,
+    openShortcuts,
+    closeShortcuts,
+    applyEngine,
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot, { once: true })
+  } else {
+    boot()
+  }
+})(typeof globalThis !== 'undefined' ? globalThis : this)
+
+</script>
+</body>
+</html>

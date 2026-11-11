@@ -1,0 +1,160 @@
+/* base.css — MDUI 1 文档站式骨架（v2.3）：顶栏 + 左侧分组导航 + 内容卡片 + 右侧设置抽屉。
+ * 变量见 tokens.css，输入控件见 input.css。禁止 !important；[hidden] 靠属性本身生效。
+ */
+*,*::before,*::after{box-sizing:border-box}
+html{color-scheme:var(--color-scheme)}
+body{min-height:100vh;min-height:100dvh;margin:0;display:flex;flex-direction:column;background-color:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:var(--font-size-base);line-height:var(--line-height);transition:background-color var(--transition-base) var(--ease),color var(--transition-base) var(--ease)}
+/* [hidden] 必须能压过组件自带的 display（如 .button{display:inline-flex}）：
+   用 :root 提高特异性到 (0,1,1)，避免在禁用 !important 的前提下失效。 */
+:root [hidden]{display:none}
+
+/* 涟漪（MDUI 招牌反馈）：JS 只注入 span.ripple 并写内联尺寸/位置 */
+.ripple{position:absolute;border-radius:50%;transform:scale(0);animation:ripple var(--ripple-duration) linear;background:currentColor;opacity:.24;pointer-events:none}
+@keyframes ripple{to{transform:scale(1);opacity:0}}
+.button,.nav-item,.appbar-icon,.panel-close,.switch-row,.segmented-item,.text-button,#search-submit,.icon-button,.suggest-item{position:relative;overflow:hidden}
+
+/* ------------------------------------------------------------ 顶栏 */
+.appbar{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:var(--space-2);height:64px;padding:0 var(--space-2);background-color:var(--primary-bg);color:var(--on-primary);box-shadow:var(--elevation-2)}
+.appbar-title{flex:1;min-width:0;font-size:var(--font-size-lg);font-weight:var(--font-weight-medium);letter-spacing:var(--letter-spacing);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.appbar-logo{display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center;width:32px;height:32px;margin-right:var(--space-1);border-radius:var(--radius-full);background-color:rgba(255,255,255,.18)}
+.appbar-logo-svg{width:20px;height:20px;fill:none;stroke:var(--on-primary);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.appbar-icon{display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center;width:40px;height:40px;padding:0;border:0;border-radius:var(--radius-full);background-color:transparent;color:var(--on-primary);cursor:pointer;transition:background-color var(--transition-fast) var(--ease)}
+@media (hover:hover){.appbar-icon:hover{background-color:rgba(255,255,255,.12)}}
+.appbar-icon:active{background-color:rgba(255,255,255,.2)}
+.appbar-icon:focus-visible{outline:var(--focus-ring-width) solid var(--on-primary)}
+.appbar-icon-svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#nav-toggle{display:none}
+.panel-close{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;padding:0;border:0;border-radius:var(--radius-full);background-color:transparent;color:var(--text-secondary);cursor:pointer;transition:background-color var(--transition-fast) var(--ease)}
+@media (hover:hover){.panel-close:hover{background-color:var(--overlay-hover)}}
+.panel-close-svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* ------------------------------------------------------------ 骨架 + 左侧导航 */
+.shell{display:flex;flex:1 0 auto;align-items:flex-start;min-height:calc(100vh - 64px)}
+.site-nav{flex:0 0 auto;width:240px;min-height:calc(100vh - 64px);padding:var(--space-4) 0;background-color:var(--surface);border-right:1px solid var(--divider);position:sticky;top:64px}
+.nav-group-title{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);margin:0 0 var(--space-2);padding:0 var(--space-5);font-size:12px;font-weight:var(--font-weight-medium);letter-spacing:1px;color:var(--text-secondary);text-transform:uppercase}
+.nav-list{display:flex;flex-direction:column;margin:0;padding:0;list-style:none}
+.nav-item{display:flex;align-items:center;width:100%;min-height:44px;padding:0 var(--space-5);border:0;background-color:transparent;color:var(--text);font-family:var(--font-sans);font-size:var(--font-size-sm);font-weight:var(--font-weight-medium);line-height:var(--line-height-tight);text-align:left;cursor:pointer;box-shadow:inset 0 0 0 transparent;transition:background-color var(--transition-fast) var(--ease),color var(--transition-fast) var(--ease),box-shadow var(--transition-fast) var(--ease)}
+@media (hover:hover){.nav-item:hover{background-color:var(--overlay-hover)}}
+.nav-item[aria-current='true']{background-color:var(--overlay-active);color:var(--primary);box-shadow:inset 3px 0 0 var(--primary)}
+.nav-icon{flex:0 0 auto;width:18px;height:18px;margin-right:var(--space-3);fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.nav-label{flex:1;text-align:left}
+
+/* ------------------------------------------------------------ 内容区卡片 */
+#main-content{flex:1;min-width:0;padding:var(--space-5)}
+.card{background-color:var(--surface);border-radius:var(--radius-sm);box-shadow:var(--elevation-2);padding:var(--space-5)}
+.card + .card{margin-top:var(--space-4)}
+.card-title{margin:0 0 var(--space-4);font-size:var(--font-size-md);font-weight:var(--font-weight-medium);color:var(--text)}
+
+/* 搜索表单（控件样式见 input.css） */
+#search-form{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:var(--space-2);width:100%;max-width:var(--content-max-width);margin:0 auto}
+#search-form .search-field{flex:1 1 320px;min-width:0}
+
+/* 站点按钮墙 + MD1 raised button */
+#buttons-container{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px;width:100%}
+.button{display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center;gap:6px;min-height:var(--control-height);padding:0 var(--space-3);border:0;border-radius:var(--radius-sm);background-color:var(--button-bg);color:var(--button-text);font-size:var(--font-size-sm);font-weight:var(--font-weight-medium);letter-spacing:var(--letter-spacing);line-height:var(--line-height-tight);text-align:center;text-transform:uppercase;white-space:nowrap;cursor:pointer;box-shadow:var(--elevation-2);transition:box-shadow var(--transition-fast) var(--ease),background-color var(--transition-fast) var(--ease)}
+@media (hover:hover){.button:hover{background-color:var(--button-bg-hover);box-shadow:var(--elevation-4)}}
+.button:active{box-shadow:var(--elevation-8)}
+
+/* 内联 SVG 图标（build 生成隐藏 sprite）与无图标站点的 monogram 兜底 */
+.icon-sprite{position:absolute;width:0;height:0;overflow:hidden}
+.button-icon{flex:0 0 auto;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.button-icon-text{display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;background-color:var(--overlay-hover);color:var(--text-secondary);font-size:11px;font-weight:var(--font-weight-medium);line-height:1}
+
+/* ------------------------------------------------------------ 右侧设置抽屉 */
+#settings-panel{position:fixed;top:0;right:0;bottom:0;width:320px;max-width:86vw;overflow-y:auto;background-color:var(--surface);box-shadow:var(--elevation-8);z-index:var(--z-panel);transform:translateX(100%);transition:transform 250ms var(--ease)}
+body.panel-open #settings-panel{transform:none}
+.panel-header{display:flex;align-items:center;justify-content:space-between;padding:16px 16px 8px 24px}
+.panel-title{margin:0;font-size:20px;font-weight:var(--font-weight-medium);color:var(--text)}
+.panel-body{display:flex;flex-direction:column;gap:8px;padding:8px 16px 24px}
+.panel-link{display:flex;align-items:center;min-height:48px;padding:0 8px;border-top:1px solid var(--divider);margin-top:8px;color:var(--primary);font-size:var(--font-size-sm);font-weight:var(--font-weight-medium);text-decoration:none}
+@media (hover:hover){.panel-link:hover{background-color:var(--overlay-hover)}}
+
+/* 设置里的「主题色」行与 MDUI 色块 */
+.settings-row{display:flex;flex-direction:column;gap:var(--space-2);padding:var(--space-2) var(--space-2) var(--space-1)}
+.settings-label{font-size:13px;color:var(--text-secondary)}
+.swatches{display:flex;flex-wrap:wrap;gap:var(--space-2)}
+.swatch{width:28px;height:28px;padding:0;border:0;border-radius:var(--radius-full);cursor:pointer;transition:transform var(--transition-fast) var(--ease),box-shadow var(--transition-fast) var(--ease)}
+@media (hover:hover){.swatch:hover{transform:scale(1.12)}}
+.swatch:active{transform:scale(.96)}
+.swatch[aria-pressed='true']{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--primary-bg)}
+.swatch:focus-visible{outline:var(--focus-ring-width) solid var(--focus-ring);outline-offset:2px}
+
+/* 主题模式分段控件（MD1 segmented control） */
+.segmented{display:inline-flex;align-self:flex-start;overflow:hidden;border:1px solid var(--divider);border-radius:var(--radius-sm)}
+.segmented-item{height:36px;padding:0 var(--space-3);border:0;background-color:transparent;color:var(--text-secondary);font-family:var(--font-sans);font-size:13px;font-weight:var(--font-weight-medium);line-height:1;white-space:nowrap;cursor:pointer;transition:background-color var(--transition-fast) var(--ease),color var(--transition-fast) var(--ease)}
+.segmented-item + .segmented-item{border-left:1px solid var(--divider)}
+.segmented-item[aria-pressed='true']{background-color:var(--primary-bg);color:var(--on-primary)}
+@media (hover:hover){.segmented-item[aria-pressed='false']:hover{background-color:var(--overlay-hover)}}
+.segmented-item:focus-visible{outline:var(--focus-ring-width) solid var(--focus-ring);outline-offset:-2px}
+/* 搜索引擎 4 段：窄屏允许换行，避免 320px 面板横向溢出 */
+#engine-mode{flex-wrap:wrap;max-width:100%}
+
+/* 设置行：左标签 + 右侧值/按钮（搜索历史等） */
+.settings-row-inline{flex-direction:row;align-items:center;justify-content:space-between;min-height:48px}
+.settings-value{margin-left:var(--space-1);font-size:13px;color:var(--text-secondary)}
+.text-button{display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 var(--space-3);border:0;border-radius:var(--radius-sm);background-color:transparent;color:var(--primary);font-family:var(--font-sans);font-size:13px;font-weight:var(--font-weight-medium);line-height:1;white-space:nowrap;cursor:pointer;transition:background-color var(--transition-fast) var(--ease)}
+@media (hover:hover){.text-button:hover{background-color:var(--overlay-hover)}}
+.text-button[disabled]{color:var(--text-secondary);cursor:default;background-color:transparent}
+.panel-version{margin:16px 8px 0;font-size:12px;color:var(--text-secondary)}
+
+/* MD1 switch：文字在左，::after 轨道 / ::before 滑块，只靠 aria-pressed 切换 */
+.switch-row{display:flex;align-items:center;width:100%;min-height:56px;padding:0 56px 0 8px;border:0;border-radius:var(--radius-sm);background-color:transparent;color:var(--text);font-family:var(--font-sans);font-size:15px;font-weight:var(--font-weight-medium);line-height:var(--line-height-tight);text-align:left;cursor:pointer;transition:background-color var(--transition-fast) var(--ease)}
+@media (hover:hover){.switch-row:hover{background-color:var(--overlay-hover)}}
+.switch-row::after{content:'';position:absolute;top:50%;right:8px;width:34px;height:14px;margin-top:-7px;border-radius:7px;background-color:rgba(0,0,0,.38);transition:background-color var(--transition-base) var(--ease)}
+.switch-row::before{content:'';position:absolute;top:50%;right:26px;z-index:1;width:20px;height:20px;margin-top:-10px;border-radius:50%;background-color:var(--surface);box-shadow:var(--elevation-2);transition:transform var(--transition-base) var(--ease),background-color var(--transition-base) var(--ease)}
+.switch-row[aria-pressed='true']::after{background-color:var(--primary-bg);opacity:.5}
+.switch-row[aria-pressed='true']::before{transform:translateX(18px);background-color:var(--primary-bg)}
+:root[data-theme='dark'] .switch-row[aria-pressed='false']::after{background-color:rgba(255,255,255,.5)}
+:root[data-theme='dark'] .switch-row[aria-pressed='false']::before{background-color:rgba(255,255,255,.87)}
+
+/* ------------------------------------------------------------ 遮罩 */
+#scrim{position:fixed;inset:0;background-color:rgba(0,0,0,.5);z-index:var(--z-scrim)}
+
+/* ------------------------------------------------------------ MD1 快捷键对话框（与 #scrim 共用遮罩） */
+.dialog{position:fixed;left:50%;top:50%;z-index:var(--z-dialog);transform:translate(-50%,-50%);width:min(480px,90vw);max-height:80vh;overflow:auto;background-color:var(--surface);border-radius:var(--radius-sm);box-shadow:0 11px 15px -7px rgba(0,0,0,.2),0 24px 38px 3px rgba(0,0,0,.14),0 9px 46px 8px rgba(0,0,0,.12);overscroll-behavior:contain}
+.dialog-header{display:flex;align-items:center;justify-content:space-between;padding:16px 16px 8px 24px}
+.dialog-title{margin:0;font-size:20px;font-weight:var(--font-weight-medium);color:var(--text)}
+.dialog-close{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;padding:0;border:0;border-radius:var(--radius-full);background-color:transparent;color:var(--text-secondary);font-size:16px;line-height:1;cursor:pointer;transition:background-color var(--transition-fast) var(--ease)}
+@media (hover:hover){.dialog-close:hover{background-color:var(--overlay-hover)}}
+.shortcut-list{display:flex;flex-direction:column;gap:2px;margin:0;padding:8px 24px 24px}
+.shortcut-list > div{display:flex;align-items:center;gap:12px;min-height:36px}
+.shortcut-list dt{display:flex;flex:0 0 96px;flex-wrap:wrap;align-items:center;gap:4px;min-width:96px}
+.shortcut-list dd{margin:0;color:var(--text-secondary);font-size:14px}
+kbd{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:22px;padding:0 6px;border:1px solid var(--divider);border-radius:3px;background-color:var(--bg);color:var(--text);font-family:inherit;font-size:12px;font-weight:500;line-height:1}
+
+/* ------------------------------------------------------------ skip-link / 焦点 / 兜底 */
+.skip-link{position:fixed;top:var(--space-2);left:var(--space-2);z-index:var(--z-skip-link);padding:var(--space-2) var(--space-4);border-radius:var(--radius-sm);background-color:var(--primary-bg);color:var(--on-primary);font-size:var(--font-size-sm);font-weight:var(--font-weight-medium);text-decoration:none;box-shadow:var(--elevation-2);transform:translateY(calc(-100% - var(--space-4)));transition:transform var(--transition-base) var(--ease)}
+.skip-link:focus{transform:translateY(0)}
+:focus-visible{outline:var(--focus-ring-width) solid var(--focus-ring);outline-offset:2px}
+:focus:not(:focus-visible){outline:none}
+.noscript-hint{margin:0;color:var(--text);font-size:var(--font-size-sm);text-align:center}
+
+/* ------------------------------------------------------------ 响应式：<960 侧边栏变抽屉 */
+@media (max-width:959px){
+#nav-toggle{display:inline-flex}
+.shell{display:block}
+.site-nav{position:fixed;top:64px;bottom:0;left:0;z-index:var(--z-drawer);width:80%;max-width:300px;min-height:0;overflow-y:auto;transform:translateX(-100%);transition:transform 250ms var(--ease);box-shadow:var(--elevation-4)}
+body.nav-open .site-nav{transform:none}
+#main-content{padding:var(--space-4)}
+}
+@media (max-width:480px){
+.appbar{height:56px;padding:0 var(--space-1)}
+.appbar-logo{width:28px;height:28px}
+.appbar-logo-svg{width:18px;height:18px}
+.site-nav{top:56px}
+.card,#main-content{padding:var(--space-4)}
+/* 窄屏：输入框与搜索按钮同一行，站点按钮触控 ≥44px */
+#search-form .search-field{flex:1 1 0}
+.button{min-height:var(--control-height-lg)}
+/* 窄屏：对话框与引擎分段压缩内边距 */
+.dialog{width:min(480px,92vw);max-height:78vh}
+.shortcut-list{padding:8px 16px 16px}
+#engine-mode .segmented-item{padding:0 10px}
+}
+
+/* reduced motion：关闭涟漪与过渡 */
+@media (prefers-reduced-motion:reduce){
+:root{--transition-fast:0ms;--transition-base:0ms;--ripple-duration:0ms}
+*,*::before,*::after{animation-duration:.01ms;animation-iteration-count:1;transition-duration:.01ms;scroll-behavior:auto}
+.ripple{animation:none}
+}

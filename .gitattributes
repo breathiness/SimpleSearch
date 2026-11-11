@@ -1,0 +1,12 @@
+# 统一换行符为 LF：Windows 下若按 CRLF 检出，
+# scripts/build.mjs --check 会误判"生成产物与模板不一致"（整文件 diff）。
+* text=auto eol=lf
+
+# 二进制资源不参与换行符转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary

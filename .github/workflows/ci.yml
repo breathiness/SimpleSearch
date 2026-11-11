@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: 构建、测试与校验
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # 本项目零依赖：package.json 没有 dependencies / devDependencies，
+      # 因此不需要 npm ci 或 npm install，checkout 后直接跑脚本即可。
+      - name: 产物漂移检查
+        # 必须在 npm run check 之前执行：check 里的 build 会重新写入产物，
+        # 先 build 再 diff 才能发现「改了 sites.js / 模板却忘了提交生成页」的漂移。
+        # sw.js 也是 build 产物（含版本号 + precache 列表），必须一起检查；
+        # manifest.webmanifest / PWA 图标是手写静态文件，不参与 diff。
+        run: |
+          npm run build
+          git diff --exit-code -- index.html SimpleSearch.html SimpleSearch-Light.html SimpleSearch-Dark.html sw.js
+
+      - name: 构建、单元测试、静态校验
+        run: npm run check
