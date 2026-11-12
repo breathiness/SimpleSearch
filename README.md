@@ -481,3 +481,8 @@ v2 重构把站点收拢到一处、补上了当年想加的几个小功能，v2
 [MIT](LICENSE) © 2023 breathiness
 
 界面设计语言参考 [MDUI](https://www.mdui.org/) / Material Design 1，仅参考视觉规范，未引入其库或任何第三方资源。
+
+<br>
+
+[![](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)
+
