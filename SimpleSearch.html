@@ -129,7 +129,7 @@ body{min-height:100vh;min-height:100dvh;margin:0;display:flex;flex-direction:col
 /* 涟漪（MDUI 招牌反馈）：JS 只注入 span.ripple 并写内联尺寸/位置 */
 .ripple{position:absolute;border-radius:50%;transform:scale(0);animation:ripple var(--ripple-duration) linear;background:currentColor;opacity:.24;pointer-events:none}
 @keyframes ripple{to{transform:scale(1);opacity:0}}
-.button,.nav-item,.appbar-icon,.panel-close,.switch-row,.segmented-item,.text-button,#search-submit,.icon-button,.suggest-item{position:relative;overflow:hidden}
+.button,.nav-item,.appbar-icon,.panel-close,.switch-row,.segmented-item,.text-button,.row-action,#search-submit,.icon-button,.suggest-item{position:relative;overflow:hidden}
 
 /* ------------------------------------------------------------ 顶栏 */
 .appbar{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:var(--space-2);height:64px;padding:0 var(--space-2);background-color:var(--primary-bg);color:var(--on-primary);box-shadow:var(--elevation-2)}
@@ -244,6 +244,30 @@ body.panel-open #settings-panel{transform:none}
 .shortcut-list dd{margin:0;color:var(--text-secondary);font-size:14px}
 kbd{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:22px;padding:0 6px;border:1px solid var(--divider);border-radius:3px;background-color:var(--bg);color:var(--text);font-family:inherit;font-size:12px;font-weight:500;line-height:1}
 
+/* ------------------------------------------------------------ 站点管理 / 常用排序对话框（v2.9） */
+.dialog-wide{width:min(560px,92vw)}
+.dialog-body{max-height:calc(80vh - 72px);overflow-y:auto;padding:8px 24px 24px}
+.dialog-hint{margin:0 0 8px;font-size:13px;color:var(--text-secondary)}
+.sites-list,.order-list{display:flex;flex-direction:column;gap:4px;margin:0;padding:0;list-style:none}
+.sites-list li,.order-list li{display:flex;align-items:center;gap:8px;min-height:44px;padding:0 8px;border-radius:var(--radius-sm);transition:background-color var(--transition-fast) var(--ease)}
+@media (hover:hover){.sites-list li:hover,.order-list li:hover{background-color:var(--overlay-active)}}
+.site-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.site-group{flex:0 0 auto;font-size:12px;color:var(--text-secondary)}
+.row-action{display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center;width:36px;height:36px;padding:0;border:0;border-radius:var(--radius-full);background-color:transparent;color:var(--text-secondary);font-family:var(--font-sans);font-size:13px;line-height:1;cursor:pointer;transition:background-color var(--transition-fast) var(--ease),color var(--transition-fast) var(--ease)}
+@media (hover:hover){.row-action:hover{background-color:var(--overlay-hover);color:var(--text)}}
+.sites-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;padding-top:12px;border-top:1px solid var(--divider)}
+/* .site-form 初始带 hidden，用 :not([hidden]) 写 display，避免盖掉原生 hidden */
+.site-form{margin-top:8px;padding-top:12px;border-top:1px solid var(--divider)}
+.site-form:not([hidden]){display:flex;flex-direction:column;gap:10px}
+.site-form-title{margin:0;font-size:15px;font-weight:var(--font-weight-medium)}
+.field{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--text-secondary)}
+.field input,.field select{height:36px;padding:0 10px;border:1px solid var(--divider);border-radius:var(--radius-sm);background-color:var(--surface);color:var(--text);font-family:var(--font-sans);font-size:14px}
+.field input::placeholder{color:var(--text-secondary);opacity:1}
+.field-inline input{accent-color:var(--primary-bg)}
+.field-inline{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text)}
+.form-error{margin:0;color:var(--danger);font-size:13px}
+.form-actions{display:flex;justify-content:flex-end;gap:8px}
+
 /* ------------------------------------------------------------ skip-link / 焦点 / 兜底 */
 .skip-link{position:fixed;top:var(--space-2);left:var(--space-2);z-index:var(--z-skip-link);padding:var(--space-2) var(--space-4);border-radius:var(--radius-sm);background-color:var(--primary-bg);color:var(--on-primary);font-size:var(--font-size-sm);font-weight:var(--font-weight-medium);text-decoration:none;box-shadow:var(--elevation-2);transform:translateY(calc(-100% - var(--space-4)));transition:transform var(--transition-base) var(--ease)}
 .skip-link:focus{transform:translateY(0)}
@@ -272,6 +296,8 @@ body.nav-open .site-nav{transform:none}
 .button{min-height:var(--control-height-lg);font-size:13px;letter-spacing:.2px}
 /* 窄屏：对话框与引擎分段压缩内边距 */
 .dialog{width:min(480px,92vw);max-height:78vh}
+.dialog-wide{width:min(560px,94vw)}
+.dialog-body{padding:8px 16px 16px}
 .shortcut-list{padding:8px 16px 16px}
 #engine-mode .segmented-item{padding:0 10px}
 }
@@ -654,39 +680,39 @@ body.nav-open .site-nav{transform:none}
       <section class="card card-sites" aria-label="常用网站">
         <h2 class="card-title">常用网站</h2>
         <nav id="buttons-container" aria-label="站点快捷按钮">
-      <button class="button" type="button" data-site="github" data-group="tech" data-keywords="gh git 代码 开源" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-github"></use></svg><span class="button-label">GitHub</span></button>
-      <button class="button" type="button" data-site="unsplash" data-group="content" data-keywords="图片 壁纸 摄影 photo wallpaper" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-unsplash"></use></svg><span class="button-label">Unsplash</span></button>
-      <button class="button" type="button" data-site="bilibili" data-group="media" data-keywords="b站 哔哩 视频 弹幕 bilibili" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-bilibili"></use></svg><span class="button-label">哔哩哔哩</span></button>
-      <button class="button" type="button" data-site="sspai" data-group="content" data-keywords="少数派 效率 数码 sspai" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-sspai"></use></svg><span class="button-label">少数派</span></button>
-      <button class="button" type="button" data-site="moegirl" data-group="media" data-keywords="萌娘 百科 二次元 moe acg" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-moegirl"></use></svg><span class="button-label">萌娘百科</span></button>
-      <button class="button" type="button" data-site="zhihu" data-group="community" data-keywords="知乎 问答 zhihu qa" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-zhihu"></use></svg><span class="button-label">知乎</span></button>
-      <button class="button" type="button" data-site="tieba" data-group="community" data-keywords="贴吧 百度 tieba forum" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-tieba"></use></svg><span class="button-label">百度贴吧</span></button>
-      <button class="button" type="button" data-site="taobao" data-group="shopping" data-keywords="淘宝 购物 taobao shop" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-taobao"></use></svg><span class="button-label">淘宝</span></button>
-      <button class="button" type="button" data-site="jd" data-group="shopping" data-keywords="京东 购物 jd jd.com" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-jd"></use></svg><span class="button-label">京东</span></button>
-      <button class="button" type="button" data-site="steam" data-group="media" data-keywords="steam 蒸汽 游戏 game" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-steam"></use></svg><span class="button-label">Steam</span></button>
-      <button class="button" type="button" data-site="archwiki" data-group="tech" data-keywords="arch linux wiki 文档" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-archwiki"></use></svg><span class="button-label">ArchWiki</span></button>
-      <button class="button" type="button" data-site="stackoverflow" data-group="tech" data-keywords="so stack 问答" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-stackoverflow"></use></svg><span class="button-label">StackOverflow</span></button>
-      <button class="button" type="button" data-site="mdn" data-group="tech" data-keywords="mdn 文档 web 前端" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-tech"></use></svg><span class="button-label">MDN</span></button>
-      <button class="button" type="button" data-site="gitee" data-group="tech" data-keywords="码云 gitee 国内git" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-tech"></use></svg><span class="button-label">Gitee</span></button>
-      <button class="button" type="button" data-site="npm" data-group="tech" data-keywords="npm 包 node" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-npm"></use></svg><span class="button-label">npm</span></button>
-      <button class="button" type="button" data-site="juejin" data-group="tech" data-keywords="掘金 juejin 前端" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-tech"></use></svg><span class="button-label">掘金</span></button>
-      <button class="button" type="button" data-site="douban" data-group="community" data-keywords="豆瓣 电影 书评" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-douban"></use></svg><span class="button-label">豆瓣</span></button>
-      <button class="button" type="button" data-site="weibo" data-group="community" data-keywords="微博 热搜 weibo" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-weibo"></use></svg><span class="button-label">微博</span></button>
-      <button class="button" type="button" data-site="v2ex" data-group="community" data-keywords="v2ex 社区 程序员" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-community"></use></svg><span class="button-label">V2EX</span></button>
-      <button class="button" type="button" data-site="reddit" data-group="community" data-keywords="reddit forum" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-reddit"></use></svg><span class="button-label">Reddit</span></button>
-      <button class="button" type="button" data-site="youtube" data-group="media" data-keywords="油管 youtube 视频" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-youtube"></use></svg><span class="button-label">YouTube</span></button>
-      <button class="button" type="button" data-site="douyin" data-group="media" data-keywords="抖音 短视频 tiktok" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-media"></use></svg><span class="button-label">抖音</span></button>
-      <button class="button" type="button" data-site="iqiyi" data-group="media" data-keywords="爱奇艺 剧集 iqiyi" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-media"></use></svg><span class="button-label">爱奇艺</span></button>
-      <button class="button" type="button" data-site="vqq" data-group="media" data-keywords="腾讯视频 剧 vqq" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-media"></use></svg><span class="button-label">腾讯视频</span></button>
-      <button class="button" type="button" data-site="twitch" data-group="media" data-keywords="twitch 直播 游戏" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-twitch"></use></svg><span class="button-label">Twitch</span></button>
-      <button class="button" type="button" data-site="tmall" data-group="shopping" data-keywords="天猫 tmall 购物" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-tmall"></use></svg><span class="button-label">天猫</span></button>
-      <button class="button" type="button" data-site="pinduoduo" data-group="shopping" data-keywords="拼多多 pdd 百亿补贴" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-shopping"></use></svg><span class="button-label">拼多多</span></button>
-      <button class="button" type="button" data-site="goofish" data-group="shopping" data-keywords="闲鱼 二手 goofish" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-shopping"></use></svg><span class="button-label">闲鱼</span></button>
-      <button class="button" type="button" data-site="amazon" data-group="shopping" data-keywords="亚马逊 amazon 海淘" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-amazon"></use></svg><span class="button-label">亚马逊</span></button>
-      <button class="button" type="button" data-site="pexels" data-group="content" data-keywords="pexels 图片 素材" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-pexels"></use></svg><span class="button-label">Pexels</span></button>
-      <button class="button" type="button" data-site="pixabay" data-group="content" data-keywords="pixabay 图库 素材" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-pixabay"></use></svg><span class="button-label">Pixabay</span></button>
-      <button class="button" type="button" data-site="36kr" data-group="content" data-keywords="36氪 科技 融资" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-content"></use></svg><span class="button-label">36氪</span></button>
-      <button class="button" type="button" data-site="zcool" data-group="content" data-keywords="站酷 设计 zcool" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-content"></use></svg><span class="button-label">站酷</span></button>
+      <button class="button" type="button" data-site="github" data-icon="#i-github" data-group="tech" data-keywords="gh git 代码 开源" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-github"></use></svg><span class="button-label">GitHub</span></button>
+      <button class="button" type="button" data-site="unsplash" data-icon="#i-unsplash" data-group="content" data-keywords="图片 壁纸 摄影 photo wallpaper" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-unsplash"></use></svg><span class="button-label">Unsplash</span></button>
+      <button class="button" type="button" data-site="bilibili" data-icon="#i-bilibili" data-group="media" data-keywords="b站 哔哩 视频 弹幕 bilibili" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-bilibili"></use></svg><span class="button-label">哔哩哔哩</span></button>
+      <button class="button" type="button" data-site="sspai" data-icon="#i-sspai" data-group="content" data-keywords="少数派 效率 数码 sspai" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-sspai"></use></svg><span class="button-label">少数派</span></button>
+      <button class="button" type="button" data-site="moegirl" data-icon="#i-moegirl" data-group="media" data-keywords="萌娘 百科 二次元 moe acg" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-moegirl"></use></svg><span class="button-label">萌娘百科</span></button>
+      <button class="button" type="button" data-site="zhihu" data-icon="#i-zhihu" data-group="community" data-keywords="知乎 问答 zhihu qa" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-zhihu"></use></svg><span class="button-label">知乎</span></button>
+      <button class="button" type="button" data-site="tieba" data-icon="#i-tieba" data-group="community" data-keywords="贴吧 百度 tieba forum" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-tieba"></use></svg><span class="button-label">百度贴吧</span></button>
+      <button class="button" type="button" data-site="taobao" data-icon="#i-taobao" data-group="shopping" data-keywords="淘宝 购物 taobao shop" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-taobao"></use></svg><span class="button-label">淘宝</span></button>
+      <button class="button" type="button" data-site="jd" data-icon="#i-jd" data-group="shopping" data-keywords="京东 购物 jd jd.com" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-jd"></use></svg><span class="button-label">京东</span></button>
+      <button class="button" type="button" data-site="steam" data-icon="#i-steam" data-group="media" data-keywords="steam 蒸汽 游戏 game" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-steam"></use></svg><span class="button-label">Steam</span></button>
+      <button class="button" type="button" data-site="archwiki" data-icon="#i-archwiki" data-group="tech" data-keywords="arch linux wiki 文档" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-archwiki"></use></svg><span class="button-label">ArchWiki</span></button>
+      <button class="button" type="button" data-site="stackoverflow" data-icon="#i-stackoverflow" data-group="tech" data-keywords="so stack 问答" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-stackoverflow"></use></svg><span class="button-label">StackOverflow</span></button>
+      <button class="button" type="button" data-site="mdn" data-icon="#i-cat-tech" data-group="tech" data-keywords="mdn 文档 web 前端" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-tech"></use></svg><span class="button-label">MDN</span></button>
+      <button class="button" type="button" data-site="gitee" data-icon="#i-cat-tech" data-group="tech" data-keywords="码云 gitee 国内git" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-tech"></use></svg><span class="button-label">Gitee</span></button>
+      <button class="button" type="button" data-site="npm" data-icon="#i-npm" data-group="tech" data-keywords="npm 包 node" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-npm"></use></svg><span class="button-label">npm</span></button>
+      <button class="button" type="button" data-site="juejin" data-icon="#i-cat-tech" data-group="tech" data-keywords="掘金 juejin 前端" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-tech"></use></svg><span class="button-label">掘金</span></button>
+      <button class="button" type="button" data-site="douban" data-icon="#i-douban" data-group="community" data-keywords="豆瓣 电影 书评" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-douban"></use></svg><span class="button-label">豆瓣</span></button>
+      <button class="button" type="button" data-site="weibo" data-icon="#i-weibo" data-group="community" data-keywords="微博 热搜 weibo" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-weibo"></use></svg><span class="button-label">微博</span></button>
+      <button class="button" type="button" data-site="v2ex" data-icon="#i-cat-community" data-group="community" data-keywords="v2ex 社区 程序员" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-community"></use></svg><span class="button-label">V2EX</span></button>
+      <button class="button" type="button" data-site="reddit" data-icon="#i-reddit" data-group="community" data-keywords="reddit forum" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-reddit"></use></svg><span class="button-label">Reddit</span></button>
+      <button class="button" type="button" data-site="youtube" data-icon="#i-youtube" data-group="media" data-keywords="油管 youtube 视频" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-youtube"></use></svg><span class="button-label">YouTube</span></button>
+      <button class="button" type="button" data-site="douyin" data-icon="#i-cat-media" data-group="media" data-keywords="抖音 短视频 tiktok" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-media"></use></svg><span class="button-label">抖音</span></button>
+      <button class="button" type="button" data-site="iqiyi" data-icon="#i-cat-media" data-group="media" data-keywords="爱奇艺 剧集 iqiyi" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-media"></use></svg><span class="button-label">爱奇艺</span></button>
+      <button class="button" type="button" data-site="vqq" data-icon="#i-cat-media" data-group="media" data-keywords="腾讯视频 剧 vqq" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-media"></use></svg><span class="button-label">腾讯视频</span></button>
+      <button class="button" type="button" data-site="twitch" data-icon="#i-twitch" data-group="media" data-keywords="twitch 直播 游戏" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-twitch"></use></svg><span class="button-label">Twitch</span></button>
+      <button class="button" type="button" data-site="tmall" data-icon="#i-tmall" data-group="shopping" data-keywords="天猫 tmall 购物" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-tmall"></use></svg><span class="button-label">天猫</span></button>
+      <button class="button" type="button" data-site="pinduoduo" data-icon="#i-cat-shopping" data-group="shopping" data-keywords="拼多多 pdd 百亿补贴" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-shopping"></use></svg><span class="button-label">拼多多</span></button>
+      <button class="button" type="button" data-site="goofish" data-icon="#i-cat-shopping" data-group="shopping" data-keywords="闲鱼 二手 goofish" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-shopping"></use></svg><span class="button-label">闲鱼</span></button>
+      <button class="button" type="button" data-site="amazon" data-icon="#i-amazon" data-group="shopping" data-keywords="亚马逊 amazon 海淘" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-amazon"></use></svg><span class="button-label">亚马逊</span></button>
+      <button class="button" type="button" data-site="pexels" data-icon="#i-pexels" data-group="content" data-keywords="pexels 图片 素材" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-pexels"></use></svg><span class="button-label">Pexels</span></button>
+      <button class="button" type="button" data-site="pixabay" data-icon="#i-pixabay" data-group="content" data-keywords="pixabay 图库 素材" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-pixabay"></use></svg><span class="button-label">Pixabay</span></button>
+      <button class="button" type="button" data-site="36kr" data-icon="#i-cat-content" data-group="content" data-keywords="36氪 科技 融资" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-content"></use></svg><span class="button-label">36氪</span></button>
+      <button class="button" type="button" data-site="zcool" data-icon="#i-cat-content" data-group="content" data-keywords="站酷 设计 zcool" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-content"></use></svg><span class="button-label">站酷</span></button>
         </nav>
       </section>
     </main>
@@ -734,7 +760,15 @@ body.nav-open .site-nav{transform:none}
         <span class="settings-label">键盘快捷键</span>
         <button id="shortcuts-open" class="text-button" type="button">查看</button>
       </div>
-      <p class="panel-version">简单搜索 v2.8.1</p>
+      <div class="settings-row settings-row-inline">
+        <span class="settings-label">我的站点</span>
+        <button id="custom-sites-open" class="text-button" type="button">管理</button>
+      </div>
+      <div class="settings-row settings-row-inline">
+        <span class="settings-label">常用排序</span>
+        <button id="order-open" class="text-button" type="button">调整</button>
+      </div>
+      <p class="panel-version">简单搜索 v2.9.0</p>
     </div>
   </aside>
 
@@ -755,6 +789,51 @@ body.nav-open .site-nav{transform:none}
       <div><dt><kbd>!</kbd></dt><dd>站点快捷搜索，例如 !gh rust</dd></div>
       <div><dt><kbd>Ctrl</kbd><kbd>⌘</kbd></dt><dd>按住再点击站点按钮：新标签页打开</dd></div>
     </dl>
+  </section>
+
+  <section id="sites-dialog" class="dialog dialog-wide" role="dialog" aria-modal="true"
+           aria-labelledby="sites-title" hidden>
+    <div class="dialog-header">
+      <h2 id="sites-title" class="dialog-title">我的站点</h2>
+      <button id="sites-close" class="icon-button dialog-close" type="button" aria-label="关闭">✕</button>
+    </div>
+    <div class="dialog-body">
+      <p id="sites-empty" class="dialog-hint">还没有自定义站点。它们只保存在你的浏览器里。</p>
+      <ul id="sites-list" class="sites-list" aria-label="自定义站点列表"></ul>
+      <div class="sites-actions">
+        <button id="site-add" class="text-button" type="button">新增站点</button>
+        <button id="config-export" class="text-button" type="button">导出配置</button>
+        <button id="config-import-open" class="text-button" type="button">导入配置</button>
+        <input id="config-import-file" type="file" accept=".json,application/json" hidden>
+      </div>
+      <p id="sites-status" class="dialog-hint" role="status" aria-live="polite"></p>
+      <form id="site-form" class="site-form" hidden>
+        <h3 id="site-form-title" class="site-form-title">新增站点</h3>
+        <label class="field"><span>名称</span><input id="site-label" name="label" type="text" required maxlength="24"></label>
+        <label class="field"><span>首页网址</span><input id="site-home" name="home" type="url" required placeholder="https://example.com"></label>
+        <label class="field"><span>搜索模板（用 {q} 表示关键词）</span><input id="site-search" name="search" type="text" required placeholder="https://example.com/search?q={q}"></label>
+        <label class="field"><span>分类</span><select id="site-group" name="group"></select></label>
+        <label class="field"><span>关键词（空格分隔，可选）</span><input id="site-keywords" name="keywords" type="text" placeholder="别名 关键词"></label>
+        <label class="field-inline"><input id="site-featured" name="featured" type="checkbox"><span>放进「常用」</span></label>
+        <p id="site-form-error" class="form-error" role="alert" hidden></p>
+        <div class="form-actions">
+          <button id="site-save" class="text-button" type="submit">保存</button>
+          <button id="site-cancel" class="text-button" type="button">取消</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section id="order-dialog" class="dialog" role="dialog" aria-modal="true"
+           aria-labelledby="order-title" hidden>
+    <div class="dialog-header">
+      <h2 id="order-title" class="dialog-title">常用排序</h2>
+      <button id="order-close" class="icon-button dialog-close" type="button" aria-label="关闭">✕</button>
+    </div>
+    <div class="dialog-body">
+      <p class="dialog-hint">调整「常用」视图里的按钮顺序，越靠上越靠前。</p>
+      <ul id="order-list" class="order-list" aria-label="常用站点顺序"></ul>
+    </div>
   </section>
 
   <script>window.__SS_SINGLE_FILE = true;</script>
@@ -3204,6 +3283,1091 @@ body.nav-open .site-nav{transform:none}
 
 </script>
   <script>
+/* assets/js/sites-store.js */
+// v2.9 自定义站点数据层（契约 §20.1）。
+// 纯数据：不碰 DOM、不读真实 localStorage —— storage 由调用方注入（{getItem,setItem}）。
+// 经典脚本：只注册 SS.sitesStore，Node 里可直接 import 后从 globalThis.SimpleSearch 读取。
+;(function (root) {
+  'use strict'
+
+  const SS = (root.SimpleSearch = root.SimpleSearch || {})
+
+  const CUSTOM_KEY = 'ss.customSites'
+  const ORDER_KEY = 'ss.order'
+  const MAX_CUSTOM = 100
+  const MAX_LABEL = 24
+  const MAX_KEYWORDS = 8
+  const MAX_KEYWORD_LENGTH = 32
+  const VERSION = '2.9.0'
+  const ID_RE = /^[a-z0-9-]+$/
+
+  // 内置 UI 图标 symbol 名（i-xxx 去掉 i- 前缀）；站点图标另从 SS.sites 推导
+  const UI_ICONS = [
+    'menu', 'settings', 'close', 'logo',
+    'cat-all', 'cat-tech', 'cat-community', 'cat-media', 'cat-shopping', 'cat-content',
+  ]
+
+  // ---------------------------------------------------------------- 基础工具
+
+  function hasStorage(storage) {
+    return Boolean(storage) &&
+      typeof storage.getItem === 'function' &&
+      typeof storage.setItem === 'function'
+  }
+
+  function readJson(storage, key) {
+    if (!storage || typeof storage.getItem !== 'function') return null
+    try {
+      const raw = storage.getItem(key)
+      if (typeof raw !== 'string' || raw === '') return null
+      return JSON.parse(raw)
+    } catch (error) {
+      return null
+    }
+  }
+
+  function writeJson(storage, key, value) {
+    if (!hasStorage(storage)) return false
+    try {
+      storage.setItem(key, JSON.stringify(value))
+      return true
+    } catch (error) {
+      return false
+    }
+  }
+
+  function groupIds() {
+    const groups = SS.siteGroups
+    if (!Array.isArray(groups)) return []
+    return groups
+      .filter((group) => group && typeof group.id === 'string' && group.id !== '')
+      .map((group) => group.id)
+  }
+
+  // 是否是合法 https URL（search 模板先把 {q} 换成占位符再校验）
+  function isHttpsUrl(value) {
+    if (typeof value !== 'string') return false
+    const text = value.trim()
+    if (text === '' || /\s/.test(text)) return false
+    if (!/^https:\/\/[^/?#]+/i.test(text)) return false
+    try {
+      const url = new URL(text)
+      return url.protocol === 'https:' && url.hostname !== ''
+    } catch (error) {
+      return false
+    }
+  }
+
+  function charLength(value) {
+    return Array.from(value).length
+  }
+
+  // ---------------------------------------------------------------- 字段归一化
+
+  function normalizeKeywords(input) {
+    if (input === undefined || input === null) return { ok: true, keywords: [] }
+    let source = null
+    if (Array.isArray(input)) source = input
+    else if (typeof input === 'string') source = input.split(/\s+/)
+    else return { ok: false, error: '关键词必须是数组，或用空格分隔的字符串' }
+
+    const keywords = []
+    const seen = Object.create(null)
+    for (const value of source) {
+      if (typeof value !== 'string') continue
+      const word = value.trim()
+      if (word === '' || word.length > MAX_KEYWORD_LENGTH) continue
+      if (seen[word]) continue
+      seen[word] = true
+      keywords.push(word)
+      if (keywords.length >= MAX_KEYWORDS) break
+    }
+    return { ok: true, keywords }
+  }
+
+  function normalizeGroup(input) {
+    const ids = groupIds()
+    const value = typeof input === 'string' ? input.trim() : ''
+    if (ids.length === 0) {
+      // 站点分组表未加载（模块单独使用）：保留原值并提示，不崩
+      if (value === '') return { ok: false, error: '分类不能为空' }
+      return { ok: true, group: value, warning: '站点分组表未加载，分类未校验' }
+    }
+    if (value !== '' && ids.indexOf(value) !== -1) return { ok: true, group: value, warning: '' }
+    return { ok: false, error: '分类「' + (value || '空') + '」不存在，请重新选择' }
+  }
+
+  // 已知 symbol 名：内置站点 id + 站点 icon 字段 + UI 图标
+  function knownIconNames() {
+    const known = Object.create(null)
+    for (const name of UI_ICONS) known[name] = true
+    const sites = Array.isArray(SS.sites) ? SS.sites : []
+    for (const site of sites) {
+      if (!site || typeof site !== 'object') continue
+      if (typeof site.id === 'string' && site.id !== '') known[site.id] = true
+      if (typeof site.icon === 'string' && site.icon !== '') {
+        known[site.icon.replace(/^i-/, '')] = true
+      }
+    }
+    return known
+  }
+
+  function normalizeIcon(input) {
+    if (input === undefined || input === null || input === '') return { icon: '', warning: '' }
+    if (typeof input !== 'string') return { icon: '', warning: '图标值不合法，已忽略' }
+    const name = input.trim().replace(/^#/, '').replace(/^i-/, '')
+    if (name === '') return { icon: '', warning: '' }
+    if (!/^[a-z0-9][a-z0-9-]*$/.test(name)) {
+      return { icon: '', warning: '图标「' + input + '」不存在，已忽略' }
+    }
+    if (!knownIconNames()[name]) {
+      return { icon: '', warning: '图标「' + input + '」不存在，已忽略' }
+    }
+    return { icon: name, warning: '' }
+  }
+
+  // ---------------------------------------------------------------- 校验入口
+
+  // 校验 + 归一化单个自定义站点：{ ok:true, site, warnings? } | { ok:false, error }
+  function normalizeSite(input) {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) {
+      return { ok: false, error: '站点数据格式不正确' }
+    }
+    const warnings = []
+
+    const label = typeof input.label === 'string' ? input.label.trim() : ''
+    if (label === '') return { ok: false, error: '名称不能为空' }
+    if (charLength(label) > MAX_LABEL) {
+      return { ok: false, error: '名称不能超过 ' + MAX_LABEL + ' 个字符' }
+    }
+
+    if (!isHttpsUrl(input.home)) {
+      return { ok: false, error: '首页网址必须是有效的 https 地址' }
+    }
+    if (typeof input.search !== 'string' || input.search.indexOf('{q}') === -1) {
+      return { ok: false, error: '搜索模板必须包含 {q} 占位符' }
+    }
+    if (!isHttpsUrl(input.search.split('{q}').join('q'))) {
+      return { ok: false, error: '搜索模板必须是有效的 https 地址' }
+    }
+
+    const group = normalizeGroup(input.group)
+    if (!group.ok) return { ok: false, error: group.error }
+    if (group.warning) warnings.push(group.warning)
+
+    const keywords = normalizeKeywords(input.keywords)
+    if (!keywords.ok) return { ok: false, error: keywords.error }
+
+    const icon = normalizeIcon(input.icon)
+    if (icon.warning) warnings.push(icon.warning)
+
+    let id = ''
+    if (input.id !== undefined && input.id !== null && input.id !== '') {
+      if (typeof input.id !== 'string' || !ID_RE.test(input.id)) {
+        return { ok: false, error: '站点 id 只能包含小写字母、数字和连字符' }
+      }
+      id = input.id
+    }
+
+    const site = {
+      label,
+      home: input.home.trim(),
+      search: input.search.trim(),
+      group: group.group,
+      keywords: keywords.keywords,
+      featured: input.featured === true || input.featured === 1 || input.featured === 'true',
+    }
+    if (id !== '') site.id = id
+    if (icon.icon !== '') site.icon = icon.icon
+
+    const result = { ok: true, site }
+    if (warnings.length > 0) result.warnings = warnings
+    return result
+  }
+
+  // ---------------------------------------------------------------- id 生成
+
+  function assignGeneratedId(site, used, list) {
+    let max = 0
+    const scan = (value) => {
+      if (!value || typeof value !== 'string') return
+      const match = /^custom-(\d+)$/.exec(value)
+      if (match) max = Math.max(max, Number(match[1]))
+    }
+    if (used && typeof used.forEach === 'function') used.forEach(scan)
+    if (Array.isArray(list)) {
+      for (const item of list) {
+        if (item && typeof item.id === 'string') scan(item.id)
+      }
+    }
+    let next = max + 1
+    while (used && typeof used.has === 'function' && used.has('custom-' + next)) next += 1
+    return Object.assign({}, site, { id: 'custom-' + next })
+  }
+
+  // ---------------------------------------------------------------- 读写存储
+
+  function listCustom(storage) {
+    const parsed = readJson(storage, CUSTOM_KEY)
+    if (!Array.isArray(parsed)) return []
+    const result = []
+    const used = new Set()
+    for (const item of parsed) {
+      if (result.length >= MAX_CUSTOM) break
+      const normalized = normalizeSite(item)
+      if (!normalized.ok) continue
+      let site = normalized.site
+      if (!site.id || used.has(site.id)) site = assignGeneratedId(site, used, result)
+      used.add(site.id)
+      result.push(site)
+    }
+    return result
+  }
+
+  function saveCustom(storage, list) {
+    if (!Array.isArray(list) || list.length > MAX_CUSTOM) return false
+    const normalized = []
+    const used = new Set()
+    for (const item of list) {
+      const result = normalizeSite(item)
+      if (!result.ok) return false
+      let site = result.site
+      if (!site.id || used.has(site.id)) site = assignGeneratedId(site, used, normalized)
+      used.add(site.id)
+      normalized.push(site)
+    }
+    return writeJson(storage, CUSTOM_KEY, normalized)
+  }
+
+  function addCustom(storage, input) {
+    const normalized = normalizeSite(input)
+    if (!normalized.ok) return normalized
+    const list = listCustom(storage)
+    if (list.length >= MAX_CUSTOM) {
+      return { ok: false, error: '最多只能保存 ' + MAX_CUSTOM + ' 个自定义站点' }
+    }
+    const used = new Set()
+    for (const site of list) if (site && site.id) used.add(site.id)
+    const site = assignGeneratedId(normalized.site, used, list)
+    list.push(site)
+    if (!writeJson(storage, CUSTOM_KEY, list)) {
+      return { ok: false, error: '本地存储不可用，无法保存站点' }
+    }
+    const result = { ok: true, site }
+    if (normalized.warnings) result.warnings = normalized.warnings
+    return result
+  }
+
+  function updateCustom(storage, id, input) {
+    const list = listCustom(storage)
+    let index = -1
+    for (let i = 0; i < list.length; i += 1) {
+      if (list[i].id === id) {
+        index = i
+        break
+      }
+    }
+    if (index === -1) return { ok: false, error: '找不到要编辑的站点' }
+
+    const normalized = normalizeSite(input)
+    if (!normalized.ok) return normalized
+    const site = Object.assign({}, normalized.site, { id })
+    list[index] = site
+    if (!writeJson(storage, CUSTOM_KEY, list)) {
+      return { ok: false, error: '本地存储不可用，无法保存站点' }
+    }
+    const result = { ok: true, site }
+    if (normalized.warnings) result.warnings = normalized.warnings
+    return result
+  }
+
+  function removeCustom(storage, id) {
+    const list = listCustom(storage)
+    let index = -1
+    for (let i = 0; i < list.length; i += 1) {
+      if (list[i].id === id) {
+        index = i
+        break
+      }
+    }
+    if (index === -1) return false
+    list.splice(index, 1)
+    return writeJson(storage, CUSTOM_KEY, list)
+  }
+
+  // ---------------------------------------------------------------- 常用排序
+
+  function getOrder(storage) {
+    const parsed = readJson(storage, ORDER_KEY)
+    if (!Array.isArray(parsed)) return []
+    const order = []
+    const seen = new Set()
+    for (const value of parsed) {
+      if (typeof value !== 'string' || !ID_RE.test(value) || seen.has(value)) continue
+      seen.add(value)
+      order.push(value)
+    }
+    return order
+  }
+
+  function saveOrder(storage, ids) {
+    if (!Array.isArray(ids)) return false
+    const order = []
+    const seen = new Set()
+    for (const value of ids) {
+      if (typeof value !== 'string' || !ID_RE.test(value) || seen.has(value)) continue
+      seen.add(value)
+      order.push(value)
+    }
+    return writeJson(storage, ORDER_KEY, order)
+  }
+
+  // 内置保持原顺序，自定义追加在后
+  function merge(builtin, custom) {
+    const head = Array.isArray(builtin) ? builtin.slice() : []
+    const tail = Array.isArray(custom) ? custom.slice() : []
+    return head.concat(tail)
+  }
+
+  // order 中出现的 id 按其顺序放前面，其余站点保持原相对顺序；未知 id 忽略
+  function applyOrder(sites, orderIds) {
+    const list = Array.isArray(sites) ? sites.slice() : []
+    const order = Array.isArray(orderIds) ? orderIds : []
+    const byId = new Map()
+    for (const site of list) {
+      if (site && typeof site.id === 'string') byId.set(site.id, site)
+    }
+    const front = []
+    const placed = new Set()
+    for (const id of order) {
+      if (typeof id !== 'string' || placed.has(id)) continue
+      const site = byId.get(id)
+      if (!site) continue
+      placed.add(id)
+      front.push(site)
+    }
+    const rest = list.filter((site) => !site || typeof site.id !== 'string' || !placed.has(site.id))
+    return front.concat(rest)
+  }
+
+  // ---------------------------------------------------------------- 导入 / 导出
+
+  function exportConfig(storage, settings) {
+    let safeSettings = {}
+    if (settings && typeof settings === 'object' && !Array.isArray(settings)) {
+      try {
+        safeSettings = JSON.parse(JSON.stringify(settings))
+      } catch (error) {
+        safeSettings = {}
+      }
+    }
+    return {
+      app: 'SimpleSearch',
+      schema: 1,
+      version: VERSION,
+      customSites: listCustom(storage),
+      order: getOrder(storage),
+      settings: safeSettings,
+    }
+  }
+
+  function serializeConfig(config) {
+    try {
+      return JSON.stringify(config, null, 2)
+    } catch (error) {
+      return ''
+    }
+  }
+
+  // 只做 JSON.parse，绝不执行任何代码；坏 JSON / 坏 schema / 超量 / 非法站点 → 整包拒绝
+  function parseImport(text) {
+    if (typeof text !== 'string' || text.trim() === '') {
+      return { ok: false, error: '导入内容为空' }
+    }
+    let data = null
+    try {
+      data = JSON.parse(text)
+    } catch (error) {
+      return { ok: false, error: '不是合法的 JSON 文件' }
+    }
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      return { ok: false, error: '配置文件格式不正确' }
+    }
+    if (data.app !== 'SimpleSearch') {
+      return { ok: false, error: '这不是简单搜索的配置文件' }
+    }
+    if (data.schema !== 1) {
+      return { ok: false, error: '不支持的配置版本 schema=' + String(data.schema) }
+    }
+    if (!Array.isArray(data.customSites)) {
+      return { ok: false, error: '配置里的 customSites 必须是数组' }
+    }
+    if (data.customSites.length > MAX_CUSTOM) {
+      return { ok: false, error: '自定义站点超过上限（最多 ' + MAX_CUSTOM + ' 个）' }
+    }
+
+    const customSites = []
+    const used = new Set()
+    for (let index = 0; index < data.customSites.length; index += 1) {
+      const normalized = normalizeSite(data.customSites[index])
+      if (!normalized.ok) {
+        return {
+          ok: false,
+          error: '第 ' + (index + 1) + ' 个站点不合法：' + normalized.error,
+        }
+      }
+      let site = normalized.site
+      if (site.id) {
+        if (used.has(site.id)) {
+          return { ok: false, error: '存在重复的站点 id：' + site.id }
+        }
+      } else {
+        site = assignGeneratedId(site, used, customSites)
+      }
+      used.add(site.id)
+      customSites.push(site)
+    }
+
+    const order = []
+    const seenOrder = new Set()
+    if (Array.isArray(data.order)) {
+      for (const id of data.order) {
+        if (typeof id !== 'string' || !ID_RE.test(id) || seenOrder.has(id)) continue
+        seenOrder.add(id)
+        order.push(id)
+      }
+    }
+
+    const settings =
+      data.settings && typeof data.settings === 'object' && !Array.isArray(data.settings)
+        ? data.settings
+        : {}
+
+    return {
+      ok: true,
+      data: {
+        app: 'SimpleSearch',
+        schema: 1,
+        version: typeof data.version === 'string' && data.version !== '' ? data.version : VERSION,
+        customSites,
+        order,
+        settings,
+      },
+    }
+  }
+
+  SS.sitesStore = {
+    CUSTOM_KEY,
+    ORDER_KEY,
+    MAX_CUSTOM,
+    VERSION,
+    normalizeSite,
+    listCustom,
+    saveCustom,
+    addCustom,
+    updateCustom,
+    removeCustom,
+    getOrder,
+    saveOrder,
+    merge,
+    applyOrder,
+    exportConfig,
+    serializeConfig,
+    parseImport,
+  }
+})(typeof globalThis !== 'undefined' ? globalThis : this)
+
+</script>
+  <script>
+/* assets/js/sites-admin.js */
+// v2.9 自定义站点 / 配置导入导出 / 常用排序 —— UI 层（契约 §20.2）。
+// 只做 DOM 绑定与渲染；数据读写全部走 SS.sitesStore（注入 localStorage）。
+// 所有用户数据一律用 textContent 渲染，禁止 HTML 字符串拼接。
+// 经典脚本：只注册 SS.sitesAdmin，由 app.js 在 DOM 就绪后调用 init()。
+;(function (root) {
+  'use strict'
+
+  const SS = (root.SimpleSearch = root.SimpleSearch || {})
+
+  let initialized = false
+
+  function init() {
+    if (initialized) return
+    const doc = root.document
+    if (!doc) return
+    const store = SS.sitesStore
+    if (!store) return
+
+    const byId = (id) => doc.getElementById(id)
+
+    const dialog = byId('sites-dialog')
+    const sitesList = byId('sites-list')
+    const sitesEmpty = byId('sites-empty')
+    const sitesStatus = byId('sites-status')
+    const sitesClose = byId('sites-close')
+    const openSitesButton = byId('custom-sites-open')
+    const addButton = byId('site-add')
+    const exportButton = byId('config-export')
+    const importOpenButton = byId('config-import-open')
+    const importFile = byId('config-import-file')
+
+    const orderDialog = byId('order-dialog')
+    const orderList = byId('order-list')
+    const orderClose = byId('order-close')
+    const openOrderButton = byId('order-open')
+
+    const form = byId('site-form')
+    const formTitle = byId('site-form-title')
+    const formError = byId('site-form-error')
+    const fieldLabel = byId('site-label')
+    const fieldHome = byId('site-home')
+    const fieldSearch = byId('site-search')
+    const fieldGroup = byId('site-group')
+    const fieldKeywords = byId('site-keywords')
+    const fieldFeatured = byId('site-featured')
+    const formCancel = byId('site-cancel')
+
+    if (!dialog && !orderDialog) return
+
+    let editingId = null
+    let orderIds = []
+
+    // ------------------------------------------------------------ 基础工具
+
+    function safeStorage() {
+      try {
+        return root.localStorage || null
+      } catch (error) {
+        return null
+      }
+    }
+
+    function listCustom() {
+      try {
+        return store.listCustom(safeStorage())
+      } catch (error) {
+        return []
+      }
+    }
+
+    function refreshButtons() {
+      if (SS.app && typeof SS.app.refreshSiteButtons === 'function') {
+        try {
+          SS.app.refreshSiteButtons()
+        } catch (error) {
+          /* 重建失败不影响当前操作 */
+        }
+      }
+    }
+
+    function setStatus(message) {
+      if (sitesStatus) sitesStatus.textContent = message || ''
+    }
+
+    function setFormError(message) {
+      if (!formError) return
+      formError.textContent = message || ''
+      formError.hidden = !message
+    }
+
+    function groupLabel(groupId) {
+      const groups = Array.isArray(SS.siteGroups) ? SS.siteGroups : []
+      for (const group of groups) {
+        if (group && group.id === groupId) {
+          return typeof group.label === 'string' && group.label !== '' ? group.label : groupId
+        }
+      }
+      return groupId || ''
+    }
+
+    function createElement(tag, className, text) {
+      const element = doc.createElement(tag)
+      if (className) element.className = className
+      if (text !== undefined) element.textContent = text
+      return element
+    }
+
+    function createRowAction(attribute, value, className, accessibleLabel, text) {
+      const button = doc.createElement('button')
+      button.type = 'button'
+      button.className = className
+      button.setAttribute(attribute, value)
+      button.setAttribute('aria-label', accessibleLabel)
+      button.textContent = text
+      return button
+    }
+
+    // 打开/关闭优先交给 app.js（它统一管理 scrim / 焦点 / Esc / Tab 循环）；
+    // 旧装配环境缺失 API 时做最小兜底。
+    function syncScrimFallback() {
+      const scrim = byId('scrim')
+      if (!scrim) return
+      const overlays = [dialog, orderDialog, byId('shortcuts-dialog'), byId('settings-panel')]
+      let open = doc.body.classList.contains('nav-open')
+      for (const element of overlays) {
+        if (element && !element.hidden) open = true
+      }
+      scrim.hidden = !open
+    }
+
+    function openSites(trigger) {
+      hideForm()
+      setStatus('')
+      if (SS.app && typeof SS.app.openSitesDialog === 'function') {
+        SS.app.openSitesDialog(trigger || null)
+      } else if (dialog) {
+        dialog.hidden = false
+        syncScrimFallback()
+        if (sitesClose && typeof sitesClose.focus === 'function') sitesClose.focus()
+      }
+      renderSitesList()
+    }
+
+    function closeSites() {
+      hideForm()
+      if (SS.app && typeof SS.app.closeSitesDialog === 'function') {
+        SS.app.closeSitesDialog()
+      } else if (dialog) {
+        dialog.hidden = true
+        syncScrimFallback()
+      }
+    }
+
+    function openOrder(trigger) {
+      if (SS.app && typeof SS.app.openOrderDialog === 'function') {
+        SS.app.openOrderDialog(trigger || null)
+      } else if (orderDialog) {
+        orderDialog.hidden = false
+        syncScrimFallback()
+        if (orderClose && typeof orderClose.focus === 'function') orderClose.focus()
+      }
+      renderOrderList()
+    }
+
+    function closeOrder() {
+      if (SS.app && typeof SS.app.closeOrderDialog === 'function') {
+        SS.app.closeOrderDialog()
+      } else if (orderDialog) {
+        orderDialog.hidden = true
+        syncScrimFallback()
+      }
+    }
+
+    // ------------------------------------------------------------ 自定义站点列表
+
+    function renderSitesList() {
+      if (!sitesList) return
+      const customSites = listCustom()
+      sitesList.textContent = ''
+      for (const site of customSites) {
+        const row = doc.createElement('li')
+        row.setAttribute('data-site-id', site.id)
+        row.appendChild(createElement('span', 'site-label', site.label))
+        row.appendChild(createElement('span', 'site-group', groupLabel(site.group)))
+        row.appendChild(createRowAction('data-action', 'edit', 'row-action', '编辑 ' + site.label, '编辑'))
+        row.appendChild(createRowAction('data-action', 'delete', 'row-action', '删除 ' + site.label, '删除'))
+        sitesList.appendChild(row)
+      }
+      if (sitesEmpty) sitesEmpty.hidden = customSites.length > 0
+    }
+
+    function findCustomSite(id) {
+      const customSites = listCustom()
+      for (const site of customSites) {
+        if (site.id === id) return site
+      }
+      return null
+    }
+
+    // ------------------------------------------------------------ 新增 / 编辑表单
+
+    function fillGroupOptions() {
+      if (!fieldGroup) return
+      fieldGroup.textContent = ''
+      const groups = Array.isArray(SS.siteGroups) ? SS.siteGroups : []
+      for (const group of groups) {
+        if (!group || typeof group.id !== 'string' || group.id === '') continue
+        const option = doc.createElement('option')
+        option.value = group.id
+        option.textContent = typeof group.label === 'string' ? group.label : group.id
+        fieldGroup.appendChild(option)
+      }
+      if (groups.length > 0) fieldGroup.value = groups[0].id
+    }
+
+    function showForm(site) {
+      if (!form) return
+      editingId = site && typeof site.id === 'string' && site.id !== '' ? site.id : null
+      if (formTitle) formTitle.textContent = editingId ? '编辑站点' : '新增站点'
+      try {
+        form.reset()
+      } catch (error) {
+        /* 老浏览器忽略 */
+      }
+      fillGroupOptions()
+      if (site) {
+        if (fieldLabel) fieldLabel.value = site.label || ''
+        if (fieldHome) fieldHome.value = site.home || ''
+        if (fieldSearch) fieldSearch.value = site.search || ''
+        if (fieldGroup && site.group) fieldGroup.value = site.group
+        if (fieldKeywords) {
+          fieldKeywords.value = Array.isArray(site.keywords) ? site.keywords.join(' ') : ''
+        }
+        if (fieldFeatured) fieldFeatured.checked = site.featured === true
+      }
+      setFormError('')
+      form.hidden = false
+      if (fieldLabel && typeof fieldLabel.focus === 'function') fieldLabel.focus()
+    }
+
+    function hideForm() {
+      editingId = null
+      if (form) form.hidden = true
+      setFormError('')
+    }
+
+    function readForm() {
+      return {
+        label: fieldLabel ? fieldLabel.value : '',
+        home: fieldHome ? fieldHome.value : '',
+        search: fieldSearch ? fieldSearch.value : '',
+        group: fieldGroup ? fieldGroup.value : '',
+        keywords: fieldKeywords ? fieldKeywords.value : '',
+        featured: Boolean(fieldFeatured && fieldFeatured.checked),
+      }
+    }
+
+    function handleSubmit(event) {
+      if (event) event.preventDefault()
+      const storage = safeStorage()
+      const result = editingId
+        ? store.updateCustom(storage, editingId, readForm())
+        : store.addCustom(storage, readForm())
+      if (!result.ok) {
+        setFormError(result.error || '保存失败')
+        setStatus('保存失败：' + (result.error || '未知错误'))
+        return
+      }
+      hideForm()
+      renderSitesList()
+      refreshButtons()
+      setStatus('已保存：' + result.site.label)
+    }
+
+    function deleteSite(site) {
+      let confirmed = false
+      try {
+        confirmed = Boolean(root.confirm('确定删除「' + site.label + '」吗？此操作不可撤销。'))
+      } catch (error) {
+        confirmed = false
+      }
+      if (!confirmed) return
+      const removed = store.removeCustom(safeStorage(), site.id)
+      if (!removed) {
+        setStatus('删除失败：本地存储不可用或站点不存在')
+        return
+      }
+      if (editingId === site.id) hideForm()
+      renderSitesList()
+      refreshButtons()
+      setStatus('已删除：' + site.label)
+    }
+
+    // ------------------------------------------------------------ 导入 / 导出
+
+    function collectSettings() {
+      const settings = {}
+      const storage = safeStorage()
+      if (!storage) return settings
+      const read = (key) => {
+        try {
+          return storage.getItem(key)
+        } catch (error) {
+          return null
+        }
+      }
+      const theme = read('ss.theme')
+      if (theme === 'light' || theme === 'dark') settings.theme = theme
+      const color = read('ss.color')
+      if (typeof color === 'string' && color !== '') settings.color = color
+      const engine = read('ss.engine')
+      if (typeof engine === 'string' && engine !== '') settings.engine = engine
+      const remote = read('ss.remote')
+      if (remote === 'on' || remote === 'off') settings.remote = remote
+      return settings
+    }
+
+    function handleExport() {
+      try {
+        const config = store.exportConfig(safeStorage(), collectSettings())
+        const text = store.serializeConfig(config)
+        const blob = new root.Blob([text], { type: 'application/json;charset=utf-8' })
+        const url = root.URL.createObjectURL(blob)
+        const anchor = doc.createElement('a')
+        anchor.href = url
+        anchor.download = 'simplesearch-config.json'
+        anchor.rel = 'noopener'
+        doc.body.appendChild(anchor)
+        anchor.click()
+        anchor.remove()
+        root.setTimeout(() => {
+          try {
+            root.URL.revokeObjectURL(url)
+          } catch (error) {
+            /* 忽略 */
+          }
+        }, 1000)
+        setStatus('已导出配置（含 ' + config.customSites.length + ' 个自定义站点）')
+      } catch (error) {
+        setStatus('导出失败：' + (error && error.message ? error.message : '未知错误'))
+      }
+    }
+
+    function applyImportedSettings(settings) {
+      if (!settings || typeof settings !== 'object') return
+      const storage = safeStorage()
+      const write = (key, value) => {
+        if (!storage) return
+        try {
+          storage.setItem(key, String(value))
+        } catch (error) {
+          /* 忽略 */
+        }
+      }
+      if (settings.remote === 'on' || settings.remote === 'off') write('ss.remote', settings.remote)
+      if (typeof settings.color === 'string' && settings.color !== '') {
+        write('ss.color', settings.color)
+        if (SS.theme && typeof SS.theme.applyColor === 'function') {
+          try {
+            SS.theme.applyColor(settings.color)
+          } catch (error) {
+            /* 忽略 */
+          }
+        }
+      }
+      if (settings.theme === 'light' || settings.theme === 'dark' || settings.theme === 'auto') {
+        if (SS.theme && typeof SS.theme.setMode === 'function') {
+          try {
+            SS.theme.setMode(settings.theme)
+          } catch (error) {
+            write('ss.theme', settings.theme)
+          }
+        } else {
+          write('ss.theme', settings.theme)
+        }
+      }
+      if (typeof settings.engine === 'string' && SS.engines && SS.engines[settings.engine]) {
+        if (SS.app && typeof SS.app.applyEngine === 'function') {
+          try {
+            SS.app.applyEngine(settings.engine)
+          } catch (error) {
+            write('ss.engine', settings.engine)
+          }
+        } else {
+          write('ss.engine', settings.engine)
+        }
+      }
+    }
+
+    function applyImport(parsed) {
+      const data = parsed.data
+      const current = listCustom()
+      const merged = new Map()
+      for (const site of current) merged.set(site.id, site)
+      for (const site of data.customSites) merged.set(site.id, site)
+      if (!store.saveCustom(safeStorage(), Array.from(merged.values()))) {
+        setStatus('导入失败：本地存储不可用')
+        return
+      }
+      store.saveOrder(safeStorage(), data.order)
+      applyImportedSettings(data.settings)
+      refreshButtons()
+      renderSitesList()
+      renderOrderList()
+      setStatus('已导入 ' + data.customSites.length + ' 个自定义站点')
+    }
+
+    function readFileText(file) {
+      if (file && typeof file.text === 'function') return file.text()
+      return new Promise((resolve, reject) => {
+        const reader = new root.FileReader()
+        reader.onload = () => resolve(String(reader.result || ''))
+        reader.onerror = () => reject(reader.error || new Error('无法读取文件'))
+        reader.readAsText(file)
+      })
+    }
+
+    function handleImportFile() {
+      const file = importFile && importFile.files && importFile.files[0] ? importFile.files[0] : null
+      if (!file) return
+      readFileText(file)
+        .then((text) => {
+          const parsed = store.parseImport(text)
+          if (!parsed.ok) {
+            setStatus('导入失败：' + (parsed.error || '配置文件不合法'))
+            return
+          }
+          applyImport(parsed)
+        })
+        .catch((error) => {
+          setStatus('导入失败：' + (error && error.message ? error.message : '无法读取文件'))
+        })
+        .then(() => {
+          if (importFile) {
+            try {
+              importFile.value = ''
+            } catch (error) {
+              /* 忽略 */
+            }
+          }
+        })
+    }
+
+    // ------------------------------------------------------------ 常用排序
+
+    function featuredSites() {
+      if (SS.app && typeof SS.app.getFeaturedSites === 'function') {
+        try {
+          const list = SS.app.getFeaturedSites()
+          if (Array.isArray(list)) return list
+        } catch (error) {
+          /* 继续走兜底 */
+        }
+      }
+      if (Array.isArray(SS.sites)) {
+        const list = SS.sites.filter((site) => site && site.featured === true)
+        if (list.length > 0) return list
+      }
+      const result = []
+      const container = byId('buttons-container')
+      if (!container) return result
+      for (const button of container.querySelectorAll('[data-site]')) {
+        if (button.getAttribute('data-featured') !== 'true') continue
+        const id = button.getAttribute('data-site')
+        const labelNode = button.querySelector('.button-label')
+        result.push({ id, label: labelNode ? labelNode.textContent : id, featured: true })
+      }
+      return result
+    }
+
+    function renderOrderList() {
+      if (!orderList) return
+      const sites = featuredSites()
+      orderIds = sites.map((site) => site.id)
+      orderList.textContent = ''
+      if (sites.length === 0) {
+        orderList.appendChild(createElement('li', 'order-empty', '还没有「常用」站点'))
+        return
+      }
+      for (const site of sites) {
+        const row = doc.createElement('li')
+        row.setAttribute('data-site-id', site.id)
+        row.appendChild(createElement('span', 'site-label', site.label || site.id))
+        row.appendChild(createRowAction('data-move', 'up', 'row-action', '上移 ' + (site.label || site.id), '↑'))
+        row.appendChild(createRowAction('data-move', 'down', 'row-action', '下移 ' + (site.label || site.id), '↓'))
+        row.appendChild(createRowAction('data-move', 'top', 'row-action', '置顶 ' + (site.label || site.id), '置顶'))
+        orderList.appendChild(row)
+      }
+    }
+
+    function moveSite(id, move) {
+      const index = orderIds.indexOf(id)
+      if (index === -1) return
+      const next = orderIds.slice()
+      if (move === 'top') {
+        next.splice(index, 1)
+        next.unshift(id)
+      } else if (move === 'up' && index > 0) {
+        next[index - 1] = orderIds[index]
+        next[index] = orderIds[index - 1]
+      } else if (move === 'down' && index < orderIds.length - 1) {
+        next[index] = orderIds[index + 1]
+        next[index + 1] = orderIds[index]
+      } else {
+        return
+      }
+      store.saveOrder(safeStorage(), next)
+      orderIds = next
+      refreshButtons()
+      renderOrderList()
+    }
+
+    // ------------------------------------------------------------ 事件绑定
+
+    if (openSitesButton) {
+      openSitesButton.addEventListener('click', () => openSites(openSitesButton))
+    }
+    if (openOrderButton) {
+      openOrderButton.addEventListener('click', () => openOrder(openOrderButton))
+    }
+    if (sitesClose) sitesClose.addEventListener('click', closeSites)
+    if (orderClose) orderClose.addEventListener('click', closeOrder)
+
+    if (addButton) addButton.addEventListener('click', () => showForm(null))
+    if (formCancel) formCancel.addEventListener('click', hideForm)
+    if (form) form.addEventListener('submit', handleSubmit)
+    if (sitesList) {
+      sitesList.addEventListener('click', (event) => {
+        const target = event.target
+        const actionButton = target && typeof target.closest === 'function'
+          ? target.closest('[data-action]')
+          : null
+        if (!actionButton || !sitesList.contains(actionButton)) return
+        const row = actionButton.closest('[data-site-id]')
+        if (!row) return
+        const site = findCustomSite(row.getAttribute('data-site-id'))
+        if (!site) return
+        if (actionButton.getAttribute('data-action') === 'edit') showForm(site)
+        else if (actionButton.getAttribute('data-action') === 'delete') deleteSite(site)
+      })
+    }
+    if (orderList) {
+      orderList.addEventListener('click', (event) => {
+        const target = event.target
+        const moveButton = target && typeof target.closest === 'function'
+          ? target.closest('[data-move]')
+          : null
+        if (!moveButton || !orderList.contains(moveButton)) return
+        const row = moveButton.closest('[data-site-id]')
+        if (!row) return
+        moveSite(row.getAttribute('data-site-id'), moveButton.getAttribute('data-move'))
+      })
+    }
+    if (exportButton) exportButton.addEventListener('click', handleExport)
+    if (importOpenButton) {
+      importOpenButton.addEventListener('click', () => {
+        if (importFile) importFile.click()
+      })
+    }
+    if (importFile) importFile.addEventListener('change', handleImportFile)
+
+    // 对话框可能被 app.js 直接打开（SS.app.openSitesDialog()），用 MutationObserver 兜底渲染；
+    // 同时兼容不支持 MutationObserver 的老浏览器：直接渲染一次。
+    function watchDialog(element, render) {
+      if (!element) return
+      if (typeof root.MutationObserver !== 'function') {
+        render()
+        return
+      }
+      const observer = new root.MutationObserver(() => {
+        if (!element.hidden) render()
+      })
+      observer.observe(element, { attributes: true, attributeFilter: ['hidden'] })
+    }
+    watchDialog(dialog, renderSitesList)
+    watchDialog(orderDialog, renderOrderList)
+
+    if (fieldGroup) fillGroupOptions()
+    renderSitesList()
+    renderOrderList()
+    initialized = true
+  }
+
+  SS.sitesAdmin = { init }
+})(typeof globalThis !== 'undefined' ? globalThis : this)
+
+</script>
+  <script>
 /* assets/js/app.js */
 // 应用装配层：只负责把各模块接到 DOM 上，不含业务逻辑。
 //
@@ -3251,6 +4415,106 @@ body.nav-open .site-nav{transform:none}
       if (!button || !container.contains(button)) return
       handleSiteClick(button.getAttribute('data-site'), event)
     })
+  }
+
+  // ---------------------------------------------------------------- 站点注册表（v2.9）
+  // 内置站点快照 + 本地自定义站点（ss.customSites）合并，应用常用排序（ss.order），
+  // 结果写回 SS.sites —— 联想、!bang、站点 URL 解析都读这份运行时注册表。
+  const builtinSites = Array.isArray(SS.sites) ? SS.sites.slice() : []
+  let currentGroup = 'all'
+
+  function safeStorage() {
+    try {
+      return window.localStorage || null
+    } catch (error) {
+      return null
+    }
+  }
+
+  function mergedSites() {
+    const store = SS.sitesStore
+    if (!store || typeof store.merge !== 'function') return builtinSites
+    let custom = []
+    let order = []
+    try {
+      custom = store.listCustom(safeStorage())
+      order = store.getOrder(safeStorage())
+    } catch (error) {
+      custom = []
+      order = []
+    }
+    return store.applyOrder(store.merge(builtinSites, custom), order)
+  }
+
+  function syncSiteRegistry() {
+    const sites = mergedSites()
+    if (Array.isArray(SS.sites)) {
+      SS.sites.length = 0
+      for (const site of sites) SS.sites.push(site)
+    }
+    return sites
+  }
+
+  function iconHrefFor(site, iconMap) {
+    if (iconMap[site.id]) return iconMap[site.id]
+    if (site.icon && document.getElementById(`i-${site.icon}`)) return `#i-${site.icon}`
+    return ''
+  }
+
+  function createSiteButton(site, iconMap) {
+    const button = document.createElement('button')
+    button.className = 'button'
+    button.type = 'button'
+    button.setAttribute('data-site', site.id)
+    button.setAttribute('data-group', site.group || '')
+    if (Array.isArray(site.keywords) && site.keywords.length) {
+      button.setAttribute('data-keywords', site.keywords.join(' '))
+    }
+    if (site.featured === true) button.setAttribute('data-featured', 'true')
+    else button.hidden = true
+
+    const href = iconHrefFor(site, iconMap)
+    button.setAttribute('data-icon', href)
+    if (href) {
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+      svg.setAttribute('class', 'button-icon')
+      svg.setAttribute('aria-hidden', 'true')
+      svg.setAttribute('focusable', 'false')
+      const use = document.createElementNS('http://www.w3.org/2000/svg', 'use')
+      use.setAttribute('href', href)
+      svg.appendChild(use)
+      button.appendChild(svg)
+    } else {
+      const span = document.createElement('span')
+      span.className = 'button-icon button-icon-text'
+      span.setAttribute('aria-hidden', 'true')
+      span.textContent = (String(site.label || '?').trim().charAt(0) || '?').toUpperCase()
+      button.appendChild(span)
+    }
+
+    const label = document.createElement('span')
+    label.className = 'button-label'
+    label.textContent = site.label
+    button.appendChild(label)
+    return button
+  }
+
+  // 按注册表（含自定义站点与新排序）重建按钮墙；内置图标从 data-icon 复用
+  function refreshSiteButtons() {
+    const container = $('buttons-container')
+    if (!container) return
+    const iconMap = {}
+    for (const button of container.querySelectorAll('[data-site]')) {
+      const href = button.getAttribute('data-icon')
+      if (href) iconMap[button.getAttribute('data-site')] = href
+      button.remove()
+    }
+    for (const site of syncSiteRegistry()) container.appendChild(createSiteButton(site, iconMap))
+    applyGroupFilter(currentGroup, { syncUrl: false })
+  }
+
+  function getFeaturedSites() {
+    return (Array.isArray(SS.sites) ? SS.sites : []).filter((site) => site && site.featured === true)
   }
 
   function bindSearchForm() {
@@ -3310,9 +4574,10 @@ body.nav-open .site-nav{transform:none}
     }
   }
 
-  function applyGroupFilter(group) {
+  function applyGroupFilter(group, options) {
     const nav = $('group-chips')
     const isAll = group === 'all'
+    currentGroup = group
     let label = ''
     if (nav) {
       for (const item of nav.querySelectorAll('[data-group]')) {
@@ -3335,7 +4600,8 @@ body.nav-open .site-nav{transform:none}
     // 卡片标题跟随当前视图
     const title = document.querySelector('.card-title')
     if (title) title.textContent = isAll ? '常用网站' : label || '常用网站'
-    syncCategoryUrl(group)
+    // 重建按钮墙时只更新 UI，不改地址栏（否则会把 ?cat= 深链抹掉）
+    if (!options || options.syncUrl !== false) syncCategoryUrl(group)
   }
 
   function isMobileNav() {
@@ -3359,10 +4625,24 @@ body.nav-open .site-nav{transform:none}
   // 不要只看 body class —— openSettings 要等 rAF 才加 class，早一步判断会漏掉。
   function anyOverlayOpen() {
     const panel = $('settings-panel')
-    const dialog = $('shortcuts-dialog')
     const panelOpen = Boolean(panel && !panel.hidden)
-    const dialogOpen = Boolean(dialog && !dialog.hidden)
+    const dialogs = ['shortcuts-dialog', 'sites-dialog', 'order-dialog']
+    const dialogOpen = dialogs.some((id) => {
+      const el = $(id)
+      return Boolean(el && !el.hidden)
+    })
     return panelOpen || dialogOpen || document.body.classList.contains('nav-open')
+  }
+
+  // 当前打开的最上层覆盖层（用于 Esc / Tab / 遮罩点击的事件路由）
+  function openOverlay() {
+    for (const id of ['sites-dialog', 'order-dialog', 'shortcuts-dialog']) {
+      const el = $(id)
+      if (el && !el.hidden) return { id, el }
+    }
+    const panel = $('settings-panel')
+    if (panel && !panel.hidden) return { id: 'settings-panel', el: panel }
+    return null
   }
 
   function syncScrim() {
@@ -3374,6 +4654,8 @@ body.nav-open .site-nav{transform:none}
   function openNav() {
     closeShortcuts(false)
     closeSettings(false)
+    closeSitesDialog(false)
+    closeOrderDialog(false)
     document.body.classList.add('nav-open')
     const toggle = $('nav-toggle')
     if (toggle) toggle.setAttribute('aria-expanded', 'true')
@@ -3391,6 +4673,8 @@ body.nav-open .site-nav{transform:none}
   function openSettings() {
     closeShortcuts(false)
     closeNav(false)
+    closeSitesDialog(false)
+    closeOrderDialog(false)
     const panel = $('settings-panel')
     const toggle = $('settings-toggle')
     if (!panel || !toggle) return
@@ -3422,6 +4706,8 @@ body.nav-open .site-nav{transform:none}
   function openShortcuts(trigger) {
     closeSettings(false)
     closeNav(false)
+    closeSitesDialog(false)
+    closeOrderDialog(false)
     const dialog = $('shortcuts-dialog')
     if (!dialog) return
     shortcutsTrigger = trigger || null
@@ -3439,6 +4725,71 @@ body.nav-open .site-nav{transform:none}
     const target = shortcutsTrigger
     shortcutsTrigger = null
     if (restoreFocus && target && typeof target.focus === 'function') target.focus()
+  }
+
+  // ---------------------------------------------------------------- 站点管理 / 常用排序对话框（v2.9）
+  let sitesDialogTrigger = null
+  let orderDialogTrigger = null
+
+  function openSitesDialog(trigger) {
+    closeShortcuts(false)
+    closeSettings(false)
+    closeNav(false)
+    closeOrderDialog(false)
+    const dialog = $('sites-dialog')
+    if (!dialog) return
+    sitesDialogTrigger = trigger || null
+    dialog.hidden = false
+    syncScrim()
+    const close = $('sites-close')
+    if (close && typeof close.focus === 'function') close.focus()
+  }
+
+  function closeSitesDialog(restoreFocus = true) {
+    const dialog = $('sites-dialog')
+    if (!dialog || dialog.hidden) return
+    dialog.hidden = true
+    syncScrim()
+    const target = sitesDialogTrigger
+    sitesDialogTrigger = null
+    if (restoreFocus && target && typeof target.focus === 'function') target.focus()
+  }
+
+  function openOrderDialog(trigger) {
+    closeShortcuts(false)
+    closeSettings(false)
+    closeNav(false)
+    closeSitesDialog(false)
+    const dialog = $('order-dialog')
+    if (!dialog) return
+    orderDialogTrigger = trigger || null
+    dialog.hidden = false
+    syncScrim()
+    const close = $('order-close')
+    if (close && typeof close.focus === 'function') close.focus()
+  }
+
+  function closeOrderDialog(restoreFocus = true) {
+    const dialog = $('order-dialog')
+    if (!dialog || dialog.hidden) return
+    dialog.hidden = true
+    syncScrim()
+    const target = orderDialogTrigger
+    orderDialogTrigger = null
+    if (restoreFocus && target && typeof target.focus === 'function') target.focus()
+  }
+
+  // Esc / 点遮罩 / Tab 循环的统一入口：关掉最上层覆盖层
+  function closeTopOverlay(restoreFocus = true) {
+    const open = openOverlay()
+    if (!open) {
+      if (document.body.classList.contains('nav-open')) closeNav(restoreFocus)
+      return
+    }
+    if (open.id === 'sites-dialog') closeSitesDialog(restoreFocus)
+    else if (open.id === 'order-dialog') closeOrderDialog(restoreFocus)
+    else if (open.id === 'shortcuts-dialog') closeShortcuts(restoreFocus)
+    else closeSettings(restoreFocus)
   }
 
   function bindDrawers() {
@@ -3462,12 +4813,7 @@ body.nav-open .site-nav{transform:none}
     }
     if (settingsClose) settingsClose.addEventListener('click', () => closeSettings())
     if (scrim) {
-      scrim.addEventListener('click', () => {
-        const dialog = $('shortcuts-dialog')
-        if (dialog && !dialog.hidden) closeShortcuts()
-        else if (panel && !panel.hidden) closeSettings()
-        else if (document.body.classList.contains('nav-open')) closeNav()
-      })
+      scrim.addEventListener('click', () => closeTopOverlay())
     }
     const shortcutsOpen = $('shortcuts-open')
     if (shortcutsOpen) {
@@ -3488,8 +4834,8 @@ body.nav-open .site-nav{transform:none}
       }
     })
     document.addEventListener('keydown', (event) => {
-      const dialog = $('shortcuts-dialog')
-      const trap = dialog && !dialog.hidden ? dialog : panel && !panel.hidden ? panel : null
+      const open = openOverlay()
+      const trap = open ? open.el : null
       // aria-modal 覆盖层：Tab 在内部循环，不跑到背后的页面
       if (event.key === 'Tab' && trap) {
         const focusables = trap.querySelectorAll('button, a[href]')
@@ -3507,9 +4853,7 @@ body.nav-open .site-nav{transform:none}
         return
       }
       if (event.key !== 'Escape' || !isScrimVisible()) return
-      if (dialog && !dialog.hidden) closeShortcuts()
-      else if (panel && !panel.hidden) closeSettings()
-      else closeNav()
+      closeTopOverlay()
       event.preventDefault()
     })
   }
@@ -3684,6 +5028,9 @@ body.nav-open .site-nav{transform:none}
     bindDrawers()
     bindRipple()
     bindEngines()
+    // v2.9：把本地自定义站点并入运行时注册表，并按常用排序重建按钮墙
+    refreshSiteButtons()
+    if (SS.sitesAdmin && typeof SS.sitesAdmin.init === 'function') SS.sitesAdmin.init()
     // 深链优先（?cat= / ?site=），否则默认「常用」视图；两种情况下都要跑一次过滤
     const deepGroup = applyDeepLinks()
     applyGroupFilter(deepGroup || 'all')
@@ -3703,6 +5050,15 @@ body.nav-open .site-nav{transform:none}
     openShortcuts,
     closeShortcuts,
     applyEngine,
+    refreshSiteButtons,
+    getFeaturedSites,
+    getCurrentGroup: () => currentGroup,
+    openSitesDialog,
+    closeSitesDialog,
+    openOrderDialog,
+    closeOrderDialog,
+    closeTopOverlay,
+    syncOverlays: syncScrim,
   }
 
   if (document.readyState === 'loading') {

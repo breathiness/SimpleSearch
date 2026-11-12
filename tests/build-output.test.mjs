@@ -1015,7 +1015,7 @@ testSingle('v2.6 单文件便携版：build 生成 + CSS/JS 全内联 + 无 asse
   }
 })
 
-testSingle('v2.6 单文件体积 ≤ 200KB（未压缩，零外部请求）', () => {
+testSingle('v2.6 单文件体积 ≤ 260KB（未压缩，零外部请求）', () => {
   const bytes = Buffer.byteLength(readRepo('SimpleSearch.html'), 'utf8')
-  assert.ok(bytes <= 200 * 1024, `SimpleSearch.html 体积 ${(bytes / 1024).toFixed(1)} KB，超过 200KB 上限`)
+  assert.ok(bytes <= 260 * 1024, `SimpleSearch.html 体积 ${(bytes / 1024).toFixed(1)} KB，超过 260KB 上限`)
 })

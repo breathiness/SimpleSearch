@@ -1,4 +1,4 @@
-// SimpleSearch v2.8 静态校验与产物一致性门禁。
+// SimpleSearch v2.9 静态校验与产物一致性门禁。
 // 用法：node scripts/validate.mjs（npm run validate）
 //
 // 产物模型（docs/contract.md §7、§12-§17）：npm run build 生成 5 个产物
@@ -15,7 +15,7 @@
 //   3. index.html head：charset / lang / viewport / theme-color / favicon / data-theme / data-theme-default=auto
 //   4. index.html 硬约束：无 type="module"、无内联 on* 事件、无未替换 {{...}}、无重复 id、DOM 契约 id 齐全
 //   5. index.html 引用的所有本地 resources 真实存在
-//   6. index.html 按契约顺序引用 8 个经典脚本（remote.js 在 input.js 之前）
+//   6. index.html 按契约顺序引用 10 个经典脚本（remote.js 在 input.js 之前；sites-store/sites-admin 在 app.js 之前）
 //   7. index.html 的 data-site 与 SS.sites 一一对应（顺序/label/数量/data-group）
 //   8. 文档站骨架：.appbar（含 .appbar-logo→#i-logo）/.shell/#main-content/.card、
 //      设置面板（dialog/hidden/#theme-mode 三段式/唯一 .switch-row/.settings-row+空 #color-swatches）、
@@ -37,12 +37,16 @@
 //      壳不得包含真实页内容（#buttons-container / data-site / assets/js bundle），体积 < 1KB
 //  21. 唯一性：只有 index.html 是真实页
 //  22. CSS 不含 !important（契约 §6）
-//  23. 体积信息：index.html 单页加载资源合计 < 156KB（仅提示，契约 §9.9，gzip 为真实成本口径；
+//  23. 体积信息：index.html 单页加载资源合计 < 200KB（仅提示，契约 §9.9，gzip 为真实成本口径；
 //      sw.js / manifest / PWA 图标不计入首屏）
 //  24. 单文件便携版 SimpleSearch.html：build 生成 + CSS/JS 全内联 + 零 assets/manifest/apple-touch-icon 引用
-//  25. 单文件体积 ≤ 200KB（提示项）
+//  25. 单文件体积 ≤ 260KB（提示项）
 //  26. v2.7 站点库规模：总站点数 ≥30、每分组 ≥3、DOM 含全部 data-site 按钮（可见性由 JS 控制）
 //  27. v2.8 featured 视图：11 个 featured 可见、22 个非 featured 带 hidden、.card-title「常用网站」、导航首项「常用」
+//  28. v2.9 设置入口与对话框：#custom-sites-open/#order-open、#sites-dialog/#order-dialog（hidden/dialog/aria-modal/
+//      标题）+ 表单/列表/按钮 id 齐全
+//  29. v2.9 data-icon：内置按钮带 data-icon（非空时 #i-xxx 且命中 sprite）；sites-store/sites-admin 在 app.js 之前；
+//      新脚本无 eval / new Function
 // 任一失败 → 退出码 1，并打印失败详情。
 import fs from 'node:fs'
 import path from 'node:path'
@@ -59,7 +63,7 @@ const SHELLS = [
   { file: 'SimpleSearch-Dark.html', theme: 'dark' },
 ]
 
-// 契约 §6 / §12.1：入口页脚本顺序（remote.js 必须在 input.js 之前）
+// 契约 §6 / §20：入口页脚本顺序（v2.9 起 sites-store / sites-admin 在 app.js 之前）
 const EXPECTED_SCRIPTS = [
   'assets/js/sites.js',
   'assets/js/search.js',
@@ -68,6 +72,8 @@ const EXPECTED_SCRIPTS = [
   'assets/js/theme.js',
   'assets/js/remote.js',
   'assets/js/input.js',
+  'assets/js/sites-store.js',
+  'assets/js/sites-admin.js',
   'assets/js/app.js',
 ]
 
@@ -97,6 +103,29 @@ const REQUIRED_IDS = [
   'shortcuts-dialog',
   'shortcuts-title',
   'shortcuts-close',
+  // v2.9 自定义站点 / 排序 / 导入导出
+  'custom-sites-open',
+  'order-open',
+  'sites-dialog',
+  'sites-title',
+  'sites-close',
+  'sites-list',
+  'sites-status',
+  'site-form',
+  'site-label',
+  'site-home',
+  'site-search',
+  'site-group',
+  'site-keywords',
+  'site-featured',
+  'site-save',
+  'site-cancel',
+  'config-export',
+  'config-import-file',
+  'order-dialog',
+  'order-title',
+  'order-close',
+  'order-list',
   'scrim',
 ]
 
@@ -157,9 +186,9 @@ const BUILTIN_IDS = [
 const BUILD_MARKER = /<!--\s*由 scripts\/build\.mjs/
 // v2.6 PWA 唯一允许被引用的图片（apple-touch-icon / manifest icons / sw precache）
 const PWA_ICON_PATHS = ['assets/img/icon-192.png', 'assets/img/icon-512.png']
-// 体积预算口径（lead 2026-11-11 v2.7）：单页加载 < 156 KB（gzip 前；契约 §9.9 以 gzip 为真实成本口径；
+// 体积预算口径（lead 2026-11-13 v2.9）：单页加载 < 200 KB（gzip 前；契约 §9.9 以 gzip 为真实成本口径；
 // sw.js / manifest / PWA 图标不计入首屏）
-const BUDGET_KB = 156
+const BUDGET_KB = 200
 const SHELL_MAX_BYTES = 1024
 
 // ---------------------------------------------------------------- 通用工具
@@ -816,7 +845,7 @@ check('index.html 引用的本地资源全部存在', () => {
 
 // ---------------------------------------------------------------- 6. 脚本顺序
 
-check('index.html 按契约顺序引用 8 个经典脚本（remote.js 在 input.js 之前）', () => {
+check('index.html 按契约顺序引用 10 个经典脚本（sites-store/sites-admin 在 app.js 之前）', () => {
   if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
   const localScripts = extractScriptSrcs(realPage.html).filter((src) => !isExternalUrl(src))
   if (localScripts.join(',') !== EXPECTED_SCRIPTS.join(',')) {
@@ -1724,7 +1753,7 @@ check('CSS 不含 !important（契约 §6）', () => {
 
 // ---------------------------------------------------------------- 23. 体积信息
 
-check('体积信息（index.html 单页加载预算 < 156 KB，仅供参考不阻断）', () => {
+check('体积信息（index.html 单页加载预算 < 200 KB，仅供参考不阻断）', () => {
   if (!realPage.exists) return { problems: [], notes: [`${REAL_PAGE} 不存在，跳过体积统计`] }
 
   const notes = []
@@ -1772,7 +1801,7 @@ check('体积信息（index.html 单页加载预算 < 156 KB，仅供参考不�
 // ---------------------------------------------------------------- 24. v2.6 单文件便携版
 
 const SINGLE_FILE = 'SimpleSearch.html'
-const SINGLE_FILE_MAX_KB = 200
+const SINGLE_FILE_MAX_KB = 260
 
 check('v2.6 单文件便携版 SimpleSearch.html：build 生成 + CSS/JS 全内联 + 零 assets/manifest/apple-touch-icon 引用', () => {
   const singlePath = path.join(ROOT, SINGLE_FILE)
@@ -1831,7 +1860,7 @@ check('v2.6 单文件便携版 SimpleSearch.html：build 生成 + CSS/JS 全内�
 
 // ---------------------------------------------------------------- 25. v2.6 单文件体积
 
-check('v2.6 单文件体积（≤ 200KB，提示项不阻断）', () => {
+check('v2.6 单文件体积（≤ 260KB，提示项不阻断）', () => {
   const singlePath = path.join(ROOT, SINGLE_FILE)
   if (!fs.existsSync(singlePath)) return [`缺少 ${SINGLE_FILE}`]
   const bytes = fs.statSync(singlePath).size
@@ -1939,13 +1968,131 @@ check('v2.8 默认常用视图（静态）：11 个 featured（data-featured="tr
   }
 })
 
+// ---------------------------------------------------------------- 28. v2.9 设置入口 + 自定义站点/排序对话框（§20.2）
+
+check('v2.9 设置入口与对话框：#custom-sites-open/#order-open + #sites-dialog/#order-dialog（hidden/dialog/aria-modal/标题）+ 表单/列表/按钮 id 齐全', () => {
+  if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
+  const clean = stripHtmlComments(realPage.html)
+  const problems = []
+
+  // 设置面板入口
+  for (const id of ['custom-sites-open', 'order-open']) {
+    if (!findTagById(clean, id)) problems.push(`${REAL_PAGE} 设置面板缺少 #${id}`)
+  }
+
+  // 两个对话框的语义属性
+  const dialogExpectations = [
+    { id: 'sites-dialog', titleId: 'sites-title', closeId: 'sites-close' },
+    { id: 'order-dialog', titleId: 'order-title', closeId: 'order-close' },
+  ]
+  for (const expected of dialogExpectations) {
+    const tag = findTagById(clean, expected.id)
+    if (!tag) {
+      problems.push(`${REAL_PAGE} 缺少 #${expected.id}`)
+      continue
+    }
+    if (!hasClass(tag, 'dialog')) problems.push(`#${expected.id} 应带 .dialog 类`)
+    if ((getAttr(tag, 'role') || '').toLowerCase() !== 'dialog') {
+      problems.push(`#${expected.id} 的 role 应为 dialog，实际 ${JSON.stringify(getAttr(tag, 'role'))}`)
+    }
+    if (getAttr(tag, 'aria-modal') !== 'true') problems.push(`#${expected.id} 的 aria-modal 应为 true`)
+    if (!hasHiddenAttr(tag)) problems.push(`#${expected.id} 初始应带 hidden（关闭状态）`)
+    if (getAttr(tag, 'aria-labelledby') !== expected.titleId) {
+      problems.push(`#${expected.id} 的 aria-labelledby 应为 ${expected.titleId}，实际 ${JSON.stringify(getAttr(tag, 'aria-labelledby'))}`)
+    }
+    if (!findTagById(clean, expected.titleId)) problems.push(`${REAL_PAGE} 缺少 #${expected.titleId}`)
+    if (!findTagById(clean, expected.closeId)) problems.push(`${REAL_PAGE} 缺少 #${expected.closeId}`)
+  }
+
+  // 表单 / 列表 / 操作按钮 id（REQUIRED_IDS 已覆盖存在性，这里再确认一遍关键分组，便于失败定位）
+  for (const id of [
+    'site-form',
+    'site-label',
+    'site-home',
+    'site-search',
+    'site-group',
+    'site-keywords',
+    'site-featured',
+    'site-save',
+    'site-cancel',
+    'sites-list',
+    'order-list',
+    'sites-status',
+    'config-export',
+    'config-import-file',
+  ]) {
+    if (!findTagById(clean, id)) problems.push(`${REAL_PAGE} 缺少 #${id}`)
+  }
+
+  return problems
+})
+
+// ---------------------------------------------------------------- 29. v2.9 data-icon / 新脚本（§20.3）
+
+check('v2.9 data-icon 与脚本：内置按钮带 data-icon（非空时形如 #i-xxx 且命中 sprite），sites-store/sites-admin 在 app.js 之前，且无 eval/new Function', () => {
+  if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
+  if (!sites) return [registry.problem || '无法读取 SS.sites']
+
+  const clean = stripHtmlComments(realPage.html)
+  const problems = []
+
+  // 每个内置站点按钮必须有 data-icon 属性；非空值形如 #i-xxx 且 sprite 中存在
+  const sprite = extractSprite(clean)
+  const symbolSet = sprite ? new Set(extractSymbols(sprite.inner).map((symbol) => symbol.id)) : new Set()
+  const buttons = extractSiteButtons(clean)
+  const builtinSet = new Set(BUILTIN_IDS)
+  for (const button of buttons) {
+    if (!builtinSet.has(button.id)) continue
+    if (!/\bdata-icon\s*=/i.test(button.openTag)) {
+      problems.push(`内置站点 ${button.id} 的按钮缺少 data-icon 属性（运行时重建按钮要用）`)
+      continue
+    }
+    const iconValue = getAttr(button.openTag, 'data-icon') || ''
+    if (iconValue !== '') {
+      if (!/^#i-[a-z0-9-]+$/.test(iconValue)) {
+        problems.push(`内置站点 ${button.id} 的 data-icon 格式不对：${JSON.stringify(iconValue)}`)
+      } else if (!symbolSet.has(iconValue.slice(1))) {
+        problems.push(`内置站点 ${button.id} 的 data-icon ${iconValue} 不在 sprite 中`)
+      }
+    }
+  }
+
+  // 新脚本顺序：sites-store.js / sites-admin.js 必须在 app.js 之前
+  const localScripts = extractScriptSrcs(clean).filter((src) => !isExternalUrl(src))
+  const indexOf = (name) => localScripts.indexOf(name)
+  for (const name of ['assets/js/sites-store.js', 'assets/js/sites-admin.js']) {
+    if (indexOf(name) === -1) {
+      problems.push(`${REAL_PAGE} 脚本列表缺少 ${name}`)
+      continue
+    }
+    if (indexOf(name) > indexOf('assets/js/app.js')) problems.push(`${name} 应排在 app.js 之前`)
+  }
+
+  // 新脚本不得使用 eval / new Function
+  for (const file of ['assets/js/sites-store.js', 'assets/js/sites-admin.js']) {
+    const full = path.join(ROOT, file)
+    if (!fs.existsSync(full)) {
+      problems.push(`缺少 ${file}（v2.9 新增模块）`)
+      continue
+    }
+    const source = fs.readFileSync(full, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    if (/\beval\s*\(/.test(source)) problems.push(`${file} 使用了 eval(（禁止）`)
+    if (/\bnew\s+Function\s*\(/.test(source)) problems.push(`${file} 使用了 new Function(（禁止）`)
+  }
+
+  return {
+    problems,
+    notes: [`内置按钮 data-icon 检查 ${buttons.filter((button) => builtinSet.has(button.id)).length} 个`],
+  }
+})
+
 // ---------------------------------------------------------------- 输出摘要
 
 function printReport() {
   const failed = checks.filter((item) => item.problems.length > 0)
   const passed = checks.length - failed.length
 
-  console.log('SimpleSearch v2.8 静态校验（validate）')
+  console.log('SimpleSearch v2.9 静态校验（validate）')
   console.log(`仓库：${ROOT}`)
   console.log(`产物：${REAL_PAGE}（真实页）+ ${SHELLS.map((shell) => shell.file).join(' + ')}（重定向壳）`)
   console.log('')

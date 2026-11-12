@@ -140,6 +140,14 @@
         <span class="settings-label">键盘快捷键</span>
         <button id="shortcuts-open" class="text-button" type="button">查看</button>
       </div>
+      <div class="settings-row settings-row-inline">
+        <span class="settings-label">我的站点</span>
+        <button id="custom-sites-open" class="text-button" type="button">管理</button>
+      </div>
+      <div class="settings-row settings-row-inline">
+        <span class="settings-label">常用排序</span>
+        <button id="order-open" class="text-button" type="button">调整</button>
+      </div>
       <p class="panel-version">简单搜索 v{{APP_VERSION}}</p>
     </div>
   </aside>
@@ -163,6 +171,51 @@
     </dl>
   </section>
 
+  <section id="sites-dialog" class="dialog dialog-wide" role="dialog" aria-modal="true"
+           aria-labelledby="sites-title" hidden>
+    <div class="dialog-header">
+      <h2 id="sites-title" class="dialog-title">我的站点</h2>
+      <button id="sites-close" class="icon-button dialog-close" type="button" aria-label="关闭">✕</button>
+    </div>
+    <div class="dialog-body">
+      <p id="sites-empty" class="dialog-hint">还没有自定义站点。它们只保存在你的浏览器里。</p>
+      <ul id="sites-list" class="sites-list" aria-label="自定义站点列表"></ul>
+      <div class="sites-actions">
+        <button id="site-add" class="text-button" type="button">新增站点</button>
+        <button id="config-export" class="text-button" type="button">导出配置</button>
+        <button id="config-import-open" class="text-button" type="button">导入配置</button>
+        <input id="config-import-file" type="file" accept=".json,application/json" hidden>
+      </div>
+      <p id="sites-status" class="dialog-hint" role="status" aria-live="polite"></p>
+      <form id="site-form" class="site-form" hidden>
+        <h3 id="site-form-title" class="site-form-title">新增站点</h3>
+        <label class="field"><span>名称</span><input id="site-label" name="label" type="text" required maxlength="24"></label>
+        <label class="field"><span>首页网址</span><input id="site-home" name="home" type="url" required placeholder="https://example.com"></label>
+        <label class="field"><span>搜索模板（用 {q} 表示关键词）</span><input id="site-search" name="search" type="text" required placeholder="https://example.com/search?q={q}"></label>
+        <label class="field"><span>分类</span><select id="site-group" name="group"></select></label>
+        <label class="field"><span>关键词（空格分隔，可选）</span><input id="site-keywords" name="keywords" type="text" placeholder="别名 关键词"></label>
+        <label class="field-inline"><input id="site-featured" name="featured" type="checkbox"><span>放进「常用」</span></label>
+        <p id="site-form-error" class="form-error" role="alert" hidden></p>
+        <div class="form-actions">
+          <button id="site-save" class="text-button" type="submit">保存</button>
+          <button id="site-cancel" class="text-button" type="button">取消</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section id="order-dialog" class="dialog" role="dialog" aria-modal="true"
+           aria-labelledby="order-title" hidden>
+    <div class="dialog-header">
+      <h2 id="order-title" class="dialog-title">常用排序</h2>
+      <button id="order-close" class="icon-button dialog-close" type="button" aria-label="关闭">✕</button>
+    </div>
+    <div class="dialog-body">
+      <p class="dialog-hint">调整「常用」视图里的按钮顺序，越靠上越靠前。</p>
+      <ul id="order-list" class="order-list" aria-label="常用站点顺序"></ul>
+    </div>
+  </section>
+
   <script defer src="assets/js/sites.js"></script>
   <script defer src="assets/js/search.js"></script>
   <script defer src="assets/js/suggest.js"></script>
@@ -170,6 +223,8 @@
   <script defer src="assets/js/theme.js"></script>
   <script defer src="assets/js/remote.js"></script>
   <script defer src="assets/js/input.js"></script>
+  <script defer src="assets/js/sites-store.js"></script>
+  <script defer src="assets/js/sites-admin.js"></script>
   <script defer src="assets/js/app.js"></script>
 </body>
 </html>
