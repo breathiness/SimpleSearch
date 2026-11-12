@@ -3,6 +3,8 @@
 SimpleSearch 的站点按钮来自**唯一的数据源**：`assets/js/sites.js` 里的 `SS.sites` 数组。
 `scripts/build.mjs` 会从这份数据生成五个产物：唯一真实页面 `index.html`、单文件便携版 `SimpleSearch.html`、两个 0 秒跳转的重定向壳 `SimpleSearch-Light.html` / `SimpleSearch-Dark.html`，以及 PWA 的 `sw.js`。**不需要、也不应该再去手工改 HTML**。
 
+加站点有两种方式：**设置里可视化添加**（推荐，只影响你自己的浏览器，见 §2）或**改 `sites.js` 进仓库内置**（需要重新构建，所有访问者都能看到，见 §3 起）。
+
 ## 1. 数据源
 
 打开 `assets/js/sites.js`，找到 `SS.sites`：
@@ -33,7 +35,19 @@ SS.siteGroups = [
 ]
 ```
 
-## 2. 字段逐项说明
+## 2. 用界面添加（推荐）
+
+不用改代码、不用构建：右上角设置 → **我的站点** → 管理 → **新增站点**。
+
+- 填表：名称、首页网址、搜索模板（用 `{q}` 表示关键词）、分类（技术开发 / 社区问答 / 影音游戏 / 购物 / 素材资讯）、关键词（空格分隔，可选）、是否放进「常用」。
+- 校验：首页 / 搜索模板必须 `https://`，搜索模板必须含 `{q}`，分类必须是内置 5 类之一；不合法会提示原因，不会写入。
+- 保存后按钮**立刻**出现在对应分类；勾了「常用」就同时进常用视图。自定义站点的 id 自动生成（`custom-…`），id 和关键词自动成为 `!bang` token。
+- 数据存在浏览器本地 `ss.customSites`（最多 100 个），刷新或重开页面仍在；列表里可以继续编辑、删除。界面添加的站点不选图标，默认显示首字母 monogram。
+- **常用排序**：设置里「常用排序 → 调整」，用 ↑ / ↓ / 置顶改常用视图顺序，存 `ss.order`。
+- **配置备份 / 迁移**：设置里「导出配置」会下载 `simplesearch-config.json`（包含自定义站点、常用顺序、主题模式 / 主题色 / 搜索引擎 / 联网联想开关）；「导入配置」会校验格式，非法整包拒绝并提示。导入只做 JSON 解析 + 校验，不执行任何代码。
+- 想让站点成为**所有访问者都能看到的内置站点**，才需要走下面的 `sites.js` 流程并重新构建。
+
+## 3. 字段逐项说明
 
 | 字段 | 类型 | 必填 | 说明 |
 |---|---|---|---|
@@ -56,7 +70,7 @@ SS.siteGroups = [
 - 缩进用 2 个空格、字符串用单引号、对象末尾保留逗号，和文件里现有条目保持一致。
 - `id` 一旦发布就尽量别改名，改名等于换了一个站点（测试与用户书签都可能引用它）。
 
-## 3. `{q}` 占位规则
+## 4. `{q}` 占位规则
 
 - `{q}` 在运行时会被替换成**编码后的关键词**（`encodeURIComponent`，见 `assets/js/search.js` 的 `buildUrl`）。
 - 关键词会先做规范化：去掉首尾空白，把连续空白折叠成一个空格；空关键词不会拼搜索地址，而是走 `home`。
@@ -64,7 +78,7 @@ SS.siteGroups = [
 - 搜索地址的查询参数名因站而异（`q`、`keyword`、`term`、`qw`、`search`…），照抄目标站点真实搜索结果的地址即可，只有 `{q}` 的位置由我们决定。
 - `{q}` 也可以出现在路径里，例如 Unsplash 的 `https://unsplash.com/s/photos/{q}`。
 
-## 4. 常见站点搜索 URL 模板示例
+## 5. 常见站点搜索 URL 模板示例
 
 | 站点 | `home` | `search` 模板 |
 |---|---|---|
@@ -83,7 +97,7 @@ SS.siteGroups = [
 
 > 站点改版可能让旧的搜索地址失效（v2 就修正了 Unsplash 的 `search?q=`）。发现点按钮后搜索词丢了，先手动在目标站搜一次，把浏览器地址栏里的真实搜索地址抄回来替换即可。
 
-## 5. `!bang` 快捷搜索
+## 6. `!bang` 快捷搜索
 
 站点的 `id` 和 `keywords` 会自动变成 `!bang` 的 token，不需要额外注册：
 
@@ -91,7 +105,7 @@ SS.siteGroups = [
 - 匹配规则：token 大小写不敏感、与 `id` 或某个 keyword **完全相等**才算命中；允许中文；**只认第一个 token**（`!nope !gh x` 不会命中 GitHub）；未知 token 当普通搜索。
 - 注意：keywords 是全表共享的匹配空间，两个站点用了同一个 keyword 时，命中的是注册表里靠前的那个站点——起别名时尽量别撞车。
 
-## 6. 分类（`group`）
+## 7. 分类（`group`）
 
 - 分类写在 `assets/js/sites.js` 的 `SS.siteGroups` 里，每个站点用 `group` 字段指过去。
 - 页面左侧的分类导航是「常用 + 每个分组」，**顺序跟 `SS.siteGroups` 数组一致**；点「常用」只显示 11 个常用站，点某个分类显示该分类全部站点。宽屏（≥960px）导航常驻 240px；窄屏（<960px）变成左侧抽屉，用顶栏汉堡按钮打开，点遮罩 / 按 `Esc` / 选中分类后自动收起。
@@ -99,7 +113,7 @@ SS.siteGroups = [
 - 新增分类：在 `SS.siteGroups` 里追加 `{ id: 'xxx', label: '显示名' }`（`id` 用小写 `[a-z0-9-]`，不能重复），把相关站点的 `group` 改成 `xxx`，再 `npm run build`。**导航图标按 `cat-<分组 id>` 取名**：内置 5 个分类已有图标；新分类还要在 `scripts/icons.mjs` 的 `UI_ICONS` 里加一条 `'cat-xxx'`，否则导航项的图标引用不到目标，`npm run validate` 会报错。
 - 删除分类：先把该分类下的站点挪到别的分类（或一起删掉），再从 `SS.siteGroups` 移除。空分组 build 只会警告，但站点 `group` 指向不存在的分类会让 build 失败。
 
-## 7. 图标（可选）
+## 8. 图标（可选）
 
 图标是加分项，不是必填。构建时的解析顺序是：**站点专属图标 → `icon` 指向的 symbol → 首字符 monogram**。
 
@@ -122,7 +136,7 @@ SS.siteGroups = [
 - 请画**通用几何符号**，不要精确复制他人商标；整个 sprite 的 HTML 增量要控制在 **12 KB** 内（未压缩）。
 - 不要用外链 favicon 服务、外部图标库/CDN 或 emoji 来替代——前者会新增请求，后者跨平台风格不统一。
 
-## 8. 新增 / 删除网站
+## 9. 新增 / 删除网站
 
 新增：
 
@@ -153,10 +167,11 @@ SS.siteGroups = [
 
 > 如果只改了 `sites.js` 却忘了跑 `npm run build`，CI 的产物漂移检查会失败——因为提交的 HTML 和注册表对不上。报错时跑一次 `npm run build` 把生成结果一起提交即可。
 
-## 9. 为什么只改一处就够
+## 10. 为什么只改一处就够
 
 - 开发时，`scripts/build.mjs` 用 Node 直接 `import` 这个经典脚本，读 `globalThis.SimpleSearch.sites` / `SS.siteGroups`，按 `templates/page.html` 里的占位符生成唯一真实页面 `index.html`（含顶栏、左侧分类导航、卡片按钮墙和图标 sprite），再由 `templates/redirect.html` 生成两个指向它的重定向壳，用 `templates/sw.js` 生成带版本号与 precache 列表的 `sw.js`，最后把 `index.html` 内联成单文件便携版 `SimpleSearch.html`。
 - 图标数据来自 `scripts/icons.mjs`，它同样是 **dev-time 资产**：只在构建时被 Node 读取，不会被页面加载、不会增加请求。
 - Service Worker 的 precache 列表由构建扫描生成：`assets/css` / `assets/js` 下的文件会自动加入；如果你在其它目录新增了本地资源，需要在 `scripts/build.mjs` 的 `buildPrecacheList` 里补一行。
 - 线上仍然是纯静态文件：浏览器只加载已经生成好的 HTML，不需要在运行时读取注册表，也不需要任何构建工具或依赖。
 - 想确认产物和模板/注册表是否一致：运行 `node scripts/build.mjs --check`（`npm run validate` 里也包含这个检查）。
+

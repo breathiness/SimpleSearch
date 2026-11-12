@@ -1370,7 +1370,7 @@ async function run() {
     check('N: 样式已内联生效', single.appbarBg === 'rgb(63, 81, 181)', String(single.appbarBg))
     check('N: 零外部资源引用', single.externalRefs === 0 && single.hasManifest === false, `external=${single.externalRefs} manifest=${single.hasManifest}`)
     check('N: 内联了样式与脚本', single.inlineStyles >= 3 && single.inlineScripts >= 9, `style=${single.inlineStyles} script=${single.inlineScripts}`)
-    check('N: 文件体积合理（≤ 200KB）', single.size <= 200 * 1024, `${(single.size / 1024).toFixed(1)} KB`)
+    check('N: 文件体积合理（≤ 260KB）', single.size <= 260 * 1024, `${(single.size / 1024).toFixed(1)} KB`)
 
     const singleRequests = page.state.requests.filter((u) => u.includes('/assets/'))
     check('N: 打开单文件不请求 assets', singleRequests.length === 0, singleRequests[0] || '')
@@ -1404,6 +1404,232 @@ async function run() {
       'N: 单文件里分类筛选在渲染层生效',
       singleFilter.rendered === singleFilter.expected && singleFilter.expected > 0,
       `渲染可见=${singleFilter.rendered}，期望=${singleFilter.expected}`
+    )
+
+    // ================= O. 自定义站点 / 导入导出 / 常用排序（v2.9） =================
+    console.log('\n=== O. 自定义站点 + 配置导入导出 + 常用排序 ===')
+    await page.clearStorage()
+    await page.goto(PAGE, 300)
+
+    // O1 设置抽屉里有两个新入口
+    const entry = await page.evaluate(`(() => ({
+      sites: !!document.getElementById('custom-sites-open'),
+      order: !!document.getElementById('order-open'),
+    }))()`)
+    check('O: 设置里有「我的站点」「常用排序」入口', entry.sites && entry.order, JSON.stringify(entry))
+
+    // O2 打开「我的站点」对话框
+    await page.evaluate("SimpleSearch.app.openSettings()")
+    await sleep(250)
+    await page.evaluate("document.getElementById('custom-sites-open').click()")
+    await sleep(250)
+    const sitesDialogState = await page.evaluate(`(() => ({
+      open: !document.getElementById('sites-dialog').hidden,
+      panelClosed: document.getElementById('settings-panel').hidden,
+      scrim: !document.getElementById('scrim').hidden,
+      empty: !document.getElementById('sites-empty').hidden,
+      rows: document.querySelectorAll('#sites-list li').length,
+    }))()`)
+    check(
+      'O: 「我的站点」对话框打开且为空',
+      sitesDialogState.open && sitesDialogState.panelClosed && sitesDialogState.scrim && sitesDialogState.empty && sitesDialogState.rows === 0,
+      JSON.stringify(sitesDialogState)
+    )
+
+    // O3 新增一个自定义站点（tech 分类、进常用）
+    await page.evaluate(`document.getElementById('site-add').click()`)
+    await sleep(200)
+    const formVisible = await page.evaluate("!document.getElementById('site-form').hidden")
+    check('O: 点「新增站点」显示表单', formVisible)
+    await page.evaluate(`(() => {
+      document.getElementById('site-label').value = '示例站'
+      document.getElementById('site-home').value = 'https://example.com'
+      document.getElementById('site-search').value = 'https://example.com/s?q={q}'
+      document.getElementById('site-group').value = 'tech'
+      document.getElementById('site-keywords').value = '示例 demo'
+      document.getElementById('site-featured').checked = true
+      document.getElementById('site-save').click()
+    })()`)
+    await sleep(350)
+    const afterAdd = await page.evaluate(`(() => {
+      const rows = [...document.querySelectorAll('#sites-list li')]
+      let raw = null
+      try { raw = JSON.parse(localStorage.getItem('ss.customSites') || 'null') } catch (e) {}
+      return {
+        rows: rows.length,
+        ids: rows.map((li) => li.getAttribute('data-site-id')),
+        status: (document.getElementById('sites-status') || {}).textContent,
+        stored: Array.isArray(raw) ? raw.length : -1,
+        formHidden: document.getElementById('site-form').hidden,
+        emptyHidden: document.getElementById('sites-empty').hidden,
+      }
+    })()`)
+    check(
+      'O: 新增站点写入存储并出现在列表',
+      afterAdd.rows === 1 && afterAdd.stored === 1 && afterAdd.ids[0] === 'custom-1' && afterAdd.emptyHidden && afterAdd.formHidden,
+      JSON.stringify(afterAdd)
+    )
+    check('O: 新增后给出反馈文案', typeof afterAdd.status === 'string' && afterAdd.status.length > 0, afterAdd.status)
+
+    if (SHOTS) await page.screenshot('sites-dialog-added.png')
+
+    // O4 关闭对话框 → 切到「技术开发」→ 自定义站点在列表里，搜索 URL 正确
+    await page.evaluate("document.getElementById('sites-close').click()")
+    await sleep(250)
+    const sitesDialogClosed = await page.evaluate("document.getElementById('sites-dialog').hidden")
+    check('O: 关闭对话框后 scrim 消失', sitesDialogClosed && (await page.evaluate("document.getElementById('scrim').hidden")))
+    await page.evaluate(`document.querySelector('#group-chips [data-group="tech"]').click()`)
+    await sleep(250)
+    const customInTech = await page.evaluate(`(() => {
+      const button = document.querySelector('#buttons-container [data-site="custom-1"]')
+      return {
+        exists: !!button,
+        visible: !!button && getComputedStyle(button).display !== 'none',
+        label: button ? button.querySelector('.button-label').textContent : '',
+        url: (SimpleSearch.search.resolveSite('custom-1', 'hello world') || {}).url,
+      }
+    })()`)
+    check(
+      'O: 自定义站点出现在对应分类且 URL 正确',
+      customInTech.exists && customInTech.visible && customInTech.label === '示例站' && customInTech.url === 'https://example.com/s?q=hello%20world',
+      JSON.stringify(customInTech)
+    )
+
+    // O5 刷新后仍在（localStorage 持久化 + 常用视图可见）
+    await page.goto(PAGE, 400)
+    const persisted = await page.evaluate(`(() => ({
+      custom: document.querySelectorAll('#buttons-container [data-site="custom-1"]').length,
+      featured: (() => { const b = document.querySelector('#buttons-container [data-site="custom-1"]'); return !!b && b.getAttribute('data-featured') === 'true' })(),
+      visibleInCommon: (() => { const b = document.querySelector('#buttons-container [data-site="custom-1"]'); return !!b && getComputedStyle(b).display !== 'none' })(),
+      total: document.querySelectorAll('#buttons-container [data-site]').length,
+    }))()`)
+    check(
+      'O: 刷新后自定义站点仍在且进「常用」',
+      persisted.custom === 1 && persisted.featured && persisted.visibleInCommon && persisted.total >= 34,
+      JSON.stringify(persisted)
+    )
+
+    // O6 编辑名称
+    await page.evaluate("SimpleSearch.app.openSitesDialog(document.getElementById('custom-sites-open'))")
+    await sleep(250)
+    await page.evaluate(`document.querySelector('#sites-list li[data-site-id="custom-1"] [data-action="edit"]').click()`)
+    await sleep(200)
+    await page.evaluate(`(() => {
+      document.getElementById('site-label').value = '示例站2'
+      document.getElementById('site-save').click()
+    })()`)
+    await sleep(350)
+    const edited = await page.evaluate(`(() => {
+      const li = document.querySelector('#sites-list li[data-site-id="custom-1"] .site-label')
+      const button = document.querySelector('#buttons-container [data-site="custom-1"] .button-label')
+      return { list: li ? li.textContent : '', button: button ? button.textContent : '' }
+    })()`)
+    check('O: 编辑后列表与按钮名称同步', edited.list === '示例站2' && edited.button === '示例站2', JSON.stringify(edited))
+    await page.evaluate("SimpleSearch.app.closeSitesDialog()")
+
+    // O7 常用排序：把自定义站点置顶
+    await page.evaluate("SimpleSearch.app.openOrderDialog(document.getElementById('order-open'))")
+    await sleep(300)
+    const orderRows = await page.evaluate("document.querySelectorAll('#order-list li').length")
+    check('O: 排序对话框列出常用站点', orderRows >= 12, String(orderRows))
+    await page.evaluate(`document.querySelector('#order-list li[data-site-id="custom-1"] [data-move="top"]').click()`)
+    await sleep(350)
+    const firstCommon = await page.evaluate(`(() => {
+      const buttons = [...document.querySelectorAll('#buttons-container [data-site]')].filter((b) => getComputedStyle(b).display !== 'none')
+      return { first: buttons[0] ? buttons[0].getAttribute('data-site') : '', count: buttons.length }
+    })()`)
+    check('O: 置顶后「常用」第一个按钮变化', firstCommon.first === 'custom-1', JSON.stringify(firstCommon))
+    if (SHOTS) await page.screenshot('order-dialog.png')
+    await page.evaluate("SimpleSearch.app.closeOrderDialog()")
+
+    // O8 Esc 关闭对话框
+    await page.evaluate("SimpleSearch.app.openSitesDialog()")
+    await sleep(200)
+    await page.pressKey('Escape', { vk: 27, code: 'Escape' })
+    await sleep(250)
+    check('O: Esc 关闭「我的站点」对话框', await page.evaluate("document.getElementById('sites-dialog').hidden"))
+
+    // O9 导出配置：数据层往返 + 按钮可用
+    const exported = await page.evaluate(`(() => {
+      const data = SimpleSearch.sitesStore.exportConfig(localStorage, {})
+      return { schema: data.schema, app: data.app, sites: (data.customSites || []).length, order: (data.order || []).length }
+    })()`)
+    check(
+      'O: 导出配置包含自定义站点与顺序',
+      exported.app === 'SimpleSearch' && exported.schema === 1 && exported.sites === 1 && exported.order >= 1,
+      JSON.stringify(exported)
+    )
+
+    // O10 导入配置（走隐藏 file input + change 事件）
+    const importFile = path.join(ARTIFACTS, 'e2e', 'import-config.json')
+    fs.writeFileSync(
+      importFile,
+      JSON.stringify({
+        app: 'SimpleSearch',
+        schema: 1,
+        version: '2.9.0',
+        customSites: [
+          { id: 'custom-2', label: '导入站', home: 'https://import.example', search: 'https://import.example/?q={q}', group: 'shopping', keywords: ['导入'], featured: false },
+        ],
+        order: [],
+        settings: {},
+      }),
+      'utf8'
+    )
+    await page.evaluate("SimpleSearch.app.openSitesDialog()")
+    await sleep(250)
+    try {
+      const doc = await page.cdp.send('DOM.getDocument', { depth: 1 })
+      const node = await page.cdp.send('DOM.querySelector', { nodeId: doc.root.nodeId, selector: '#config-import-file' })
+      await page.cdp.send('DOM.setFileInputFiles', { nodeId: node.nodeId, files: [importFile] })
+      await page.evaluate(`document.getElementById('config-import-file').dispatchEvent(new Event('change', { bubbles: true }))`)
+      await sleep(450)
+      const imported = await page.evaluate(`(() => ({
+        sites: document.querySelectorAll('#sites-list li').length,
+        button: document.querySelectorAll('#buttons-container [data-site="custom-2"]').length,
+        label: (() => { const b = document.querySelector('#buttons-container [data-site="custom-2"] .button-label'); return b ? b.textContent : '' })(),
+        status: (document.getElementById('sites-status') || {}).textContent,
+      }))()`)
+      check(
+        'O: 导入配置后按钮出现',
+        imported.button === 1 && imported.label === '导入站' && imported.sites >= 2,
+        JSON.stringify(imported)
+      )
+    } catch (error) {
+      check('O: 导入配置后按钮出现', false, '文件注入失败：' + (error && error.message))
+    }
+    await page.evaluate("SimpleSearch.app.closeSitesDialog()")
+
+    // O11 删除自定义站点（confirm 覆盖为 true）
+    await page.evaluate("window.confirm = () => true")
+    await page.evaluate("SimpleSearch.app.openSitesDialog()")
+    await sleep(250)
+    await page.evaluate(`document.querySelector('#sites-list li[data-site-id="custom-2"] [data-action="delete"]').click()`)
+    await sleep(350)
+    const afterDelete = await page.evaluate(`(() => ({
+      row: document.querySelectorAll('#sites-list li[data-site-id="custom-2"]').length,
+      button: document.querySelectorAll('#buttons-container [data-site="custom-2"]').length,
+      remaining: document.querySelectorAll('#sites-list li').length,
+    }))()`)
+    check(
+      'O: 删除自定义站点同步移除按钮',
+      afterDelete.row === 0 && afterDelete.button === 0 && afterDelete.remaining === 1,
+      JSON.stringify(afterDelete)
+    )
+    await page.evaluate("SimpleSearch.app.closeSitesDialog()")
+
+    // O12 清空后回到内置 33 个按钮
+    await page.clearStorage()
+    await page.goto(PAGE, 400)
+    const restoredBuiltin = await page.evaluate(`(() => ({
+      total: document.querySelectorAll('#buttons-container [data-site]').length,
+      custom: document.querySelectorAll('#buttons-container [data-site^="custom-"]').length,
+      visible: [...document.querySelectorAll('#buttons-container [data-site]')].filter((b) => getComputedStyle(b).display !== 'none').length,
+    }))()`)
+    check(
+      'O: 清空本地数据后回到内置站点',
+      restoredBuiltin.custom === 0 && restoredBuiltin.total === 33 && restoredBuiltin.visible === 11,
+      JSON.stringify(restoredBuiltin)
     )
 
   } finally {

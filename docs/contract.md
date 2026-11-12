@@ -642,3 +642,61 @@ SS.siteGroups = [
 
 - E2E：默认视图可见按钮 = 11 且全部 `data-featured="true"`；点「技术开发」→ 可见 7 个且卡片标题「技术开发」；点「常用」→ 回到 11 个、标题「常用网站」；`?cat=shopping` 深链 → 6 个且标题「购物」；单文件版同样断言。
 - 导航首项文案断言改为「常用」。
+
+## 20. v2.9：自定义站点可视化管理 + 配置导入导出 + 常用排序 + 书签小工具
+
+目标：不改代码就能加自己的站点；配置可备份/迁移/分享；常用区顺序可调。
+
+### 20.1 数据层 `assets/js/sites-store.js`（新模块，纯函数 + 注入 storage，便于单测）
+
+```js
+SS.sitesStore = {
+  CUSTOM_KEY: 'ss.customSites',   // JSON 数组
+  ORDER_KEY: 'ss.order',          // JSON：常用顺序的 site id 数组
+  MAX_CUSTOM: 100,
+  // 校验 + 归一化单个自定义站点；返回 { ok:true, site } 或 { ok:false, error }
+  normalizeSite(input) -> result,
+  listCustom(storage) -> CustomSite[],          // 读存储并逐项 normalize，非法项丢弃
+  saveCustom(storage, list) -> boolean,
+  addCustom(storage, input) -> result,          // 追加，id 冲突自动加序号
+  updateCustom(storage, id, input) -> result,
+  removeCustom(storage, id) -> boolean,
+  getOrder(storage) -> string[],
+  saveOrder(storage, ids) -> boolean,
+  merge(builtin, custom) -> Site[],             // builtin 原顺序 + custom 追加
+  applyOrder(sites, orderIds) -> Site[],        // order 里出现的 id 按其顺序在前，其余保持原相对顺序
+  exportConfig(storage, settings) -> object,    // { app:'SimpleSearch', schema:1, version, customSites, order, settings }
+  serializeConfig(obj) -> string,
+  parseImport(text) -> { ok:true, data } | { ok:false, error },
+}
+```
+- 自定义站点字段：`id`（自动生成：`custom-1`/`custom-<时间戳>`，仅 `[a-z0-9-]`）、`label`、`home`、`search`（必须含 `{q}` 且 https）、`group`（必须在 `SS.siteGroups` 内）、`keywords`（字符串数组）、`featured`（bool）、`icon`（可选，仅允许引用已存在的 UI/site symbol 名）。
+- 导入校验：`app === 'SimpleSearch'`、`schema === 1`、`customSites` 数组（≤ MAX_CUSTOM）、逐项 normalize；任一非法项拒绝整包并返回错误信息；不得执行任何代码（只 JSON.parse）。
+
+### 20.2 UI 层 `assets/js/sites-admin.js`（新模块，只在 DOM 就绪后由 app.js 调 `init()`）
+
+- 设置面板新增两行（模板已给）：`#custom-sites-open`「我的站点 → 管理」、`#order-open`「常用排序 → 调整」。
+- `#sites-dialog`：标题 + 列表 `#sites-list`（每个自定义站点一行：label + 分类 + 编辑/删除按钮）+ `#site-add` 新增 + `#config-export` 导出 + `#config-import-open` 导入（隐藏的 `#config-import-file`）+ `#sites-status`（`role="status"` 反馈）+ 表单 `#site-form`（`#site-label` `#site-home` `#site-search` `#site-group` `#site-keywords` `#site-featured` `#site-form-error` `#site-save` `#site-cancel`）。
+- `#order-dialog`：`#order-list` 列出「常用」站点（`data-featured` 为 true 的内置 + 自定义），每行有 ↑ ↓ 置顶 按钮（`aria-label` 明确），即时保存 `ss.order` 并调用 `SS.app.refreshSiteButtons()`。
+- 所有渲染用 `textContent`，禁止 innerHTML 拼接用户数据。
+- 导入/导出：导出触发下载 `simplesearch-config.json`；导入读文件（也可粘贴？不做，保持单一路径）→ `parseImport` → 写入 custom/order/settings → 刷新 UI 与页面。
+- 关闭/打开沿用 `#scrim` 机制，与设置抽屉、快捷键对话框互斥。
+
+### 20.3 app.js 集成
+
+- `SS.app.refreshSiteButtons()`：按 `merge + applyOrder` 的结果**重建** `#buttons-container` 内的站点按钮（内置按钮的图标 href 从 build 输出的 `data-icon` 属性读取，重建前先收集；自定义站点用 `icon` 指定的 symbol 或首字符 monogram），然后按当前视图应用 `hidden`（复用 `applyGroupFilter`）。
+- build 为每个内置按钮输出 `data-icon="#i-<id>"`（有图标时），供运行时重建复用；无图标则 `data-icon` 为空、走 monogram。
+- 启动顺序：先合并自定义站点进 `SS.sites`（让联想/`!bang` 立即生效）→ 再按 order 排序 → `refreshSiteButtons()`。
+- 覆盖层：`#sites-dialog`/`#order-dialog` 加入 `anyOverlayOpen`、Esc 关闭、scrim 关闭、Tab 焦点循环。
+
+### 20.4 书签小工具（文档）
+
+README 增加「书签小工具」小节：一段可复制的 `javascript:` 书签，把当前选中文字带到 `https://breathiness.github.io/SimpleSearch/?q=<选中>`（只预填，不自动提交）。
+- 需要给出**URL 编码后的完整代码**，并提示「Chrome/Edge 新建书签 → 地址填这段代码 → 在任意网页选中文字后点书签」。
+- 明确说明：这是用户在浏览器里主动点击触发的，和「明确不做的 `?q=%s` 自动提交」不冲突。
+
+### 20.5 门禁增补
+
+- 单测（`tests/sites-store.test.mjs`）：normalizeSite 的各类非法输入/合法输入；add/update/remove；id 冲突；order 合并；export/import 往返；导入坏 JSON/坏 schema/超量 拒绝；不执行代码。
+- E2E：打开「我的站点」→ 新增站点（填表）→ 保存后按钮出现在对应分类（可用 `?cat=` 验证）→ 编辑改名生效 → 删除后消失；导出会触发下载（校验 `Page.downloadWillBegin` 或至少 `#sites-status` 反馈）；常用排序把某站置顶后「常用」视图第一个按钮变化；刷新页面后自定义站点仍在（localStorage）。
+- 静态校验：新增 DOM id 的存在性、`data-icon` 属性、两个新对话框初始 `hidden`。

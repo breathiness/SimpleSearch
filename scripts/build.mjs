@@ -97,7 +97,9 @@ function renderSiteButtons(sites, icons) {
       const icon = iconId
         ? `<svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-${escapeHtml(iconId)}"></use></svg>`
         : `<span class="button-icon button-icon-text" aria-hidden="true">${escapeHtml(monogram(site.label))}</span>`
-      return `      <button class="button" type="button" data-site="${escapeHtml(site.id)}"${group}${keywords}${featuredAttr}${hiddenAttr}>${icon}<span class="button-label">${escapeHtml(site.label)}</span></button>`
+      // data-icon 供 app.js 运行时重建按钮时复用内置图标（无图标为空串）
+      const iconAttr = ` data-icon="${iconId ? `#i-${escapeHtml(iconId)}` : ''}"`
+      return `      <button class="button" type="button" data-site="${escapeHtml(site.id)}"${iconAttr}${group}${keywords}${featuredAttr}${hiddenAttr}>${icon}<span class="button-label">${escapeHtml(site.label)}</span></button>`
     })
     .join('\n')
 }

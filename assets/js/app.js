@@ -46,6 +46,106 @@
     })
   }
 
+  // ---------------------------------------------------------------- 站点注册表（v2.9）
+  // 内置站点快照 + 本地自定义站点（ss.customSites）合并，应用常用排序（ss.order），
+  // 结果写回 SS.sites —— 联想、!bang、站点 URL 解析都读这份运行时注册表。
+  const builtinSites = Array.isArray(SS.sites) ? SS.sites.slice() : []
+  let currentGroup = 'all'
+
+  function safeStorage() {
+    try {
+      return window.localStorage || null
+    } catch (error) {
+      return null
+    }
+  }
+
+  function mergedSites() {
+    const store = SS.sitesStore
+    if (!store || typeof store.merge !== 'function') return builtinSites
+    let custom = []
+    let order = []
+    try {
+      custom = store.listCustom(safeStorage())
+      order = store.getOrder(safeStorage())
+    } catch (error) {
+      custom = []
+      order = []
+    }
+    return store.applyOrder(store.merge(builtinSites, custom), order)
+  }
+
+  function syncSiteRegistry() {
+    const sites = mergedSites()
+    if (Array.isArray(SS.sites)) {
+      SS.sites.length = 0
+      for (const site of sites) SS.sites.push(site)
+    }
+    return sites
+  }
+
+  function iconHrefFor(site, iconMap) {
+    if (iconMap[site.id]) return iconMap[site.id]
+    if (site.icon && document.getElementById(`i-${site.icon}`)) return `#i-${site.icon}`
+    return ''
+  }
+
+  function createSiteButton(site, iconMap) {
+    const button = document.createElement('button')
+    button.className = 'button'
+    button.type = 'button'
+    button.setAttribute('data-site', site.id)
+    button.setAttribute('data-group', site.group || '')
+    if (Array.isArray(site.keywords) && site.keywords.length) {
+      button.setAttribute('data-keywords', site.keywords.join(' '))
+    }
+    if (site.featured === true) button.setAttribute('data-featured', 'true')
+    else button.hidden = true
+
+    const href = iconHrefFor(site, iconMap)
+    button.setAttribute('data-icon', href)
+    if (href) {
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+      svg.setAttribute('class', 'button-icon')
+      svg.setAttribute('aria-hidden', 'true')
+      svg.setAttribute('focusable', 'false')
+      const use = document.createElementNS('http://www.w3.org/2000/svg', 'use')
+      use.setAttribute('href', href)
+      svg.appendChild(use)
+      button.appendChild(svg)
+    } else {
+      const span = document.createElement('span')
+      span.className = 'button-icon button-icon-text'
+      span.setAttribute('aria-hidden', 'true')
+      span.textContent = (String(site.label || '?').trim().charAt(0) || '?').toUpperCase()
+      button.appendChild(span)
+    }
+
+    const label = document.createElement('span')
+    label.className = 'button-label'
+    label.textContent = site.label
+    button.appendChild(label)
+    return button
+  }
+
+  // 按注册表（含自定义站点与新排序）重建按钮墙；内置图标从 data-icon 复用
+  function refreshSiteButtons() {
+    const container = $('buttons-container')
+    if (!container) return
+    const iconMap = {}
+    for (const button of container.querySelectorAll('[data-site]')) {
+      const href = button.getAttribute('data-icon')
+      if (href) iconMap[button.getAttribute('data-site')] = href
+      button.remove()
+    }
+    for (const site of syncSiteRegistry()) container.appendChild(createSiteButton(site, iconMap))
+    applyGroupFilter(currentGroup, { syncUrl: false })
+  }
+
+  function getFeaturedSites() {
+    return (Array.isArray(SS.sites) ? SS.sites : []).filter((site) => site && site.featured === true)
+  }
+
   function bindSearchForm() {
     const form = $('search-form')
     const input = $('search-input')
@@ -103,9 +203,10 @@
     }
   }
 
-  function applyGroupFilter(group) {
+  function applyGroupFilter(group, options) {
     const nav = $('group-chips')
     const isAll = group === 'all'
+    currentGroup = group
     let label = ''
     if (nav) {
       for (const item of nav.querySelectorAll('[data-group]')) {
@@ -128,7 +229,8 @@
     // 卡片标题跟随当前视图
     const title = document.querySelector('.card-title')
     if (title) title.textContent = isAll ? '常用网站' : label || '常用网站'
-    syncCategoryUrl(group)
+    // 重建按钮墙时只更新 UI，不改地址栏（否则会把 ?cat= 深链抹掉）
+    if (!options || options.syncUrl !== false) syncCategoryUrl(group)
   }
 
   function isMobileNav() {
@@ -152,10 +254,24 @@
   // 不要只看 body class —— openSettings 要等 rAF 才加 class，早一步判断会漏掉。
   function anyOverlayOpen() {
     const panel = $('settings-panel')
-    const dialog = $('shortcuts-dialog')
     const panelOpen = Boolean(panel && !panel.hidden)
-    const dialogOpen = Boolean(dialog && !dialog.hidden)
+    const dialogs = ['shortcuts-dialog', 'sites-dialog', 'order-dialog']
+    const dialogOpen = dialogs.some((id) => {
+      const el = $(id)
+      return Boolean(el && !el.hidden)
+    })
     return panelOpen || dialogOpen || document.body.classList.contains('nav-open')
+  }
+
+  // 当前打开的最上层覆盖层（用于 Esc / Tab / 遮罩点击的事件路由）
+  function openOverlay() {
+    for (const id of ['sites-dialog', 'order-dialog', 'shortcuts-dialog']) {
+      const el = $(id)
+      if (el && !el.hidden) return { id, el }
+    }
+    const panel = $('settings-panel')
+    if (panel && !panel.hidden) return { id: 'settings-panel', el: panel }
+    return null
   }
 
   function syncScrim() {
@@ -167,6 +283,8 @@
   function openNav() {
     closeShortcuts(false)
     closeSettings(false)
+    closeSitesDialog(false)
+    closeOrderDialog(false)
     document.body.classList.add('nav-open')
     const toggle = $('nav-toggle')
     if (toggle) toggle.setAttribute('aria-expanded', 'true')
@@ -184,6 +302,8 @@
   function openSettings() {
     closeShortcuts(false)
     closeNav(false)
+    closeSitesDialog(false)
+    closeOrderDialog(false)
     const panel = $('settings-panel')
     const toggle = $('settings-toggle')
     if (!panel || !toggle) return
@@ -215,6 +335,8 @@
   function openShortcuts(trigger) {
     closeSettings(false)
     closeNav(false)
+    closeSitesDialog(false)
+    closeOrderDialog(false)
     const dialog = $('shortcuts-dialog')
     if (!dialog) return
     shortcutsTrigger = trigger || null
@@ -232,6 +354,71 @@
     const target = shortcutsTrigger
     shortcutsTrigger = null
     if (restoreFocus && target && typeof target.focus === 'function') target.focus()
+  }
+
+  // ---------------------------------------------------------------- 站点管理 / 常用排序对话框（v2.9）
+  let sitesDialogTrigger = null
+  let orderDialogTrigger = null
+
+  function openSitesDialog(trigger) {
+    closeShortcuts(false)
+    closeSettings(false)
+    closeNav(false)
+    closeOrderDialog(false)
+    const dialog = $('sites-dialog')
+    if (!dialog) return
+    sitesDialogTrigger = trigger || null
+    dialog.hidden = false
+    syncScrim()
+    const close = $('sites-close')
+    if (close && typeof close.focus === 'function') close.focus()
+  }
+
+  function closeSitesDialog(restoreFocus = true) {
+    const dialog = $('sites-dialog')
+    if (!dialog || dialog.hidden) return
+    dialog.hidden = true
+    syncScrim()
+    const target = sitesDialogTrigger
+    sitesDialogTrigger = null
+    if (restoreFocus && target && typeof target.focus === 'function') target.focus()
+  }
+
+  function openOrderDialog(trigger) {
+    closeShortcuts(false)
+    closeSettings(false)
+    closeNav(false)
+    closeSitesDialog(false)
+    const dialog = $('order-dialog')
+    if (!dialog) return
+    orderDialogTrigger = trigger || null
+    dialog.hidden = false
+    syncScrim()
+    const close = $('order-close')
+    if (close && typeof close.focus === 'function') close.focus()
+  }
+
+  function closeOrderDialog(restoreFocus = true) {
+    const dialog = $('order-dialog')
+    if (!dialog || dialog.hidden) return
+    dialog.hidden = true
+    syncScrim()
+    const target = orderDialogTrigger
+    orderDialogTrigger = null
+    if (restoreFocus && target && typeof target.focus === 'function') target.focus()
+  }
+
+  // Esc / 点遮罩 / Tab 循环的统一入口：关掉最上层覆盖层
+  function closeTopOverlay(restoreFocus = true) {
+    const open = openOverlay()
+    if (!open) {
+      if (document.body.classList.contains('nav-open')) closeNav(restoreFocus)
+      return
+    }
+    if (open.id === 'sites-dialog') closeSitesDialog(restoreFocus)
+    else if (open.id === 'order-dialog') closeOrderDialog(restoreFocus)
+    else if (open.id === 'shortcuts-dialog') closeShortcuts(restoreFocus)
+    else closeSettings(restoreFocus)
   }
 
   function bindDrawers() {
@@ -255,12 +442,7 @@
     }
     if (settingsClose) settingsClose.addEventListener('click', () => closeSettings())
     if (scrim) {
-      scrim.addEventListener('click', () => {
-        const dialog = $('shortcuts-dialog')
-        if (dialog && !dialog.hidden) closeShortcuts()
-        else if (panel && !panel.hidden) closeSettings()
-        else if (document.body.classList.contains('nav-open')) closeNav()
-      })
+      scrim.addEventListener('click', () => closeTopOverlay())
     }
     const shortcutsOpen = $('shortcuts-open')
     if (shortcutsOpen) {
@@ -281,8 +463,8 @@
       }
     })
     document.addEventListener('keydown', (event) => {
-      const dialog = $('shortcuts-dialog')
-      const trap = dialog && !dialog.hidden ? dialog : panel && !panel.hidden ? panel : null
+      const open = openOverlay()
+      const trap = open ? open.el : null
       // aria-modal 覆盖层：Tab 在内部循环，不跑到背后的页面
       if (event.key === 'Tab' && trap) {
         const focusables = trap.querySelectorAll('button, a[href]')
@@ -300,9 +482,7 @@
         return
       }
       if (event.key !== 'Escape' || !isScrimVisible()) return
-      if (dialog && !dialog.hidden) closeShortcuts()
-      else if (panel && !panel.hidden) closeSettings()
-      else closeNav()
+      closeTopOverlay()
       event.preventDefault()
     })
   }
@@ -477,6 +657,9 @@
     bindDrawers()
     bindRipple()
     bindEngines()
+    // v2.9：把本地自定义站点并入运行时注册表，并按常用排序重建按钮墙
+    refreshSiteButtons()
+    if (SS.sitesAdmin && typeof SS.sitesAdmin.init === 'function') SS.sitesAdmin.init()
     // 深链优先（?cat= / ?site=），否则默认「常用」视图；两种情况下都要跑一次过滤
     const deepGroup = applyDeepLinks()
     applyGroupFilter(deepGroup || 'all')
@@ -496,6 +679,15 @@
     openShortcuts,
     closeShortcuts,
     applyEngine,
+    refreshSiteButtons,
+    getFeaturedSites,
+    getCurrentGroup: () => currentGroup,
+    openSitesDialog,
+    closeSitesDialog,
+    openOrderDialog,
+    closeOrderDialog,
+    closeTopOverlay,
+    syncOverlays: syncScrim,
   }
 
   if (document.readyState === 'loading') {

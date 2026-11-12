@@ -1,6 +1,6 @@
 // 由 scripts/build.mjs 从 templates/sw.js 生成，请勿手改。
 // Service Worker：预缓存首页静态资源，断网也能打开；跨域请求（百度联想等）不拦截。
-const VERSION = '2.8.1'
+const VERSION = '2.9.0'
 const CACHE = 'simplesearch-' + VERSION
 const PRECACHE = [
   "index.html",
@@ -13,6 +13,8 @@ const PRECACHE = [
   "assets/js/input.js",
   "assets/js/remote.js",
   "assets/js/search.js",
+  "assets/js/sites-admin.js",
+  "assets/js/sites-store.js",
   "assets/js/sites.js",
   "assets/js/suggest.js",
   "assets/js/theme.js",

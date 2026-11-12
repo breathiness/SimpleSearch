@@ -11,7 +11,7 @@ body{min-height:100vh;min-height:100dvh;margin:0;display:flex;flex-direction:col
 /* 涟漪（MDUI 招牌反馈）：JS 只注入 span.ripple 并写内联尺寸/位置 */
 .ripple{position:absolute;border-radius:50%;transform:scale(0);animation:ripple var(--ripple-duration) linear;background:currentColor;opacity:.24;pointer-events:none}
 @keyframes ripple{to{transform:scale(1);opacity:0}}
-.button,.nav-item,.appbar-icon,.panel-close,.switch-row,.segmented-item,.text-button,#search-submit,.icon-button,.suggest-item{position:relative;overflow:hidden}
+.button,.nav-item,.appbar-icon,.panel-close,.switch-row,.segmented-item,.text-button,.row-action,#search-submit,.icon-button,.suggest-item{position:relative;overflow:hidden}
 
 /* ------------------------------------------------------------ 顶栏 */
 .appbar{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:var(--space-2);height:64px;padding:0 var(--space-2);background-color:var(--primary-bg);color:var(--on-primary);box-shadow:var(--elevation-2)}
@@ -126,6 +126,30 @@ body.panel-open #settings-panel{transform:none}
 .shortcut-list dd{margin:0;color:var(--text-secondary);font-size:14px}
 kbd{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:22px;padding:0 6px;border:1px solid var(--divider);border-radius:3px;background-color:var(--bg);color:var(--text);font-family:inherit;font-size:12px;font-weight:500;line-height:1}
 
+/* ------------------------------------------------------------ 站点管理 / 常用排序对话框（v2.9） */
+.dialog-wide{width:min(560px,92vw)}
+.dialog-body{max-height:calc(80vh - 72px);overflow-y:auto;padding:8px 24px 24px}
+.dialog-hint{margin:0 0 8px;font-size:13px;color:var(--text-secondary)}
+.sites-list,.order-list{display:flex;flex-direction:column;gap:4px;margin:0;padding:0;list-style:none}
+.sites-list li,.order-list li{display:flex;align-items:center;gap:8px;min-height:44px;padding:0 8px;border-radius:var(--radius-sm);transition:background-color var(--transition-fast) var(--ease)}
+@media (hover:hover){.sites-list li:hover,.order-list li:hover{background-color:var(--overlay-active)}}
+.site-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.site-group{flex:0 0 auto;font-size:12px;color:var(--text-secondary)}
+.row-action{display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center;width:36px;height:36px;padding:0;border:0;border-radius:var(--radius-full);background-color:transparent;color:var(--text-secondary);font-family:var(--font-sans);font-size:13px;line-height:1;cursor:pointer;transition:background-color var(--transition-fast) var(--ease),color var(--transition-fast) var(--ease)}
+@media (hover:hover){.row-action:hover{background-color:var(--overlay-hover);color:var(--text)}}
+.sites-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;padding-top:12px;border-top:1px solid var(--divider)}
+/* .site-form 初始带 hidden，用 :not([hidden]) 写 display，避免盖掉原生 hidden */
+.site-form{margin-top:8px;padding-top:12px;border-top:1px solid var(--divider)}
+.site-form:not([hidden]){display:flex;flex-direction:column;gap:10px}
+.site-form-title{margin:0;font-size:15px;font-weight:var(--font-weight-medium)}
+.field{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--text-secondary)}
+.field input,.field select{height:36px;padding:0 10px;border:1px solid var(--divider);border-radius:var(--radius-sm);background-color:var(--surface);color:var(--text);font-family:var(--font-sans);font-size:14px}
+.field input::placeholder{color:var(--text-secondary);opacity:1}
+.field-inline input{accent-color:var(--primary-bg)}
+.field-inline{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text)}
+.form-error{margin:0;color:var(--danger);font-size:13px}
+.form-actions{display:flex;justify-content:flex-end;gap:8px}
+
 /* ------------------------------------------------------------ skip-link / 焦点 / 兜底 */
 .skip-link{position:fixed;top:var(--space-2);left:var(--space-2);z-index:var(--z-skip-link);padding:var(--space-2) var(--space-4);border-radius:var(--radius-sm);background-color:var(--primary-bg);color:var(--on-primary);font-size:var(--font-size-sm);font-weight:var(--font-weight-medium);text-decoration:none;box-shadow:var(--elevation-2);transform:translateY(calc(-100% - var(--space-4)));transition:transform var(--transition-base) var(--ease)}
 .skip-link:focus{transform:translateY(0)}
@@ -154,6 +178,8 @@ body.nav-open .site-nav{transform:none}
 .button{min-height:var(--control-height-lg);font-size:13px;letter-spacing:.2px}
 /* 窄屏：对话框与引擎分段压缩内边距 */
 .dialog{width:min(480px,92vw);max-height:78vh}
+.dialog-wide{width:min(560px,94vw)}
+.dialog-body{padding:8px 16px 16px}
 .shortcut-list{padding:8px 16px 16px}
 #engine-mode .segmented-item{padding:0 10px}
 }
