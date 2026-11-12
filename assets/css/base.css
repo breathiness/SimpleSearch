@@ -49,9 +49,13 @@ body{min-height:100vh;min-height:100dvh;margin:0;display:flex;flex-direction:col
 #search-form{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:var(--space-2);width:100%;max-width:var(--content-max-width);margin:0 auto}
 #search-form .search-field{flex:1 1 320px;min-width:0}
 
-/* 站点按钮墙 + MD1 raised button */
-#buttons-container{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px;width:100%}
-.button{display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center;gap:6px;min-height:var(--control-height);padding:0 var(--space-3);border:0;border-radius:var(--radius-sm);background-color:var(--button-bg);color:var(--button-text);font-size:var(--font-size-sm);font-weight:var(--font-weight-medium);letter-spacing:var(--letter-spacing);line-height:var(--line-height-tight);text-align:center;text-transform:uppercase;white-space:nowrap;cursor:pointer;box-shadow:var(--elevation-2);transition:box-shadow var(--transition-fast) var(--ease),background-color var(--transition-fast) var(--ease)}
+/* 站点按钮墙：等宽等距网格（MD1 里已改）——自然宽度 + 居中换行会让每行右侧参差，
+   改为固定列宽的自适应网格，按钮统一宽度、间距统一，整体像一个 app drawer。
+   最窄桌面（≈960px 下侧栏还在时）自动落 3 列，常见桌面/平板 4 列，手机固定 2 列。 */
+#buttons-container{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;width:100%;max-width:760px;margin:0 auto}
+.button{display:inline-flex;width:100%;min-width:0;align-items:center;justify-content:center;gap:4px;min-height:var(--control-height);padding:0 var(--space-2);border:0;border-radius:var(--radius-sm);background-color:var(--button-bg);color:var(--button-text);font-size:var(--font-size-sm);font-weight:var(--font-weight-medium);letter-spacing:var(--letter-spacing);line-height:var(--line-height-tight);text-align:center;text-transform:uppercase;white-space:nowrap;cursor:pointer;box-shadow:var(--elevation-2);transition:box-shadow var(--transition-fast) var(--ease),background-color var(--transition-fast) var(--ease)}
+/* 超长标签（如 STACKOVERFLOW）在极窄列里优雅省略，不撑破等宽栅格 */
+.button-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (hover:hover){.button:hover{background-color:var(--button-bg-hover);box-shadow:var(--elevation-4)}}
 .button:active{box-shadow:var(--elevation-8)}
 
@@ -143,9 +147,11 @@ body.nav-open .site-nav{transform:none}
 .appbar-logo-svg{width:18px;height:18px}
 .site-nav{top:56px}
 .card,#main-content{padding:var(--space-4)}
-/* 窄屏：输入框与搜索按钮同一行，站点按钮触控 ≥44px */
+/* 窄屏：输入框与搜索按钮同一行，站点按钮触控 ≥44px；按钮墙固定 2 列 */
 #search-form .search-field{flex:1 1 0}
-.button{min-height:var(--control-height-lg)}
+#buttons-container{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;max-width:none}
+/* 窄屏列更窄，标签缩到 13px 避免 STACKOVERFLOW 这类长标签被省略号截断 */
+.button{min-height:var(--control-height-lg);font-size:13px;letter-spacing:.2px}
 /* 窄屏：对话框与引擎分段压缩内边距 */
 .dialog{width:min(480px,92vw);max-height:78vh}
 .shortcut-list{padding:8px 16px 16px}

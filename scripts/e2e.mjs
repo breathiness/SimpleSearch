@@ -592,6 +592,29 @@ async function run() {
     )
     check('C: 常用视图卡片标题', restored.title && restored.title.trim() === '常用网站', String(restored.title).trim())
 
+    // 等宽等距：网格布局下所有可见按钮宽度一致、行内间距一致
+    const gridInfo = await page.evaluate(`(() => {
+      const buttons = [...document.querySelectorAll('#buttons-container [data-site]')].filter(
+        (b) => getComputedStyle(b).display !== 'none'
+      )
+      const widths = buttons.map((b) => Math.round(b.getBoundingClientRect().width))
+      const container = getComputedStyle(document.getElementById('buttons-container'))
+      const rowTops = [...new Set(buttons.map((b) => Math.round(b.getBoundingClientRect().top)))]
+      return {
+        count: buttons.length,
+        minWidth: Math.min(...widths),
+        maxWidth: Math.max(...widths),
+        display: container.display,
+        gap: container.columnGap,
+        rows: rowTops.length,
+      }
+    })()`)
+    check(
+      'C: 按钮等宽（网格布局）',
+      gridInfo.display === 'grid' && gridInfo.maxWidth - gridInfo.minWidth <= 1,
+      `${gridInfo.display} / 宽 ${gridInfo.minWidth}~${gridInfo.maxWidth} / gap ${gridInfo.gap} / ${gridInfo.rows} 行`
+    )
+
     // ---- 设置抽屉 ----
     await page.evaluate("document.getElementById('settings-toggle').click()")
     await sleep(350)
