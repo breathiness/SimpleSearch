@@ -1,0 +1,56 @@
+name: 站点巡检
+
+# 每周一 01:00 UTC（北京时间 09:00）自动检查所有内置站点的 home / search 是否还可用；
+# 有 WARN / FAIL 时在带 site-health 标签的追踪 issue 下评论，没有就新建一个。
+# 也可以手动触发：Actions → 站点巡检 → Run workflow，或 `gh workflow run site-health`。
+on:
+  schedule:
+    - cron: '0 1 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  site-health:
+    name: 站点巡检
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # 零依赖：不需要 npm ci / npm install，直接跑 Node 内置 fetch 巡检。
+      # --json 模式默认退出码 0（诊断写 stderr），这里再兜一层 continue-on-error，
+      # 保证即使巡检崩溃也能进入报告 / issue 步骤留下记录。
+      - name: 巡检所有站点（JSON）
+        continue-on-error: true
+        env:
+          CHECK_TIMEOUT: '8000'
+        run: node scripts/check-sites.mjs --json > sites.json
+
+      # 生成 site-health-report.md，并把 fail / warn 计数追加到 GITHUB_OUTPUT。
+      - name: 生成 Markdown 报告
+        id: report
+        run: node scripts/site-health-report.mjs sites.json
+
+      # gh CLI 是 GitHub runner 预装的；label / 评论 / 新建都只依赖 GH_TOKEN，无第三方 action。
+      - name: 需要人工确认时创建或更新追踪 issue
+        if: ${{ steps.report.outputs.fail != '0' || steps.report.outputs.warn != '0' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh label create site-health --color FBCA04 --description "站点巡检追踪" 2>/dev/null || true
+          issue_number="$(gh issue list --label site-health --state open --limit 1 --json number --jq '.[0].number // empty' 2>/dev/null || true)"
+          if [ -n "${issue_number:-}" ]; then
+            gh issue comment "$issue_number" --body-file site-health-report.md
+          else
+            gh issue create --title "站点巡检：需要人工确认的链接" --label site-health --body-file site-health-report.md
+          fi

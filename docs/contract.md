@@ -700,3 +700,34 @@ README 增加「书签小工具」小节：一段可复制的 `javascript:` 书�
 - 单测（`tests/sites-store.test.mjs`）：normalizeSite 的各类非法输入/合法输入；add/update/remove；id 冲突；order 合并；export/import 往返；导入坏 JSON/坏 schema/超量 拒绝；不执行代码。
 - E2E：打开「我的站点」→ 新增站点（填表）→ 保存后按钮出现在对应分类（可用 `?cat=` 验证）→ 编辑改名生效 → 删除后消失；导出会触发下载（校验 `Page.downloadWillBegin` 或至少 `#sites-status` 反馈）；常用排序把某站置顶后「常用」视图第一个按钮变化；刷新页面后自定义站点仍在（localStorage）。
 - 静态校验：新增 DOM id 的存在性、`data-icon` 属性、两个新对话框初始 `hidden`。
+
+## 21. v2.10：工程化批次（站点巡检 / 体积硬门禁 / 视觉回归）
+
+### 21.1 站点巡检自动化（GitHub Actions，每周）
+
+- `scripts/check-sites.mjs` 增加 `--json`：输出到 stdout 一个 JSON 对象
+  `{ generatedAt, total, ok, warn, fail, rows: [{ id, label, group, home, search, verdict, reason, homeFinalUrl, searchFinalUrl }] }`，
+  不改变默认（人读）输出；`--json` 默认退出码 0（便于 workflow 继续处理），`--strict` 时 FAIL>0 → 1。
+- 新增 `scripts/site-health-report.mjs`：读 `--json` 结果（文件路径参数），生成 Markdown 报告文件与 `fail`/`warn` 计数输出（`GITHUB_OUTPUT` 兼容），退出码 0。
+- 新增 `.github/workflows/site-health.yml`：
+  - `on: schedule`（每周一 01:00 UTC，即 09:00 Asia/Shanghai）+ `workflow_dispatch`
+  - `permissions: contents: read, issues: write`
+  - 步骤：checkout → setup-node 22 → `node scripts/check-sites.mjs --json > sites.json`（continue-on-error）→ `node scripts/site-health-report.mjs sites.json` → 若 fail>0 或 warn>0：确保 `site-health` 标签存在，找**已打开的 `site-health` 追踪 issue**，有则评论追加、无则新建（标题「站点巡检：需要人工确认的链接」），body 用生成的 Markdown。
+  - 全部使用官方 actions + 预装 `gh` CLI（零第三方 action、零 npm 依赖）。
+
+### 21.2 体积门禁硬失败
+
+- `scripts/validate.mjs`：把「体积信息」从提示改成**失败项**——`index.html` 单页加载资源 > `BUDGET_KB`（200，gzip 前）时 `npm run validate` 退出码 1；单文件 `SimpleSearch.html` > 260 KB 同样失败。
+- 保留 gzip 数值作为信息输出（真实成本口径），不单独卡。
+- 当前实测 196.4 KB，留 3.6 KB 余量（超了就必须显式改预算并说明，防止悄悄变重）。
+
+### 21.3 视觉回归（本地按需，不进 CI）
+
+- 新增 `scripts/visual.mjs`（零依赖，Node 内置 zlib 自写 PNG 解码/编码）：
+  - 启动 `scripts/serve.mjs` + 本机 headless Edge/Chrome（与 e2e 相同的查找方式），固定 4 个状态截图：
+    `common-light-1200`、`common-dark-1200`、`mobile-light-390`、`settings-open-1200`。
+  - `--update`：把截图写入基线 `tests/visual/*.png`。
+  - 默认：与基线逐像素比较（单通道容差 8，差异像素比例 > 0.3% 视为失败），新截图与 diff 图写入 `artifacts/visual/`，失败时退出码 1。
+  - 无基线时提示先跑 `--update`，优雅跳过（退出码 0）。
+- `package.json` 增加 `visual` / `visual:update` 两个 script。
+- 基线 PNG 提交入库；视觉回归**不进 CI**（跨平台字体渲染差异大），文档说明「改 UI 后在本地跑」。

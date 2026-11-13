@@ -160,7 +160,7 @@ Chrome / Edge 打开首页后，地址栏右侧可以「安装」简单搜索，
 - **配置导入 / 导出**：导出会下载一个 `simplesearch-config.json`，里面包含自定义站点、常用顺序和主题模式 / 主题色 / 搜索引擎 / 联网联想开关；导入时会校验格式，非法配置整包拒绝并提示。适合备份、迁移或分享自己的配置。
 - **键盘快捷键**：右边有「查看」按钮，点开就是快捷键说明对话框（按 `?` 也能打开，见下方键盘操作）。
 - Github 仓库链接。
-- 底部显示当前版本，例如「简单搜索 v2.9.0」（构建时从 `package.json` 注入）。
+- 底部显示当前版本，例如「简单搜索 v2.10.0」（构建时从 `package.json` 注入）。
 
 点关闭按钮、点遮罩或按 `Esc` 都能收起；打开时焦点会进入面板，关闭后回到设置按钮。分类抽屉、设置抽屉、快捷键说明和「我的站点 / 常用排序」对话框共用一层遮罩，同一时刻只会开一个。
 
@@ -323,7 +323,7 @@ SimpleSearch/
 ├─ assets/
 │  ├─ css/                  # tokens.css（配色变量）/ base.css（页面骨架）/ input.css（输入区）
 │  ├─ img/                  # favicon.svg + PWA 图标 icon-192.png / icon-512.png
-│  └─ js/                   # 8 个经典脚本：sites / search / suggest / history / theme / remote / input / app
+│  └─ js/                   # 10 个经典脚本：sites / search / suggest / history / theme / remote / input / sites-store / sites-admin / app
 ├─ docs/
 │  ├─ contract.md           # 接口契约（开发前先读）
 │  ├─ custom-sites.md       # 自定义网站完整说明
@@ -332,7 +332,9 @@ SimpleSearch/
 │  ├─ build.mjs             # 由模板 + SS.sites + scripts/icons.mjs 生成 index.html、两个壳和 sw.js
 │  ├─ icons.mjs             # 站点 / UI / logo / 分类图标数据（dev-time，只在构建时读取，不进运行时）
 │  ├─ validate.mjs          # 静态校验 + 产物一致性检查
-│  ├─ check-sites.mjs       # 可选的站点健康自检（需网络，不进 CI）
+│  ├─ check-sites.mjs       # 可选的站点健康自检（需网络；--json 供巡检 workflow 用）
+│  ├─ site-health-report.mjs # 巡检 JSON → Markdown 报告（workflow 用，输出 fail/warn 到 GITHUB_OUTPUT）
+│  ├─ visual.mjs            # 本地视觉回归：截图、与 tests/visual 基线对比、--update 更新基线
 │  ├─ serve.mjs             # 零依赖本地静态服务器
 │  └─ e2e.mjs               # 可选的真实浏览器端到端检查
 ├─ templates/
@@ -340,7 +342,9 @@ SimpleSearch/
 │  ├─ redirect.html         # 两个重定向壳的模板
 │  └─ sw.js                 # Service Worker 模板（build 注入版本号与 precache 列表）
 ├─ tests/                   # node:test 单元测试
-├─ .github/workflows/ci.yml # GitHub Actions
+├─ .github/workflows/
+│  ├─ ci.yml               # push / PR：构建、测试、静态校验
+│  └─ site-health.yml      # 每周一 01:00 UTC 站点巡检；有 WARN/FAIL 时开/评论 tracking issue
 ├─ manifest.webmanifest     # PWA manifest（手写，install/standalone/图标）
 ├─ sw.js                    # Service Worker，由 npm run build 生成，请勿手改
 ├─ index.html               # 唯一真实页面（多文件 + PWA），由 npm run build 生成，请勿手改
@@ -364,7 +368,9 @@ SimpleSearch/
 | `npm run serve` | 本地静态服务器，默认 <http://127.0.0.1:8080/> |
 | `npm run e2e` | 可选：用本机 Edge/Chrome 跑真实浏览器检查（没装浏览器会跳过，CI 不跑），截图输出到已 gitignore 的 `artifacts/` |
 | `npm run coverage` | 可选：用 Node 内置测试覆盖率跑一遍，阈值 90% 行 / 75% 分支 / 80% 函数，低于阈值会失败；**不进 CI 必跑**，零依赖 |
-| `npm run check:sites` | 可选：逐个请求各站点的 `home` / 搜索地址，报告 OK / WARN / FAIL（WARN 多为反爬 401/403 或跨域跳转，不阻断；**需要网络、不进 CI**）；加 `--strict` 时只有 FAIL 才退出 1 |
+| `npm run check:sites` | 可选：逐个请求各站点的 `home` / 搜索地址，报告 OK / WARN / FAIL（WARN 多为反爬 401/403 或跨域跳转；**需要网络、不进普通 CI**）。加 `--strict` 时只有 FAIL 才退出 1；加 `--json` 时 stdout 只输出一个 JSON（诊断写 stderr） |
+| `npm run visual` | 可选：本地视觉回归，和 `tests/visual/` 基线逐像素比较 4 个固定状态（无基线时会提示先 `visual:update` 并跳过；**不进 CI**） |
+| `npm run visual:update` | 更新视觉回归基线（改完 UI 后先在本地跑、人工确认新截图，再把 `tests/visual/*.png` 一起提交） |
 
 ```bash
 npm run serve
@@ -373,11 +379,33 @@ npm run serve
 
 当前测试基线：`npm test` **207 例**、`npm run validate` **29 项**、`npm run e2e` **172 项**全绿；`npm run coverage` 行覆盖 **96.04%** / 分支 **80.3%** / 函数 **87.17%**（阈值 90/75/80）。`e2e` 是可选的真实浏览器检查（本机 Edge/Chrome，CI 不跑），覆盖单页主题解析、主题三态与主题色、深链、`!bang`、搜索引擎切换、快捷键对话框、PWA 注册与断网刷新、单文件便携版（零外部资源/内联样式脚本）、常用/分类视图与卡片标题、33 站点渲染与图标、自定义站点增删改与配置导入导出、联网联想开关与真实百度联调、分类导航与抽屉、设置面板、搜索历史管理、版本号、图标 sprite（无额外图片请求）、960px 断点与移动端布局和 `file://` 打开。
 
+## 维护与回归
+
+### 维护：站点巡检（每周自动）
+
+- **自动跑**：`.github/workflows/site-health.yml` 每周一 **01:00 UTC（北京时间 09:00）** 检查全部内置站点的 `home` / `search`，也可以手动触发（Actions → 站点巡检 → Run workflow，或 `gh workflow run site-health`）。
+- **有 WARN / FAIL 时**：workflow 会确保仓库里有 `site-health` 标签，然后找**已打开的** `site-health` issue 评论追加报告；没有就新建一个，标题固定「站点巡检：需要人工确认的链接」。报告同时生成在 `site-health-report.md`。
+- **本地手动**：`npm run check:sites`（人读表格）、`npm run check:sites -- --strict`（有 FAIL 时退出 1）、`npm run check:sites -- --json`（stdout 纯 JSON，便于脚本处理）。
+- 401 / 403 / 429 / 跨域跳转 / 超时这类 WARN 多为反爬或地区限制，**不一定是坏链**，点开浏览器确认一下再决定要不要改。
+- workflow 只用官方 `actions/checkout`、`actions/setup-node` 和 runner 预装的 `gh`，**不跑 `npm install`、没有第三方 action**。
+
+### 维护：视觉回归（本地按需，不进 CI）
+
+- `npm run visual`：启动本地服务器 + 本机 headless Edge/Chrome，截 4 个固定状态（`common-light-1200`、`common-dark-1200`、`mobile-light-390`、`settings-open-1200`），与 `tests/visual/` 里的基线逐像素比较（单通道容差 8，差异像素比例 > 0.3% 判失败）；新截图和 diff 图写到 `artifacts/visual/`。
+- 改完 UI 且确认新样子没问题后，用 `npm run visual:update` 更新 `tests/visual/*.png` 基线，并把基线一起提交；平时 `npm run visual` 用来发现「无意中改坏了布局」。
+- **不进 CI**：不同系统/浏览器的字体渲染差异大，硬比较容易误报，所以只在本地按需跑。
+
+### 维护：体积硬门禁
+
+- `npm run validate`（以及 CI 的 `npm run check`）会把体积当**硬失败**：多文件版 `index.html` 首屏资源超过 **200 KB**、或单文件版 `SimpleSearch.html` 超过 **260 KB**，命令直接退出 1、CI 变红。
+- gzip 数字只作为信息输出（真实成本口径），不单独卡；当前实测约 196.4 KB / gzip 55.7 KB，离 200 KB 余量不大，加东西前先想一下。
+- 超限了要么优化体积，要么**显式提高预算并写清理由**（见 [CONTRIBUTING.md](CONTRIBUTING.md)「体积硬门禁」），不要悄悄改大数字。
+
 ## 技术说明
 
 - **线上零构建、零运行时依赖**：开发时 `scripts/build.mjs` 在本地生成 `index.html`、`SimpleSearch.html`（单文件便携版）、`sw.js` 和两个重定向壳并提交入库；部署后浏览器拿到的就是纯 HTML/CSS/JS，没有框架、没有包管理器、没有构建步骤。
-- **PWA / 离线（v2.6.0）**：`manifest.webmanifest` 提供安装信息（`standalone`、192/512 图标）；`sw.js` 由构建从 `templates/sw.js` 生成，注入版本号（当前 2.9.0）和 16 项 precache 列表——`install` 预缓存、`activate` 清掉旧版本缓存并 `claim`、`fetch` 只处理同源 GET（导航请求回退缓存的首页，跨域请求直接放行不缓存）。`file://` 下不注册；换版本后旧缓存自动清理。
-- **单文件便携版（v2.6.0）**：`SimpleSearch.html` 由 `index.html` 内联生成——3 个 `<style>`、8 个经典脚本 + 防闪烁脚本 + `window.__SS_SINGLE_FILE` 标记；favicon 转成 data URI，移除 manifest / apple-touch-icon；`app.js` 看到 `__SS_SINGLE_FILE` 就不注册 SW。因此它**零外部请求**、双击即用，但没有 PWA 安装/离线缓存，且任何改动都要整页重下。
+- **PWA / 离线（v2.6.0）**：`manifest.webmanifest` 提供安装信息（`standalone`、192/512 图标）；`sw.js` 由构建从 `templates/sw.js` 生成，注入版本号（当前 2.10.0）和 16 项 precache 列表——`install` 预缓存、`activate` 清掉旧版本缓存并 `claim`、`fetch` 只处理同源 GET（导航请求回退缓存的首页，跨域请求直接放行不缓存）。`file://` 下不注册；换版本后旧缓存自动清理。
+- **单文件便携版（v2.6.0）**：`SimpleSearch.html` 由 `index.html` 内联生成——3 个 `<style>`、10 个经典脚本 + 防闪烁脚本 + `window.__SS_SINGLE_FILE` 标记；favicon 转成 data URI，移除 manifest / apple-touch-icon；`app.js` 看到 `__SS_SINGLE_FILE` 就不注册 SW。因此它**零外部请求**、双击即用，但没有 PWA 安装/离线缓存，且任何改动都要整页重下。
 - **`!bang`（v2.6.0）**：`SS.search.resolveBang` 是纯函数，`!<token> [词]` 的 token 按注册表顺序先比 `site.id` 再比 `keywords`（小写精确匹配、支持中文），只认第一个 token；命中后 `url/kind` 复用 `resolveSite`，无词就是站点首页。未知 token / `!` 后接空白 / `!!x` 一律返回 `null`，当普通搜索。
 - **搜索引擎（v2.6.0）**：`SS.engines` 有 Bing / Google / DuckDuckGo / 百度四个定义（各自带 `search` 模板和 `param`：百度用 `wd`，其余 `q`）；`ss.engine` 记住选择，切换时同步 `SS.defaultEngine`、表单 `action`、输入框 `name`，联想首项文案跟着变。
 - **快捷键说明（v2.6.0）**：按 `?`（焦点不在输入框）或设置里的「查看」打开 `#shortcuts-dialog`，列 9 条快捷键；`Esc` / 关闭按钮 / 遮罩关闭，并把焦点还给触发元素。
@@ -507,13 +535,18 @@ v2.9.0 又补上的：
 - [x] 配置导出 / 导入 `simplesearch-config.json`（自定义站点 + 排序 + 主题 / 引擎 / 联想设置）
 - [x] README 提供「把选中文字带到搜索框」的书签小工具
 
+v2.10.0 又补上的：
+
+- [x] 站点巡检自动化：每周一 workflow 跑 `check:sites`，有 WARN/FAIL 时在 `site-health` tracking issue 评论/新建
+- [x] 体积硬门禁：多文件版 >200 KB 或单文件版 >260 KB 时 `validate` / CI 直接失败
+- [x] 本地视觉回归：`npm run visual` 对比基线、`npm run visual:update` 更新基线（不进 CI）
+
 **明确不做**：把本站设为浏览器默认搜索引擎（`?q=%s` 自动提交）——这是按需求有意排除的，搜索始终由你触发。
 
 还可以做（**以下都还没实现**）：
 
-- [ ] 站点列表的可视化编辑，不用直接改 JS
 - [ ] 自选/自建更多联想源（现在只接了百度）
-- [ ] 导入/导出站点配置
+- [ ] 视觉回归进 CI（跨平台字体渲染差异大，暂时只在本地跑）
 
 ## 灵感来源
 
@@ -523,7 +556,7 @@ v2.9.0 又补上的：
 
 我其实一直都很想要一个能满足上面提到的功能，并且速度足够快的聚合搜索网站。估计是我这个需求太过小众且简单，在网络上一直没有找到有其他类似的网站。刚好最近想测试一下 Bing 的能力如何。于是将我的需求描述了一下，然后就有了现在这个项目。
 
-v2 重构把站点收拢到一处、补上了当年想加的几个小功能，v2.1 把明暗切换合进单页、加了可关闭的联网联想，v2.2 补上分类和图标，v2.3 换成文档站式骨架，v2.4 加了可换的主题色、顶栏 logo 和分类小图标，v2.5 补了深链、主题三态和历史管理，v2.6 加了离线安装、`!bang`、搜索引擎切换、快捷键说明和单文件便携版，v2.7 把站点扩到 33 个，v2.8 把默认视图改成「常用 + 分类展开」，v2.9 又让自定义站点、排序和配置导入导出都能在设置里完成，但上面这些初衷没变。
+v2 重构把站点收拢到一处、补上了当年想加的几个小功能，v2.1 把明暗切换合进单页、加了可关闭的联网联想，v2.2 补上分类和图标，v2.3 换成文档站式骨架，v2.4 加了可换的主题色、顶栏 logo 和分类小图标，v2.5 补了深链、主题三态和历史管理，v2.6 加了离线安装、`!bang`、搜索引擎切换、快捷键说明和单文件便携版，v2.7 把站点扩到 33 个，v2.8 把默认视图改成「常用 + 分类展开」，v2.9 让自定义站点、排序和配置导入导出都能在设置里完成，v2.10 又把巡检、体积硬门禁和视觉回归补进工程流程，但上面这些初衷没变。
 
 ## License
 
