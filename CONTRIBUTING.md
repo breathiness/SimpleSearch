@@ -26,7 +26,9 @@ node -v   # 应为 v21 或更高（CI 用 22）
 | `npm run serve` | 零依赖本地静态服务器，默认 <http://127.0.0.1:8080/>（可用 `PORT` 环境变量改端口） |
 | `npm run e2e` | 可选：用本机 Edge/Chrome 跑真实浏览器端到端检查（没装浏览器会跳过，CI 不跑），截图输出到已 gitignore 的 `artifacts/` |
 | `npm run coverage` | 可选：Node 内置覆盖率 + 阈值（90 行 / 75 分支 / 80 函数，低于阈值失败）；零依赖，不进 CI 必跑 |
-| `npm run check:sites` | 可选：逐个请求站点 `home` / `search`，检查是否 2xx、是否被重定向到首页（**需要网络，不进 CI**）；`--strict` 有 FAIL 退 1 |
+| `npm run check:sites` | 可选：逐个请求站点 `home` / `search`，检查是否 2xx、是否被重定向到首页（**需要网络，不进普通 CI**）；`--strict` 有 FAIL 退 1；`--json` 输出纯 JSON（stdout 只放 JSON，诊断写 stderr） |
+| `npm run visual` | 可选：本地视觉回归，与 `tests/visual/` 基线比较 4 个固定状态，失败退出 1（无基线时提示先 `visual:update` 并退出 0；不进 CI） |
+| `npm run visual:update` | 更新视觉回归基线（改完 UI 后先在本地跑、确认截图没问题，再提交 `tests/visual/*.png`） |
 
 ## 目录结构
 
@@ -37,10 +39,10 @@ SimpleSearch/
 │  ├─ img/            # favicon.svg + PWA 图标 icon-192.png / icon-512.png
 │  └─ js/             # 经典脚本（sites / search / suggest / history / theme / remote / input / sites-store / sites-admin / app）
 ├─ docs/              # 契约、自定义站点指南、更新日志
-├─ scripts/           # build.mjs / icons.mjs（dev-time 图标数据）/ serve.mjs / validate.mjs / e2e.mjs / check-sites.mjs
+├─ scripts/           # build.mjs / icons.mjs（dev-time 图标数据）/ serve.mjs / validate.mjs / e2e.mjs / check-sites.mjs / site-health-report.mjs / visual.mjs
 ├─ templates/         # page.html（真实页：顶栏 / 导航 / 卡片 / 设置抽屉 / 快捷键对话框）/ redirect.html（重定向壳）/ sw.js（Service Worker 模板）
 ├─ tests/             # node:test 单元测试
-├─ .github/workflows/ # ci.yml（GitHub Actions）
+├─ .github/workflows/ # ci.yml（push / PR 门禁）+ site-health.yml（每周站点巡检）
 ├─ manifest.webmanifest # PWA manifest（手写）
 ├─ sw.js              # Service Worker，由 build 生成，勿手改
 ├─ index.html         # 唯一真实页面（多文件 + PWA），由 build 生成，勿手改
@@ -175,12 +177,31 @@ SS.remote.provider = {
 - 历史写入**仍只由 `app.js` 负责**；`app.js` 在 `record()` 后派发 `ss:history-changed` 事件，`input.js` 监听它刷新计数（清空 / 单删后也自行刷新）。
 - 仍然最多 10 条、新的在前、去重。
 
-## 站点健康自检（可选，不进 CI）
+## 站点健康自检与每周巡检
 
 - `scripts/check-sites.mjs` + `package.json` 的 `check:sites`：从 `SS.sites` 读站点，逐个请求 `home` 和把 `{q}` 换成 `test` 的 `search`，8s 超时、`redirect: 'follow'`，输出表格（站点 id / home 状态 / search 状态 / 最终 URL / 判定：OK / 重定向到首页 / 非 2xx / 网络失败）。
 - 判定分级：`OK`（2xx 正常）、`WARN`（网络失败 / 反爬 401/403/429 / 被重定向到首页 / 跨域跳转，需人工确认）、`FAIL`（404/410/5xx 真坏链）。站点库有 33 个站点后 WARN 会更常见（Unsplash 401、知乎 403 反爬、京东跨域跳转等），可以用它逐个自查。
-- 默认退出码 0（只报告）；`npm run check:sites -- --strict` 时**只有 FAIL** 才退出 1（WARN 不阻断）。
-- **不加入 `npm run check`、不进 CI**（网络抖动会误伤）。站方改版或新增站点后可以手动跑它自查。
+- 退出码：默认 0（只报告）；`npm run check:sites -- --strict` 时**只有 FAIL** 才退出 1（WARN 不阻断）；`npm run check:sites -- --json` 时 stdout 只输出 JSON 对象（`{ generatedAt, total, ok, warn, fail, rows: [...] }`），诊断写 stderr，默认退出 0。
+- **不加入 `npm run check`、不进普通 CI**（网络抖动会误伤）。站方改版或新增站点后可以手动跑它自查。
+- **每周自动巡检**：`.github/workflows/site-health.yml` 每周一 01:00 UTC 用 `--json` 跑一遍，再由 `scripts/site-health-report.mjs` 生成 `site-health-report.md` 并把 `fail` / `warn` 写到 `GITHUB_OUTPUT`；有 WARN/FAIL 时确保 `site-health` 标签存在，在已打开的 tracking issue 下评论，没有就新建（标题「站点巡检：需要人工确认的链接」）。
+- 本地模拟 workflow：`node scripts/check-sites.mjs --json > sites.json`（需要网络）→ `node scripts/site-health-report.mjs sites.json`（无网络时可用构造的假 JSON 验证报告结构）；手动触发 workflow：`gh workflow run site-health`，或在 Actions 页面点「Run workflow」。
+- 排查报告/issue 步骤问题：看 workflow 的 `report` step 输出的 `fail` / `warn`，以及 `sites.json` 是否为空（`--json` 崩溃时 stdout 可能为空，报告脚本会写成“读取失败”并把 fail 记为 1）。
+
+## 体积硬门禁
+
+- `scripts/validate.mjs` 里两处体积**是硬失败**：多文件版 `index.html` 首屏资源 > **200 KB**（`BUDGET_KB`）或单文件版 `SimpleSearch.html` > **260 KB**（`SINGLE_FILE_MAX_KB`）时，`npm run validate` / `npm run check` 退出 1，CI 直接红。
+- gzip 只作为信息输出（真实成本口径），不单独卡阈值。
+- 超限怎么办：
+  1. 优先优化（删无用 CSS/JS、压缩内联数据、拆分/延迟加载非首屏逻辑等）；
+  2. 确实需要更大，就**显式提高预算**：改 `scripts/validate.mjs` 的常量，同时更新 README 的体积/预算说明和本文件，PR 描述里写清为什么、增加了什么、gzip 变化多少；不要只改数字不说明。
+- 当前实测约 196.4 KB（预算 200），余量不大；加新功能前先估一下体积。
+
+## 视觉回归（本地按需，不进 CI）
+
+- `scripts/visual.mjs`（零依赖，Node 内置能力）+ `package.json` 的 `visual` / `visual:update`：启动本地服务器 + 本机 headless Edge/Chrome，截 4 个固定状态——`common-light-1200`、`common-dark-1200`、`mobile-light-390`、`settings-open-1200`。
+- 默认模式：与 `tests/visual/*.png` 基线逐像素比较（单通道容差 8，差异像素比例 > 0.3% 视为失败），新截图和 diff 图写到 `artifacts/visual/`，失败退出 1；没有基线时提示先 `visual:update` 并退出 0。
+- 改 UI 的流程：改代码 → `npm run visual` 看有没有意外变动 → 确认新样子是想要的 → `npm run visual:update` 更新基线 → 打开 `artifacts/visual/` / `tests/visual/` 人工确认 → 把基线 PNG 和代码一起提交。
+- **不进 CI**：不同操作系统/浏览器字体渲染差异大，硬比较容易误报，所以只在本地按需跑；CI 只跑 `npm run check`。
 
 ## PWA / 离线（Service Worker）
 
@@ -219,7 +240,7 @@ SS.remote.provider = {
 
 - 由 `scripts/build.mjs` 的 `renderSingleFile()` 从 `index.html` 生成：把 3 个 `<style>`、10 个经典脚本、防闪烁脚本全部内联，favicon 转成 data URI，并删掉 `<link rel="manifest">` 与 `apple-touch-icon`；HTML 里加 `window.__SS_SINGLE_FILE = true` 标记。
 - `app.js` 看到 `__SS_SINGLE_FILE` 就不再注册 Service Worker（SW 必须是独立文件），所以单文件版**没有 PWA 安装 / 离线缓存**；它零外部请求、双击即用，但改一个字整页都要重新下载。要 PWA 用 `index.html` 多文件版。
-- 版本口径：当前 **2.9.0**（停在 2.x）；`sw.js` 的缓存名与设置面板版本号都跟随 `package.json`。
+- 版本口径：当前 **2.10.0**（停在 2.x）；`sw.js` 的缓存名与设置面板版本号都跟随 `package.json`。
 - 改任何 CSS / JS / 模板后都要 `npm run build` 重新生成它；CI 的产物漂移检查包含 `SimpleSearch.html`，测试 / validate 也有「CSS/JS 全内联、无 `assets/`、无 manifest/apple-touch 引用」的断言。
 
 ## 自定义站点与配置（v2.9.0）
@@ -268,6 +289,7 @@ SS.remote.provider = {
 - `npm run coverage` 可选、不进 CI 必跑；`npm run check:sites` 同样可选、需要网络。
 - `npm run e2e` 用本机 Edge/Chrome（CDP）跑真实浏览器检查：单页主题解析、主题三态与主题色切换与持久化、深链 `?cat=` / `?q=` / `?site=`、`!bang` 直达、搜索引擎切换（表单 action/name/存储）、快捷键对话框（`?` 打开、Esc 关闭归还焦点）、PWA 注册与断网刷新、两个旧链接的 0 秒跳转与地址栏清理、联网联想开关 / 超时降级 / 真实百度联调、分类导航筛选与左侧抽屉开合、设置面板、搜索历史计数 / 清空 / 单条删除、设置里的版本号、图标 sprite（无额外图片请求）、960px 断点与 390px 移动端布局、`file://` 打开。CI 不跑它（需要浏览器）。
 - GitHub Actions（`.github/workflows/ci.yml`）在 `push` 和 `pull_request` 时用 Node 22 跑 `npm run check`，并检查五个生成产物（`index.html`、`SimpleSearch.html`、两个重定向壳、`sw.js`）是否与 `sites.js` / 模板漂移。
+- `site-health.yml` 是独立的每周巡检，不阻塞 PR；调试方式见「站点健康自检与每周巡检」。
 - `e2e` 只断言首屏请求数 ≤16 + 零第三方，**不校验体积**（Service Worker 接管后传输字节会记 0）；体积预算由 `validate` 按磁盘产物校验（200 KB）。
 - 本项目零依赖，CI 里**不需要 `npm ci` / `npm install`**。
 - 只改文档或样式时也请跑一次 `npm run check`，确认没有把生成页改漂。
@@ -293,6 +315,8 @@ SS.remote.provider = {
 - [ ] 搜索引擎四选一可切换、`ss.engine` 持久化、表单 action/name 与联想首项文案同步
 - [ ] 快捷键对话框：`?` 打开、9 条快捷键、Esc / 关闭按钮 / 遮罩关闭并归还焦点
 - [ ] `npm run coverage` 通过阈值（90 / 75 / 80）
+- [ ] 体积未超硬门禁（多文件 <200 KB、单文件 <260 KB）；如果确实要改预算，PR 里写清理由和 gzip 变化
+- [ ] 改 UI 时本地跑过 `npm run visual`；如确认有意更新基线，`tests/visual/*.png` 与代码一起提交
 - [ ] 单文件便携版 `SimpleSearch.html` 已随源码 build：CSS/JS 全内联、无 `assets/` / manifest / apple-touch-icon 引用、零外部请求（约 196.6 KB / gzip 48.0 KB，上限 260 KB）
 - [ ] 站点图标来自内联 sprite（没有新增图片请求）；没配图标的站点显示 monogram；新增站点可用 `icon: 'cat-<group>'` 复用分类图标，sprite 增量 ≤12 KB
 - [ ] 直接双击 `index.html`（`file://`）无报错

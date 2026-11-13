@@ -37,10 +37,10 @@
 //      壳不得包含真实页内容（#buttons-container / data-site / assets/js bundle），体积 < 1KB
 //  21. 唯一性：只有 index.html 是真实页
 //  22. CSS 不含 !important（契约 §6）
-//  23. 体积信息：index.html 单页加载资源合计 < 200KB（仅提示，契约 §9.9，gzip 为真实成本口径；
-//      sw.js / manifest / PWA 图标不计入首屏）
+//  23. 体积门禁（§21.2）：index.html 单页加载资源合计 > BUDGET_KB（200KB，gzip 前）→ 失败；
+//      gzip 数值仅作信息输出（真实成本口径），不单独卡；sw.js / manifest / PWA 图标不计入首屏
 //  24. 单文件便携版 SimpleSearch.html：build 生成 + CSS/JS 全内联 + 零 assets/manifest/apple-touch-icon 引用
-//  25. 单文件体积 ≤ 260KB（提示项）
+//  25. 单文件体积门禁（§21.2）：SimpleSearch.html > 260KB → 失败；gzip 数值仅作信息输出
 //  26. v2.7 站点库规模：总站点数 ≥30、每分组 ≥3、DOM 含全部 data-site 按钮（可见性由 JS 控制）
 //  27. v2.8 featured 视图：11 个 featured 可见、22 个非 featured 带 hidden、.card-title「常用网站」、导航首项「常用」
 //  28. v2.9 设置入口与对话框：#custom-sites-open/#order-open、#sites-dialog/#order-dialog（hidden/dialog/aria-modal/
@@ -51,6 +51,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import vm from 'node:vm'
+import zlib from 'node:zlib'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
@@ -1751,10 +1752,10 @@ check('CSS 不含 !important（契约 §6）', () => {
   return problems
 })
 
-// ---------------------------------------------------------------- 23. 体积信息
+// ---------------------------------------------------------------- 23. 体积门禁（§21.2，超限阻断）
 
-check('体积信息（index.html 单页加载预算 < 200 KB，仅供参考不阻断）', () => {
-  if (!realPage.exists) return { problems: [], notes: [`${REAL_PAGE} 不存在，跳过体积统计`] }
+check('体积门禁（index.html 单页 < 200KB，超限阻断；gzip 仅信息输出）', () => {
+  if (!realPage.exists) return [`${REAL_PAGE} 不存在，无法统计首屏体积`]
 
   const notes = []
   const assetBytes = new Map()
@@ -1776,7 +1777,9 @@ check('体积信息（index.html 单页加载预算 < 200 KB，仅供参考不�
   }
 
   const htmlBytes = Buffer.byteLength(realPage.html, 'utf8')
+  const htmlGzip = zlib.gzipSync(Buffer.from(realPage.html, 'utf8')).length
   let loaded = htmlBytes
+  let gzipLoaded = htmlGzip
   let excluded = 0
   for (const ref of extractResourceRefs(realPage.html)) {
     if (!ref.url || isExternalUrl(ref.url) || ref.url.startsWith('#')) continue
@@ -1786,16 +1789,29 @@ check('体积信息（index.html 单页加载预算 < 200 KB，仅供参考不�
       if (assetBytes.has(cleanUrl)) excluded += assetBytes.get(cleanUrl)
       continue
     }
-    if (assetBytes.has(cleanUrl)) loaded += assetBytes.get(cleanUrl)
+    if (!assetBytes.has(cleanUrl)) continue
+    loaded += assetBytes.get(cleanUrl)
+    const target = path.join(ROOT, cleanUrl)
+    if (fs.existsSync(target)) gzipLoaded += zlib.gzipSync(fs.readFileSync(target)).length
   }
-  const verdict = loaded < BUDGET_KB * 1024 ? '达标' : '超出'
-  notes.push(`${REAL_PAGE}：${(htmlBytes / 1024).toFixed(1)} KB`)
+
+  const limitBytes = BUDGET_KB * 1024
+  notes.push(`${REAL_PAGE}：${(htmlBytes / 1024).toFixed(1)} KB / gzip ${(htmlGzip / 1024).toFixed(1)} KB`)
   notes.push(
-    `${REAL_PAGE} 单页加载体积：${(loaded / 1024).toFixed(1)} KB（${verdict} < ${BUDGET_KB} KB 预算；` +
-      `sw.js/manifest/PWA 图标不计入${excluded > 0 ? `，已排除 PWA 图标 ${(excluded / 1024).toFixed(1)} KB` : ''}）`,
+    `${REAL_PAGE} 单页加载体积：${(loaded / 1024).toFixed(1)} KB / gzip ${(gzipLoaded / 1024).toFixed(1)} KB` +
+      `（预算 ${BUDGET_KB} KB，gzip 为真实成本口径；sw.js/manifest/PWA 图标不计入` +
+      `${excluded > 0 ? `，已排除 PWA 图标 ${(excluded / 1024).toFixed(1)} KB` : ''}）`,
   )
   notes.push(`全部资源合计：${(assetTotal / 1024).toFixed(1)} KB`)
-  return { problems: [], notes }
+
+  const problems = []
+  if (loaded > limitBytes) {
+    problems.push(
+      `${REAL_PAGE} 单页加载体积 ${(loaded / 1024).toFixed(1)} KB 超过预算 ${BUDGET_KB} KB` +
+        `（gzip ${(gzipLoaded / 1024).toFixed(1)} KB）。请优化资源，或显式修改 BUDGET_KB 并在提交说明里写明原因。`,
+    )
+  }
+  return { problems, notes }
 })
 
 // ---------------------------------------------------------------- 24. v2.6 单文件便携版
@@ -1858,17 +1874,25 @@ check('v2.6 单文件便携版 SimpleSearch.html：build 生成 + CSS/JS 全内�
   return problems
 })
 
-// ---------------------------------------------------------------- 25. v2.6 单文件体积
+// ---------------------------------------------------------------- 25. 单文件体积门禁（§21.2，超限阻断）
 
-check('v2.6 单文件体积（≤ 260KB，提示项不阻断）', () => {
+check('单文件体积门禁（SimpleSearch.html ≤ 260KB，超限阻断；gzip 仅信息输出）', () => {
   const singlePath = path.join(ROOT, SINGLE_FILE)
   if (!fs.existsSync(singlePath)) return [`缺少 ${SINGLE_FILE}`]
   const bytes = fs.statSync(singlePath).size
   const kb = bytes / 1024
-  const verdict = kb <= SINGLE_FILE_MAX_KB ? '达标' : '超出'
+  const gzipKb = zlib.gzipSync(fs.readFileSync(singlePath)).length / 1024
+
+  const problems = []
+  if (kb > SINGLE_FILE_MAX_KB) {
+    problems.push(
+      `${SINGLE_FILE} 体积 ${kb.toFixed(1)} KB 超过上限 ${SINGLE_FILE_MAX_KB} KB（gzip ${gzipKb.toFixed(1)} KB）。` +
+        '请优化内联资源，或显式修改 SINGLE_FILE_MAX_KB 并在提交说明里写明原因。',
+    )
+  }
   return {
-    problems: [],
-    notes: [`${SINGLE_FILE}：${kb.toFixed(1)} KB（${verdict} ≤ ${SINGLE_FILE_MAX_KB}KB 提示线；不含任何外部请求）`],
+    problems,
+    notes: [`${SINGLE_FILE}：${kb.toFixed(1)} KB / gzip ${gzipKb.toFixed(1)} KB（上限 ${SINGLE_FILE_MAX_KB} KB，超限阻断；不含任何外部请求）`],
   }
 })
 

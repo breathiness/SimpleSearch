@@ -1,8 +1,9 @@
 // 站点健康自检（可选、需要网络，**不进 CI**）：检查 sites.js 里每个站点的
 // home 与 search 地址是否还能用，站方改版导致坏链时能尽快发现。
 //
-//   npm run check:sites          只报告（退出码 0）
-//   npm run check:sites -- --strict   有 FAIL 时退出码 1
+//   npm run check:sites                 只报告（退出码 0）
+//   npm run check:sites -- --strict     有 FAIL 时退出码 1
+//   npm run check:sites -- --json       只输出 JSON（诊断写 stderr，默认退出码 0；--strict 时 FAIL>0 → 1）
 //
 // 不引入依赖：用 Node 内置 fetch + AbortSignal.timeout。
 import path from 'node:path'
@@ -12,6 +13,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(HERE, '..')
 const TIMEOUT_MS = Number(process.env.CHECK_TIMEOUT || 8000)
 const STRICT = process.argv.includes('--strict')
+const JSON_OUT = process.argv.includes('--json')
 const UA = 'SimpleSearch-site-check (+https://github.com/breathiness/SimpleSearch)'
 
 async function loadSites() {
@@ -86,9 +88,11 @@ function pad(value, width) {
 
 async function main() {
   const sites = await loadSites()
-  console.log(`[check-sites] ${sites.length} 个站点，超时 ${TIMEOUT_MS}ms，模式=${STRICT ? 'strict' : 'report'}\n`)
-  console.log('站点          home   search  耗时    结论')
-  console.log('─'.repeat(64))
+  // --json 模式：stdout 只能出现一个 JSON，诊断一律走 stderr
+  const log = JSON_OUT ? (...args) => console.error('[check-sites]', ...args) : console.log
+  log(`${sites.length} 个站点，超时 ${TIMEOUT_MS}ms，模式=${STRICT ? 'strict' : 'report'}\n`)
+  log('站点          home   search  耗时    结论')
+  log('─'.repeat(64))
 
   const rows = []
   for (const site of sites) {
@@ -104,7 +108,7 @@ async function main() {
     const reason = [homeJudge.reason, searchJudge.reason].filter(Boolean).join('；') || '正常'
 
     rows.push({ site, home, search, verdict, reason })
-    console.log(
+    log(
       `${pad(site.id, 13)} ${pad(home.status || '--', 5)} ${pad(search.status || '--', 7)} ${pad(
         `${search.ms}ms`,
         7
@@ -113,21 +117,46 @@ async function main() {
   }
 
   const count = (v) => rows.filter((row) => row.verdict === v).length
-  console.log('─'.repeat(64))
-  console.log(`[check-sites] OK ${count('OK')} / WARN ${count('WARN')} / FAIL ${count('FAIL')}`)
+  const fail = count('FAIL')
+  const warn = count('WARN')
 
-  const warned = rows.filter((row) => row.verdict !== 'OK')
-  if (warned.length > 0) {
-    console.log('\n需要人工确认的站点：')
-    for (const row of warned) {
-      console.log(`  - ${row.site.id}（${row.site.label}）：${row.reason}`)
-      console.log(`    home:   ${row.site.home}  → ${row.home.finalUrl}`)
-      console.log(`    search: ${withQuery(row.site.search, 'test')}  → ${row.search.finalUrl}`)
+  if (JSON_OUT) {
+    const payload = {
+      generatedAt: new Date().toISOString(),
+      total: rows.length,
+      ok: count('OK'),
+      warn,
+      fail,
+      rows: rows.map((row) => ({
+        id: row.site.id,
+        label: row.site.label,
+        group: row.site.group || '',
+        home: row.site.home,
+        search: withQuery(row.site.search, 'test'),
+        verdict: row.verdict,
+        reason: row.reason,
+        homeFinalUrl: row.home.finalUrl,
+        searchFinalUrl: row.search.finalUrl,
+      })),
     }
-    console.log('\n提示：部分站点有反爬/需要登录，403/重定向不一定是真坏链，请浏览器里点一下确认。')
+    process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`)
+  } else {
+    log('─'.repeat(64))
+    log(`OK ${count('OK')} / WARN ${warn} / FAIL ${fail}`)
+
+    const warned = rows.filter((row) => row.verdict !== 'OK')
+    if (warned.length > 0) {
+      log('\n需要人工确认的站点：')
+      for (const row of warned) {
+        log(`  - ${row.site.id}（${row.site.label}）：${row.reason}`)
+        log(`    home:   ${row.site.home}  → ${row.home.finalUrl}`)
+        log(`    search: ${withQuery(row.site.search, 'test')}  → ${row.search.finalUrl}`)
+      }
+      log('\n提示：部分站点有反爬/需要登录，403/重定向不一定是真坏链，请浏览器里点一下确认。')
+    }
   }
 
-  if (STRICT && count('FAIL') > 0) process.exit(1)
+  if (STRICT && fail > 0) process.exit(1)
 }
 
 main().catch((error) => {

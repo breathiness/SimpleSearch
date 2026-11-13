@@ -16,3 +16,7 @@ desktop.ini
 
 # 本地验证产物（截图等）
 artifacts/
+
+# 站点巡检运行时产物（workflow 本地/CI 生成，不入库）
+site-health-report.md
+sites.json

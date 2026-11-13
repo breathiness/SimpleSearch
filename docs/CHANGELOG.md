@@ -3,6 +3,21 @@
 本项目的对用户可见变化都记录在这里。
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)：主版本号在页面结构/使用方式有明显变化时递增。
 
+## 2.10.0（未发布）
+
+工程化：站点巡检自动化、体积硬门禁、本地视觉回归。
+
+### 工程
+
+- **站点巡检自动化**：`scripts/check-sites.mjs` 新增 `--json`（stdout 只输出 `{ generatedAt, total, ok, warn, fail, rows }`，诊断写 stderr；默认退出 0，`--strict` 时 FAIL>0 → 1，默认人读输出不变）；新增 `scripts/site-health-report.mjs`（读 JSON → 生成 `site-health-report.md`，并把 `fail` / `warn` 追加到 `GITHUB_OUTPUT`，退出 0）；新增 `.github/workflows/site-health.yml`（每周一 01:00 UTC + `workflow_dispatch`，checkout / setup-node 22 → `--json` 巡检 → 报告 → 有 WARN/FAIL 时确保 `site-health` 标签，在已打开的 tracking issue 评论或新建「站点巡检：需要人工确认的链接」；`permissions: contents: read, issues: write`、`GH_TOKEN`，零第三方 action、零 npm 依赖）。
+- **体积硬门禁**：`scripts/validate.mjs` 把体积从提示改为**失败项**——`index.html` 首屏资源 > **200 KB** 或 `SimpleSearch.html` > **260 KB** 时 `npm run validate` / `npm run check` 退出 1、CI 变红；gzip 仍只作为信息输出。
+- **视觉回归**：新增 `scripts/visual.mjs` 与 `npm run visual` / `npm run visual:update`（零依赖；4 个固定状态 `common-light-1200` / `common-dark-1200` / `mobile-light-390` / `settings-open-1200`；单通道容差 8、差异像素比例 >0.3% 判失败；基线 `tests/visual/*.png`、diff 到 `artifacts/visual/`；无基线时提示先 `--update` 并退出 0；**不进 CI**）。
+
+### 文档
+
+- README 新增「维护：站点巡检」「维护：视觉回归」「维护：体积硬门禁」三节，并更新命令表；CONTRIBUTING 增加巡检 workflow 调试、体积超限处理、视觉回归改 UI 流程。
+- 门禁基线：`npm test` **207 例**、`npm run validate` **29 项**、`npm run e2e` **172 项**全绿（以 qa 最终数字为准）。
+
 ## 2.9.0（未发布）
 
 自定义站点可视化、配置导入导出、常用排序，以及 README 的书签小工具。
