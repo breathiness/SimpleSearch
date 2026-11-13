@@ -183,9 +183,9 @@ SS.remote.provider = {
 - 判定分级：`OK`（2xx 正常）、`WARN`（网络失败 / 反爬 401/403/429 / 被重定向到首页 / 跨域跳转，需人工确认）、`FAIL`（404/410/5xx 真坏链）。站点库有 33 个站点后 WARN 会更常见（Unsplash 401、知乎 403 反爬、京东跨域跳转等），可以用它逐个自查。
 - 退出码：默认 0（只报告）；`npm run check:sites -- --strict` 时**只有 FAIL** 才退出 1（WARN 不阻断）；`npm run check:sites -- --json` 时 stdout 只输出 JSON 对象（`{ generatedAt, total, ok, warn, fail, rows: [...] }`），诊断写 stderr，默认退出 0。
 - **不加入 `npm run check`、不进普通 CI**（网络抖动会误伤）。站方改版或新增站点后可以手动跑它自查。
-- **每周自动巡检**：`.github/workflows/site-health.yml` 每周一 01:00 UTC 用 `--json` 跑一遍，再由 `scripts/site-health-report.mjs` 生成 `site-health-report.md` 并把 `fail` / `warn` 写到 `GITHUB_OUTPUT`；有 WARN/FAIL 时确保 `site-health` 标签存在，在已打开的 tracking issue 下评论，没有就新建（标题「站点巡检：需要人工确认的链接」）。
+- **每周自动巡检**：`.github/workflows/site-health.yml` 每周一 01:00 UTC 用 `--json` 跑一遍，再由 `scripts/site-health-report.mjs` 生成 `site-health-report.md` 并把 `fail` / `warn` 写到 `GITHUB_OUTPUT`。报告**始终写进 Actions Summary**；只有 **fail>0** 时才确保 `site-health` 标签存在并在已打开的 tracking issue 下评论（没有就新建），**fail=0 时自动关闭**已打开的 tracking issue。WARN 只进摘要/报告，不单独开 issue。
 - 本地模拟 workflow：`node scripts/check-sites.mjs --json > sites.json`（需要网络）→ `node scripts/site-health-report.mjs sites.json`（无网络时可用构造的假 JSON 验证报告结构）；手动触发 workflow：`gh workflow run site-health`，或在 Actions 页面点「Run workflow」。
-- 排查报告/issue 步骤问题：看 workflow 的 `report` step 输出的 `fail` / `warn`，以及 `sites.json` 是否为空（`--json` 崩溃时 stdout 可能为空，报告脚本会写成“读取失败”并把 fail 记为 1）。
+- 排查报告/issue 步骤问题：看 workflow 的 `report` step 输出的 `fail` / `warn`，以及 `sites.json` 是否为空（`--json` 崩溃时 stdout 可能为空，报告脚本会写成“读取失败”并把 fail 记为 1，从而开 issue）；WARN 想排查就看该次运行的 Summary。
 
 ## 体积硬门禁
 

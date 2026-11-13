@@ -384,7 +384,8 @@ npm run serve
 ### 维护：站点巡检（每周自动）
 
 - **自动跑**：`.github/workflows/site-health.yml` 每周一 **01:00 UTC（北京时间 09:00）** 检查全部内置站点的 `home` / `search`，也可以手动触发（Actions → 站点巡检 → Run workflow，或 `gh workflow run site-health`）。
-- **有 WARN / FAIL 时**：workflow 会确保仓库里有 `site-health` 标签，然后找**已打开的** `site-health` issue 评论追加报告；没有就新建一个，标题固定「站点巡检：需要人工确认的链接」。报告同时生成在 `site-health-report.md`。
+- **报告去哪看**：每周的结果都会写进这次运行的 **Actions Summary**（含 OK/WARN/FAIL 汇总和明细表，即使没有坏链也能看到 WARN 提醒），不打扰 issue。
+- **只有 FAIL 才开 issue**：真的出现 404/410/5xx 坏链时，workflow 会确保 `site-health` 标签，找**已打开的**追踪 issue 评论追加报告、没有就新建（标题固定「站点巡检：需要人工确认的链接」）；**FAIL 清零后会自动关闭**该 issue。WARN（反爬/跳转）只在摘要里提示。报告同时生成在 `site-health-report.md`。
 - **本地手动**：`npm run check:sites`（人读表格）、`npm run check:sites -- --strict`（有 FAIL 时退出 1）、`npm run check:sites -- --json`（stdout 纯 JSON，便于脚本处理）。
 - 401 / 403 / 429 / 跨域跳转 / 超时这类 WARN 多为反爬或地区限制，**不一定是坏链**，点开浏览器确认一下再决定要不要改。
 - workflow 只用官方 `actions/checkout`、`actions/setup-node` 和 runner 预装的 `gh`，**不跑 `npm install`、没有第三方 action**。

@@ -712,7 +712,8 @@ README 增加「书签小工具」小节：一段可复制的 `javascript:` 书�
 - 新增 `.github/workflows/site-health.yml`：
   - `on: schedule`（每周一 01:00 UTC，即 09:00 Asia/Shanghai）+ `workflow_dispatch`
   - `permissions: contents: read, issues: write`
-  - 步骤：checkout → setup-node 22 → `node scripts/check-sites.mjs --json > sites.json`（continue-on-error）→ `node scripts/site-health-report.mjs sites.json` → 若 fail>0 或 warn>0：确保 `site-health` 标签存在，找**已打开的 `site-health` 追踪 issue**，有则评论追加、无则新建（标题「站点巡检：需要人工确认的链接」），body 用生成的 Markdown。
+  - 步骤：checkout → setup-node 22 → `node scripts/check-sites.mjs --json > sites.json`（continue-on-error）→ `node scripts/site-health-report.mjs sites.json` →**报告始终写入 job summary**（WARN 明细在 Actions 页面可见）→ 仅当 **fail>0** 时确保 `site-health` 标签存在，找**已打开的追踪 issue**，有则评论追加、无则新建（标题「站点巡检：需要人工确认的链接」）；**fail=0 时若有打开的追踪 issue 则评论并自动关闭**（WARN 不单独触发 issue）。
+  - v2.10.1 起：issue 只在 FAIL 时开/评论，WARN 只进 Actions 摘要与报告；FAIL 清零后自动关闭追踪 issue。
   - 全部使用官方 actions + 预装 `gh` CLI（零第三方 action、零 npm 依赖）。
 
 ### 21.2 体积门禁硬失败

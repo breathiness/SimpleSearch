@@ -40,9 +40,14 @@ jobs:
         id: report
         run: node scripts/site-health-report.mjs sites.json
 
-      # gh CLI 是 GitHub runner 预装的；label / 评论 / 新建都只依赖 GH_TOKEN，无第三方 action。
-      - name: 需要人工确认时创建或更新追踪 issue
-        if: ${{ steps.report.outputs.fail != '0' || steps.report.outputs.warn != '0' }}
+      # 报告始终写进 job summary：没有 FAIL 时也能在 Actions 页面看到 WARN 明细，不打扰 issue。
+      - name: 报告写入 Actions 摘要
+        if: always()
+        run: cat site-health-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      # 只有真的出现 FAIL（坏链）才开 / 评论追踪 issue；WARN 只体现在摘要和报告里。
+      - name: FAIL 时创建或更新追踪 issue
+        if: ${{ steps.report.outputs.fail != '0' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -53,4 +58,16 @@ jobs:
             gh issue comment "$issue_number" --body-file site-health-report.md
           else
             gh issue create --title "站点巡检：需要人工确认的链接" --label site-health --body-file site-health-report.md
+          fi
+
+      # FAIL 清零后自动关闭追踪 issue，避免历史 issue 越积越多（下次再出现 FAIL 会重新创建）。
+      - name: FAIL 清零时自动关闭追踪 issue
+        if: ${{ steps.report.outputs.fail == '0' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          issue_number="$(gh issue list --label site-health --state open --limit 1 --json number --jq '.[0].number // empty' 2>/dev/null || true)"
+          if [ -n "${issue_number:-}" ]; then
+            gh issue close "$issue_number" --comment "本轮巡检没有 FAIL，坏链已清零，自动关闭。若后续再出现坏链会重新创建追踪 issue。"
           fi

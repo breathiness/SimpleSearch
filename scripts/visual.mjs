@@ -214,6 +214,8 @@ function createPage(cdp) {
           '*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}',
           'html{scroll-behavior:auto!important}',
           '.ripple{display:none!important}',
+          // 版本号随每次发版变化，不属于视觉回归要盯的内容：截图时隐藏，基线跨版本稳定
+          '.panel-version{visibility:hidden!important}',
         ].join('\\n')
         document.head.appendChild(style)
       }
