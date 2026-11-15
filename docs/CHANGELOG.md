@@ -3,6 +3,14 @@
 本项目的对用户可见变化都记录在这里。
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)：主版本号在页面结构/使用方式有明显变化时递增。
 
+## 2.10.2（未发布）
+
+### 文档
+
+- **README 精简**：571 行 / 54 KB → **94 行 / 8.2 KB**，改为「居中标题 + 徽章 + 导航 → 简介 → 核心功能 → 在线体验与下载 → 文档 → 快捷键 → 常见问题 → 隐私 → 许可」的版式；详细说明移到 Wiki。
+- **新增 Wiki（8 个页面）**：Home、功能详解、自定义站点、技术实现、本地开发与测试、常见问题、`_Sidebar`、`_Footer`；页面源文件在仓库 `docs/wiki/`，便于 review 和 diff。
+- **新增 `npm run wiki:publish`**（`scripts/publish-wiki.mjs`）：把 `docs/wiki/*.md` 复制到 GitHub Wiki 仓库并推送；`--dry-run` 只预览。GitHub 没有 wiki API，首次仍需在网页上点「Create the first page」初始化。
+- `package.json` 补 `repository` / `homepage` / `bugs` 字段；`docs/images/` 加入两张界面截图（桌面常用视图、移动端）。
 ## 2.10.1（未发布）
 
 ### 工程
