@@ -323,6 +323,23 @@ SS.remote.provider = {
 - [ ] `README.md` / `docs/custom-sites.md` / `docs/CHANGELOG.md` 等受影响的文档已同步
 - [ ] PR 描述里写清楚改动内容、验证方式和截图（如涉及视觉变化）
 
+## 文档与 Wiki
+
+用户文档分两处，写的时候别重复也不要两处说法不一致：
+
+- **README.md**：只放「是什么 / 怎么用 / 在线体验 / 快捷键 / 常见问题」这类一屏能看完的内容，保持简短。
+- **Wiki**：详细说明（功能详解、自定义站点、技术实现、本地开发与测试、常见问题全文）。页面源文件在仓库的 `docs/wiki/`，改完用下面的命令发布：
+
+```bash
+npm run wiki:publish -- --dry-run   # 先看会发布哪些页面
+npm run wiki:publish                # 复制 docs/wiki/*.md 到 wiki 仓库并推送
+```
+
+- 页面文件名就是 Wiki 标题（`Home.md` → 首页，`_Sidebar.md` / `_Footer.md` 是特殊页）。
+- GitHub 没有 wiki API：**第一次**要在 <https://github.com/breathiness/SimpleSearch/wiki> 点「Create the first page」初始化 wiki 仓库，之后 `npm run wiki:publish` 才能推送。
+- 发布脚本用你本机的 git 凭据和代理设置；推不上去时先确认 `git push` 在本仓库可用。
+- `docs/` 下的其他文件（`contract.md`、`custom-sites.md`、`CHANGELOG.md`）属于仓库文档，不随 Wiki 发布。
+
 ## 有疑问？
 
 开一个 [Issue](https://github.com/breathiness/SimpleSearch/issues) 说明你的想法或复现步骤，比直接大改更容易被接受。
