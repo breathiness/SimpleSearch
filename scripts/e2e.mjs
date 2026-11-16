@@ -60,9 +60,13 @@ function findBrowser() {
     'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
     'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
     'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-    '/usr/bin/microsoft-edge',
+    // Linux 上优先 Chrome：GitHub runner 预装 Chrome 比 Edge 稳（Edge 首次启动慢/可能需要更多参数）
     '/usr/bin/google-chrome',
+    '/opt/google/chrome/chrome',
+    '/usr/bin/chromium',
+    '/usr/bin/microsoft-edge',
     '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   ].filter(Boolean)
   return candidates.find((p) => fs.existsSync(p)) || null
 }
@@ -319,6 +323,8 @@ async function run() {
     [
       '--headless=new',
       '--disable-gpu',
+      '--no-sandbox',
+      '--disable-dev-shm-usage',
       '--no-first-run',
       '--no-default-browser-check',
       '--disable-extensions',
@@ -346,6 +352,9 @@ async function run() {
     await waitFor(() => fetchOk(`${ORIGIN}/index.html`), { label: '静态服务器就绪' })
     const version = await waitFor(async () => (await fetchOk(`http://127.0.0.1:${CDP_PORT}/json/version`)).json(), {
       label: 'CDP 就绪',
+      // CI 冷启动（首次启动浏览器、无缓存）可能超过默认 15s，给足 45s
+      timeout: 45000,
+      interval: 250,
     })
     console.log(`[e2e] ${version.Browser}`)
 
