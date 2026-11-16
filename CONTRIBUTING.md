@@ -24,7 +24,7 @@ node -v   # 应为 v21 或更高（CI 用 22）
 | `npm run validate` | 静态检查 + 生成产物是否最新（内部会跑 `node scripts/build.mjs --check`） |
 | `npm run check` | `build && test && validate`，提交前与 CI 都跑这个 |
 | `npm run serve` | 零依赖本地静态服务器，默认 <http://127.0.0.1:8080/>（可用 `PORT` 环境变量改端口） |
-| `npm run e2e` | 可选：用本机 Edge/Chrome 跑真实浏览器端到端检查（没装浏览器会跳过，CI 不跑），截图输出到已 gitignore 的 `artifacts/` |
+| `npm run e2e` | 用本机 Edge/Chrome 跑真实浏览器端到端检查（CI 的 `e2e` job 在 ubuntu-latest 用预装 Chrome 跑同一脚本；无浏览器时跳过），截图输出到已 gitignore 的 `artifacts/` |
 | `npm run coverage` | 可选：Node 内置覆盖率 + 阈值（90 行 / 75 分支 / 80 函数，低于阈值失败）；零依赖，不进 CI 必跑 |
 | `npm run check:sites` | 可选：逐个请求站点 `home` / `search`，检查是否 2xx、是否被重定向到首页（**需要网络，不进普通 CI**）；`--strict` 有 FAIL 退 1；`--json` 输出纯 JSON（stdout 只放 JSON，诊断写 stderr） |
 | `npm run visual` | 可选：本地视觉回归，与 `tests/visual/` 基线比较 4 个固定状态，失败退出 1（无基线时提示先 `visual:update` 并退出 0；不进 CI） |
@@ -37,7 +37,7 @@ SimpleSearch/
 ├─ assets/
 │  ├─ css/            # tokens.css / base.css / input.css
 │  ├─ img/            # favicon.svg + PWA 图标 icon-192.png / icon-512.png
-│  └─ js/             # 经典脚本（sites / search / suggest / history / theme / remote / input / sites-store / sites-admin / app）
+│  └─ js/             # 经典脚本（sites / search / suggest / history / theme / remote / input / sites-store / sites-admin / pwa / app）
 ├─ docs/              # 契约、自定义站点指南、更新日志
 ├─ scripts/           # build.mjs / icons.mjs（dev-time 图标数据）/ serve.mjs / validate.mjs / e2e.mjs / check-sites.mjs / site-health-report.mjs / visual.mjs
 ├─ templates/         # page.html（真实页：顶栏 / 导航 / 卡片 / 设置抽屉 / 快捷键对话框）/ redirect.html（重定向壳）/ sw.js（Service Worker 模板）
@@ -88,13 +88,13 @@ SimpleSearch/
 - **`assets/js/` 里禁止 ESM**：不能出现 `import` / `export` 语句，HTML 里也不能加 `type="module"`。这是 `file://` 双击可用和测试可直接 `import()` 的前提。需要 Node 专用的脚本放 `scripts/`（`.mjs`）。
 - **禁止内联事件属性**（`onclick="..."` 之类）。事件一律在 JS 里 `addEventListener`，并在 `DOMContentLoaded` 之后由 `app.js` 装配。
 - 模块文件顶层不要直接操作 DOM；纯逻辑（URL 构建、联想、历史、主题解析）不读 DOM、不读真实 `localStorage`，由调用方注入，方便单测。
-- **脚本加载顺序**：`templates/page.html` 里按 `sites → search → suggest → history → theme → remote → input → sites-store → sites-admin → app` 顺序挂 10 个经典脚本。新增模块文件必须同步加进模板（该文件归 lead 维护，PR 里说明让 lead 改，不要自己动）。
+- **脚本加载顺序**：`templates/page.html` 里按 `sites → search → suggest → history → theme → remote → input → sites-store → sites-admin → pwa → app` 顺序挂 11 个经典脚本。新增模块文件必须同步加进模板（该文件归 lead 维护，PR 里说明让 lead 改，不要自己动）。
 - **顶栏 / 抽屉 / 设置面板 / 快捷键对话框**：`#nav-toggle`、`#settings-toggle`、`#site-nav`、`#settings-panel`、`#shortcuts-dialog`、`#scrim` 的开合、遮罩联动和焦点进出（打开时焦点进面板/关闭按钮、关闭后回到触发元素）由 `app.js` 负责。`#suggest-source-toggle` 文案固定「联网联想」，状态只用 `aria-pressed`；主题模式 / 搜索引擎都是 `#theme-mode`、`#engine-mode` 分段控件（`.segmented-item[data-mode|data-engine]`），旧的 `#theme-toggle` 开关行已移除，不要再加回来。
 - **视觉风格参考 MDUI 1 / Material Design 1**（主色、2px 圆角、elevation 阴影、涟漪、下划线输入框、raised button），但**全部是自研手写 CSS**：不引入 MDUI 库、不引入任何 CDN 或第三方资源。改样式时沿用 `tokens.css` 里的变量，别硬编码颜色。
 - 不引入 `!important`；保留可见的 `:focus-visible` 焦点轮廓；动画要尊重 `prefers-reduced-motion: reduce`。
 - **不新增第三方依赖、CDN、字体或追踪脚本**；所有核心功能必须断网可用。唯一的网络请求是**可关闭**的联网联想（见下）。
 - 读写 `localStorage`、`window.open` 等可能失败的调用要放在 `try/catch` 或做能力判断里（隐私模式不能报错）。
-- DOM 契约（`#search-input`、`#suggest-list`、`#nav-toggle`、`#site-nav`、`#settings-toggle`、`#settings-panel`、`#theme-mode`、`#engine-mode`、`.segmented-item`、`#shortcuts-dialog`、`#shortcuts-open`、`#shortcuts-close`、`#history-count`、`#history-clear`、`.panel-version`、`.suggest-delete`、`#suggest-source-toggle`、`#color-swatches`、`.swatch`、`#scrim`、`.nav-item`、`.nav-icon`、`.appbar-logo`、`.card-title`、`[data-site][data-featured]`、`#custom-sites-open`、`#sites-dialog`、`#sites-list`、`#site-form`、`#order-open`、`#order-dialog`、`#order-list`、`#config-export`、`#config-import-open`、`#config-import-file`、`#sites-status`、`#buttons-container .button[data-site]` 等 id/class）由 `docs/contract.md` 规定，改动前先确认没有别的模块依赖。
+- DOM 契约（`#search-input`、`#suggest-list`、`#nav-toggle`、`#site-nav`、`#settings-toggle`、`#settings-panel`、`#theme-mode`、`#engine-mode`、`.segmented-item`、`#shortcuts-dialog`、`#shortcuts-open`、`#shortcuts-close`、`#history-count`、`#history-clear`、`.panel-version`、`.suggest-delete`、`#suggest-source-toggle`、`#color-swatches`、`.swatch`、`#scrim`、`.nav-item`、`.nav-icon`、`.appbar-logo`、`.card-title`、`[data-site][data-featured]`、`#custom-sites-open`、`#sites-dialog`、`#sites-list`、`#site-form`、`#order-open`、`#order-dialog`、`#order-list`、`#config-export`、`#config-import-open`、`#config-import-file`、`#sites-status`、`#install-row`、`#install-app`、`#update-toast`、`#update-reload`、`#update-dismiss`、`#buttons-container .button[data-site]` 等 id/class）由 `docs/contract.md` 规定，改动前先确认没有别的模块依赖。
 
 ## 扩展联网联想数据源
 
@@ -125,7 +125,7 @@ SS.remote.provider = {
 - **它不属于运行时脚本**：不要把它加进 `templates/page.html` 的 `<script>` 列表（那 8 个才是运行时脚本）；
 - 风格：24×24 viewBox、`fill="none"`、`stroke="currentColor"`、线宽 1.8、圆头；画**通用几何符号**，不要精确复制他人商标（避免商标问题）；
 - **站点图标三级解析**：站点专属图标 `SITE_ICONS[site.id]` → `site.icon` 指向的 symbol（可写成 `cat-tech` 复用分类图标，必须存在于 `SITE_ICONS` / `UI_ICONS`）→ 首字符 monogram。所以不是每个站点都要画新图标。
-- 体积红线：sprite（32 个 symbol：22 站点 + 3 UI + 1 logo + 6 分类）让 HTML 的增量 ≤ **12 KB**（未压缩），全站仍需 < 200 KB 预算；
+- 体积红线：sprite（32 个 symbol：22 站点 + 3 UI + 1 logo + 6 分类）让 HTML 的增量 ≤ **12 KB**（未压缩），全站仍需 < 212 KB 预算；
 - 禁止：外链 favicon 服务（如 `icons.duckduckgo.com`、Google favicon API）、外部图标库/CDN、用 emoji 冒充品牌图标——前两者会新增请求，后者跨平台不一致；
 - 新增图标：站点专属图标在 `SITE_ICONS` 里加一条（键 = 站点 `id`）→ `npm run build`；UI 图标同理加进 `UI_ICONS`；
 - 分类导航的小图标按**固定 id** 取：`cat-<group.id>`（例如 `cat-tech`）。加新分类时 build 只用已存在的 `cat-<id>` 图标，没有对应图标就只显示文字，需要的话在 `UI_ICONS` 补一条。
@@ -189,12 +189,12 @@ SS.remote.provider = {
 
 ## 体积硬门禁
 
-- `scripts/validate.mjs` 里两处体积**是硬失败**：多文件版 `index.html` 首屏资源 > **200 KB**（`BUDGET_KB`）或单文件版 `SimpleSearch.html` > **260 KB**（`SINGLE_FILE_MAX_KB`）时，`npm run validate` / `npm run check` 退出 1，CI 直接红。
+- `scripts/validate.mjs` 里两处体积**是硬失败**：多文件版 `index.html` 首屏资源 > **212 KB**（`BUDGET_KB`）或单文件版 `SimpleSearch.html` > **260 KB**（`SINGLE_FILE_MAX_KB`）时，`npm run validate` / `npm run check` 退出 1，CI 直接红。
 - gzip 只作为信息输出（真实成本口径），不单独卡阈值。
 - 超限怎么办：
   1. 优先优化（删无用 CSS/JS、压缩内联数据、拆分/延迟加载非首屏逻辑等）；
   2. 确实需要更大，就**显式提高预算**：改 `scripts/validate.mjs` 的常量，同时更新 README 的体积/预算说明和本文件，PR 描述里写清为什么、增加了什么、gzip 变化多少；不要只改数字不说明。
-- 当前实测约 196.4 KB（预算 200），余量不大；加新功能前先估一下体积。
+- 当前实测约 206.8 KB（预算 212），余量不大；加新功能前先估一下体积（v2.11 就是 pwa.js + 安装行 + 社交 meta + 安全区把预算从 200 提到 212）。
 
 ## 视觉回归（本地按需，不进 CI）
 
@@ -208,7 +208,10 @@ SS.remote.provider = {
 - `manifest.webmanifest` 是**手写静态文件**：name/short_name「简单搜索」、`start_url`/`scope` 指向站点根、`display: standalone`、192/512 图标（`assets/img/icon-192.png` / `icon-512.png`，构建前手工生成并提交）。模板 `<head>` 里有 `<link rel="manifest">` 和 `apple-touch-icon`。
 - `sw.js` 是**构建产物**（`templates/sw.js` + `scripts/build.mjs`）：注入 `{{APP_VERSION}}` 与 `{{PRECACHE_LIST}}`（首页 + manifest + `assets/css`、`assets/js` 下全部文件 + favicon/PWA 图标，共 16 项）。
 - 生命周期：`install` → `cache.addAll` + `skipWaiting`；`activate` → 删除非当前版本 cache + `clients.claim`；`fetch` → 只处理同源 GET，导航请求用 `ignoreSearch` 回退缓存首页，其他 cache-first → 网络 → 回填；**跨域请求直接放行、不缓存**。
-- 注册：`app.js` 只在 http(s) 且支持 `serviceWorker` 时注册，失败静默；`file://` 不注册。
+- 注册：`assets/js/pwa.js` 的 `SS.pwa.init()`（由 `app.js` 启动时调用，缺失时回退到旧的内联注册逻辑）；只在 http(s)、非单文件版（`__SS_SINGLE_FILE`）下注册，`file://` 不注册。
+- **安装引导**：`beforeinstallprompt` 触发后阻止浏览器默认迷你条，设置面板里的 `#install-row` 显示「安装到桌面」行；点 `#install-app` 调 `prompt()` 走浏览器安装流程，`appinstalled` 或不可用时隐藏。行初始 `hidden`，无 JS / 不支持的浏览器不会出现。
+- **新版本提示**：SW `controllerchange`（且不是首次接管）时显示底部 snackbar `#update-toast`「新版本已就绪」+「刷新」/「稍后」；「刷新」`location.reload()`，「稍后」隐藏并写 `sessionStorage['ss.updateDismissed']=1`，本次会话不再弹。
+- **iPhone 安全区**：`viewport` 带 `viewport-fit=cover`，`base.css` 的顶栏 / 侧栏 / 设置面板 / snackbar 用 `env(safe-area-inset-*)`；snackbar 用 `--z-snackbar`（高于对话框），桌面 inset 为 0 不受影响。
 - **`sw.js` 必须与页面同版本**：改了静态资源后 `npm run build` 会重写 sw.js（版本号 / precache 列表），CI 的产物漂移检查包含 `sw.js`，不要手改它。
 
 ## `!bang`（站点快捷搜索）
@@ -238,9 +241,9 @@ SS.remote.provider = {
 
 ## 单文件便携版（SimpleSearch.html）
 
-- 由 `scripts/build.mjs` 的 `renderSingleFile()` 从 `index.html` 生成：把 3 个 `<style>`、10 个经典脚本、防闪烁脚本全部内联，favicon 转成 data URI，并删掉 `<link rel="manifest">` 与 `apple-touch-icon`；HTML 里加 `window.__SS_SINGLE_FILE = true` 标记。
+- 由 `scripts/build.mjs` 的 `renderSingleFile()` 从 `index.html` 生成：把 3 个 `<style>`、11 个经典脚本、防闪烁脚本全部内联，favicon 转成 data URI，并删掉 `<link rel="manifest">` 与 `apple-touch-icon`；HTML 里加 `window.__SS_SINGLE_FILE = true` 标记。
 - `app.js` 看到 `__SS_SINGLE_FILE` 就不再注册 Service Worker（SW 必须是独立文件），所以单文件版**没有 PWA 安装 / 离线缓存**；它零外部请求、双击即用，但改一个字整页都要重新下载。要 PWA 用 `index.html` 多文件版。
-- 版本口径：当前 **2.10.0**（停在 2.x）；`sw.js` 的缓存名与设置面板版本号都跟随 `package.json`。
+- 版本口径：当前 **2.11.0**（停在 2.x）；`sw.js` 的缓存名与设置面板版本号都跟随 `package.json`。
 - 改任何 CSS / JS / 模板后都要 `npm run build` 重新生成它；CI 的产物漂移检查包含 `SimpleSearch.html`，测试 / validate 也有「CSS/JS 全内联、无 `assets/`、无 manifest/apple-touch 引用」的断言。
 
 ## 自定义站点与配置（v2.9.0）
@@ -248,6 +251,7 @@ SS.remote.provider = {
 - **数据层 `assets/js/sites-store.js`**：纯函数 + 注入 storage，便于单测。键 `ss.customSites`（JSON 数组，最多 100 个）与 `ss.order`（常用顺序的站点 id 数组）。API：`normalizeSite` / `listCustom` / `saveCustom` / `addCustom` / `updateCustom` / `removeCustom` / `getOrder` / `saveOrder` / `merge` / `applyOrder` / `exportConfig` / `serializeConfig` / `parseImport`。
 - **自定义站点字段**：`id`（自动生成 `custom-1` / `custom-<时间戳>`，仅 `[a-z0-9-]`）、`label`、`home`（https）、`search`（https 且含 `{q}`）、`group`（必须在 `SS.siteGroups` 内）、`keywords`（字符串数组）、`featured`（bool）、`icon`（可选，只允许引用已存在的 symbol 名）。校验失败返回 `{ ok: false, error }`，不抛错、不写入。
 - **导入/导出**：`exportConfig` 生成 `{ app: 'SimpleSearch', schema: 1, version, customSites, order, settings }`；导出触发下载 `simplesearch-config.json`。导入只 `JSON.parse` + schema 校验（app / schema / 数组长度 / 逐项 normalize），**任一非法项整包拒绝**，不执行任何代码。
+- **导入大小上限 1 MB**：`sites-admin.js` 读文件前先看 `file.size`，超过 1 MB 直接提示「文件过大（上限 1 MB）」并返回，不进入 `JSON.parse`；`sites-store.parseImport` 再加一道 `text.length > 1_000_000` 的长度保护。
 - **UI 层 `assets/js/sites-admin.js`**：只在 DOM 就绪后由 `app.js` 调 `init()`；`#sites-dialog`（列表 + 新增/编辑表单 + 导出/导入）与 `#order-dialog`（↑/↓/置顶）。所有用户数据渲染用 `textContent`，禁止 `innerHTML` 拼接。
 - **`app.js` 集成**：启动时 `merge(builtin, custom)` → `applyOrder` → 注入 `SS.sites`（联想 / `!bang` 立即生效）→ `refreshSiteButtons()` 重建 `#buttons-container`（内置图标复用 build 输出的 `data-icon`，自定义站点用 `icon` 或 monogram）→ 再按当前视图套 `hidden`。两个新对话框纳入 `anyOverlayOpen` / Esc / scrim / Tab 焦点循环。
 - **测试**：`tests/sites-store.test.mjs` 覆盖 normalize 合法/非法、增删改、id 冲突、order 合并、export/import 往返、坏 JSON / 坏 schema / 超量拒绝；e2e 覆盖新增 → 分类里出现、编辑、删除、导出下载、置顶后常用第一个按钮变化、刷新后自定义站点仍在。
@@ -285,12 +289,15 @@ SS.remote.provider = {
 - 单元测试用 Node 内置的 `node:test`，放在 `tests/`，文件名以 `.test.mjs` 结尾，`npm test` 用 `node --test "tests/**/*.test.mjs"` 的 glob 自动发现，不用额外登记。
 - `tests/sites.test.mjs` 要求默认内置的站点都存在、且相对顺序一致（站点库现为 33 个）；**新增站点不会让测试变红**，删除内置站点才会失败并提示恢复。
 - 提交/开 PR 前必须本地跑通 `npm run check`（构建 + 测试 + 静态校验/产物一致性）。
-- 当前测试基线：`npm test` **207 例**、`npm run validate` **29 项**、`npm run e2e` **172 项**全绿；覆盖率基线约 96.04% 行 / 80.3% 分支 / 87.17% 函数（阈值 90 / 75 / 80）。
+- 当前测试基线：`npm test` **215 例**、`npm run validate` **32 项**、`npm run e2e` **183 项**全绿；覆盖率基线约 96.04% 行 / 80.3% 分支 / 87.17% 函数（阈值 90 / 75 / 80）。
 - `npm run coverage` 可选、不进 CI 必跑；`npm run check:sites` 同样可选、需要网络。
-- `npm run e2e` 用本机 Edge/Chrome（CDP）跑真实浏览器检查：单页主题解析、主题三态与主题色切换与持久化、深链 `?cat=` / `?q=` / `?site=`、`!bang` 直达、搜索引擎切换（表单 action/name/存储）、快捷键对话框（`?` 打开、Esc 关闭归还焦点）、PWA 注册与断网刷新、两个旧链接的 0 秒跳转与地址栏清理、联网联想开关 / 超时降级 / 真实百度联调、分类导航筛选与左侧抽屉开合、设置面板、搜索历史计数 / 清空 / 单条删除、设置里的版本号、图标 sprite（无额外图片请求）、960px 断点与 390px 移动端布局、`file://` 打开。CI 不跑它（需要浏览器）。
-- GitHub Actions（`.github/workflows/ci.yml`）在 `push` 和 `pull_request` 时用 Node 22 跑 `npm run check`，并检查五个生成产物（`index.html`、`SimpleSearch.html`、两个重定向壳、`sw.js`）是否与 `sites.js` / 模板漂移。
+- `npm run e2e` 真实浏览器检查：单页主题解析、主题三态与主题色切换与持久化、深链 `?cat=` / `?q=` / `?site=`、`!bang` 直达、搜索引擎切换（表单 action/name/存储）、快捷键对话框（`?` 打开、Esc 关闭归还焦点）、PWA 注册 / 断网刷新 / 安装引导 / 新版本 snackbar、导入配置 1MB 上限、社交分享 meta、iPhone 安全区、两个旧链接的 0 秒跳转与地址栏清理、联网联想开关 / 超时降级 / 真实百度联调、分类导航筛选与左侧抽屉开合、设置面板、搜索历史计数 / 清空 / 单条删除、版本号、图标 sprite（无额外图片请求）、960px 断点与 390px 移动端布局、`file://` 打开。
+- **CI 两个 job**（`.github/workflows/ci.yml`，都在 `push` / `pull_request` 触发、并行）：
+  - `check`：ubuntu-latest + Node 22 → `npm run build` + 产物漂移 `git diff --exit-code` → `npm run check`；
+  - `e2e`：ubuntu-latest + Node 22 → `node scripts/e2e.mjs`（零依赖、不跑 `npm install`）。runner 预装 `/usr/bin/google-chrome`，`findBrowser()` 会找到它。
+- **E2E 在 Ubuntu Chrome 下的注意事项**：headless 无 GPU 不影响行为断言；跨平台字体/渲染差异只影响像素，e2e 只做 DOM / 交互 / 网络断言，**不要加截图或视觉断言**（视觉回归留在本地 `npm run visual`）；不要写「没装浏览器就跳过」这种只适用于开发机的分支，CI runner 一定有 Chrome。
 - `site-health.yml` 是独立的每周巡检，不阻塞 PR；调试方式见「站点健康自检与每周巡检」。
-- `e2e` 只断言首屏请求数 ≤16 + 零第三方，**不校验体积**（Service Worker 接管后传输字节会记 0）；体积预算由 `validate` 按磁盘产物校验（200 KB）。
+- `e2e` 只断言首屏请求数 ≤17 + 零第三方，**不校验体积**（Service Worker 接管后传输字节会记 0）；体积预算由 `validate` 按磁盘产物校验（212 KB）。
 - 本项目零依赖，CI 里**不需要 `npm ci` / `npm install`**。
 - 只改文档或样式时也请跑一次 `npm run check`，确认没有把生成页改漂。
 
@@ -310,14 +317,16 @@ SS.remote.provider = {
 - [ ] 主题三态：跟随系统不写 `ss.theme` 且实时跟随；浅色 / 深色会记住；旧的 `#theme-toggle` 已移除
 - [ ] 搜索历史计数 / 清空（0 条禁用）与单条删除（`.suggest-delete` 或 `Delete`）正常
 - [ ] 设置面板底部版本号来自 `package.json`（改版本号后 `npm run build` 会自动更新）
-- [ ] PWA：`manifest.webmanifest` 可解析、`sw.js` 与页面同版本；http(s) 下能注册、断网刷新可用；`file://` 不注册
+- [ ] PWA：`manifest.webmanifest` 可解析、`sw.js` 与页面同版本；http(s) 下能注册、断网刷新可用；`file://` 不注册；安装条件满足时 `#install-row` 出现、已安装/不支持时隐藏；`controllerchange` 时 `#update-toast` 出现且「稍后」本次会话不再弹
+- [ ] 社交分享 meta：head 含 `og:url` / `og:image`（1200×900）/ `twitter:card=summary_large_image`，且是绝对 URL（单文件版分享也有图）
+- [ ] iPhone 安全区：`viewport-fit=cover`，顶栏 / 抽屉 / 设置面板 / snackbar 在 `env(safe-area-inset-*)` 下不被刘海/状态栏遮挡
 - [ ] `!bang`：`!gh rust` / `!b站 视频` 能直达；未知 token 当普通搜索；只认第一个 token
 - [ ] 搜索引擎四选一可切换、`ss.engine` 持久化、表单 action/name 与联想首项文案同步
 - [ ] 快捷键对话框：`?` 打开、9 条快捷键、Esc / 关闭按钮 / 遮罩关闭并归还焦点
 - [ ] `npm run coverage` 通过阈值（90 / 75 / 80）
-- [ ] 体积未超硬门禁（多文件 <200 KB、单文件 <260 KB）；如果确实要改预算，PR 里写清理由和 gzip 变化
+- [ ] 体积未超硬门禁（多文件 <212 KB、单文件 <260 KB）；如果确实要改预算，PR 里写清理由和 gzip 变化
 - [ ] 改 UI 时本地跑过 `npm run visual`；如确认有意更新基线，`tests/visual/*.png` 与代码一起提交
-- [ ] 单文件便携版 `SimpleSearch.html` 已随源码 build：CSS/JS 全内联、无 `assets/` / manifest / apple-touch-icon 引用、零外部请求（约 196.6 KB / gzip 48.0 KB，上限 260 KB）
+- [ ] 单文件便携版 `SimpleSearch.html` 已随源码 build：CSS/JS 全内联、无 `assets/` / manifest / apple-touch-icon 引用、零外部请求（约 207.0 KB / gzip 50.4 KB，上限 260 KB）
 - [ ] 站点图标来自内联 sprite（没有新增图片请求）；没配图标的站点显示 monogram；新增站点可用 `icon: 'cat-<group>'` 复用分类图标，sprite 增量 ≤12 KB
 - [ ] 直接双击 `index.html`（`file://`）无报错
 - [ ] `README.md` / `docs/custom-sites.md` / `docs/CHANGELOG.md` 等受影响的文档已同步

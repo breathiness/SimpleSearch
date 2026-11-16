@@ -216,6 +216,9 @@ function createPage(cdp) {
           '.ripple{display:none!important}',
           // 版本号随每次发版变化，不属于视觉回归要盯的内容：截图时隐藏，基线跨版本稳定
           '.panel-version{visibility:hidden!important}',
+          // 安装入口/更新提示依赖运行环境（是否可安装、SW 何时接管），截图里固定隐藏，保证基线稳定
+          '#install-row{display:none!important}',
+          '#update-toast{display:none!important}',
         ].join('\\n')
         document.head.appendChild(style)
       }

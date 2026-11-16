@@ -7,6 +7,9 @@
 
   const SS = (root.SimpleSearch = root.SimpleSearch || {})
 
+  // 导入配置大小上限 1 MB（契约 §22.4）；读到内存/JSON.parse 之前就拒绝
+  const MAX_IMPORT_BYTES = 1024 * 1024
+
   let initialized = false
 
   function init() {
@@ -418,6 +421,16 @@
     function handleImportFile() {
       const file = importFile && importFile.files && importFile.files[0] ? importFile.files[0] : null
       if (!file) return
+      // 导入上限 1 MB（契约 §22.4）：超限直接拒绝，不读文件、不进 JSON.parse
+      if (typeof file.size === 'number' && file.size > MAX_IMPORT_BYTES) {
+        setStatus('导入失败：文件过大（上限 1 MB）')
+        try {
+          importFile.value = ''
+        } catch (error) {
+          /* 忽略 */
+        }
+        return
+      }
       readFileText(file)
         .then((text) => {
           const parsed = store.parseImport(text)
