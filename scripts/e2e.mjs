@@ -312,6 +312,8 @@ async function run() {
   console.log(`[e2e] 浏览器：${browserPath}`)
 
   fs.mkdirSync(ARTIFACTS, { recursive: true })
+  // 导入测试要写临时 JSON 文件（O10 / P4），即使不跑 --shots 也要有这个目录
+  fs.mkdirSync(path.join(ARTIFACTS, 'e2e'), { recursive: true })
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ss-e2e-'))
 
   const server = spawn(process.execPath, [path.join(ROOT, 'scripts/serve.mjs')], {
