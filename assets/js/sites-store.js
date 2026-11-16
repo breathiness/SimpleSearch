@@ -395,7 +395,11 @@
 
   // 只做 JSON.parse，绝不执行任何代码；坏 JSON / 坏 schema / 超量 / 非法站点 → 整包拒绝
   function parseImport(text) {
-    if (typeof text !== 'string' || text.trim() === '') {
+    // 导入体积上限 1 MB（契约 §22.4）：超长文本在 JSON.parse 之前就拒绝
+    if (typeof text !== 'string' || text.length > 1_000_000) {
+      return { ok: false, error: '配置过大（上限 1 MB）' }
+    }
+    if (text.trim() === '') {
       return { ok: false, error: '导入内容为空' }
     }
     let data = null

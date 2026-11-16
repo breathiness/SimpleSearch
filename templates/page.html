@@ -3,13 +3,22 @@
 <html lang="zh-CN" data-theme="light" data-theme-default="{{THEME_DEFAULT}}" data-color="indigo">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>{{TITLE}}</title>
   <meta name="description" content="{{DESCRIPTION}}">
   <meta name="theme-color" content="{{THEME_COLOR}}">
   <meta property="og:title" content="{{TITLE}}">
   <meta property="og:description" content="{{DESCRIPTION}}">
   <meta property="og:type" content="website">
+  <meta property="og:url" content="{{SITE_URL}}">
+  <meta property="og:image" content="{{SITE_IMAGE}}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="900">
+  <meta property="og:site_name" content="简单搜索">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{TITLE}}">
+  <meta name="twitter:description" content="{{DESCRIPTION}}">
+  <meta name="twitter:image" content="{{SITE_IMAGE}}">
   <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="assets/img/icon-192.png">
   <link rel="manifest" href="manifest.webmanifest">
@@ -148,6 +157,10 @@
         <span class="settings-label">常用排序</span>
         <button id="order-open" class="text-button" type="button">调整</button>
       </div>
+      <div id="install-row" class="settings-row settings-row-inline" hidden>
+        <span class="settings-label">安装到桌面</span>
+        <button id="install-app" class="text-button" type="button">安装</button>
+      </div>
       <p class="panel-version">简单搜索 v{{APP_VERSION}}</p>
     </div>
   </aside>
@@ -216,6 +229,12 @@
     </div>
   </section>
 
+  <div id="update-toast" class="snackbar" role="status" aria-live="polite" hidden>
+    <span class="snackbar-text">新版本已就绪</span>
+    <button id="update-reload" class="snackbar-action" type="button">刷新</button>
+    <button id="update-dismiss" class="snackbar-action" type="button">稍后</button>
+  </div>
+
   <script defer src="assets/js/sites.js"></script>
   <script defer src="assets/js/search.js"></script>
   <script defer src="assets/js/suggest.js"></script>
@@ -225,6 +244,7 @@
   <script defer src="assets/js/input.js"></script>
   <script defer src="assets/js/sites-store.js"></script>
   <script defer src="assets/js/sites-admin.js"></script>
+  <script defer src="assets/js/pwa.js"></script>
   <script defer src="assets/js/app.js"></script>
 </body>
 </html>

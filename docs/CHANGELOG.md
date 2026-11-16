@@ -3,6 +3,26 @@
 本项目的对用户可见变化都记录在这里。
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)：主版本号在页面结构/使用方式有明显变化时递增。
 
+## 2.11.0（未发布）
+
+体验与工程收尾：E2E 进 CI、PWA 安装引导、新版本提示、社交分享预览、导入上限、iPhone 安全区。
+
+### 新增
+
+- **E2E 进 CI**：`.github/workflows/ci.yml` 新增 `e2e` job（ubuntu-latest、Node 22、预装 Google Chrome，直接 `node scripts/e2e.mjs`），与 `check` job 在 push / PR 上并行；不跑 `npm install`、不加截图/视觉断言。
+- **PWA 安装引导**：新增 `assets/js/pwa.js`（Service Worker 注册从 `app.js` 移入）。满足安装条件时，设置面板出现「安装到桌面」行，点「安装」走浏览器安装流程；已安装 / 浏览器不支持时自动隐藏。
+- **新版本提示**：已安装的 PWA 有新 Service Worker 接管时，底部弹 snackbar「新版本已就绪」+「刷新 / 稍后」；「刷新」立即加载新版，「稍后」本次会话不再提示（`sessionStorage['ss.updateDismissed']`）。
+- **社交分享预览**：head 新增 `og:url`、`og:image`（1200×900 截图）、`og:image:width/height`、`og:site_name`、`twitter:card=summary_large_image`、`twitter:title/description/image`；`build` 注入**绝对 URL**，分享到聊天/社交平台显示标题 + 描述 + 缩略图（单文件版同样有图）。
+- **导入配置 1 MB 上限**：导入文件超过 1 MB 直接拒绝并提示「文件过大（上限 1 MB）」，不进入 `JSON.parse`；`sites-store.parseImport` 另加 `text.length > 1_000_000` 的长度保护。
+- **iPhone 刘海安全区**：`viewport` 加 `viewport-fit=cover`，顶栏 / 侧栏 / 设置面板 / snackbar 使用 `env(safe-area-inset-*)`；全屏 PWA 顶部不再被状态栏压住，桌面端（inset 为 0）不受影响。
+
+### 工程
+
+- 经典脚本 10 → **11 个**（新增 `pwa.js`），单文件便携版内联 11 个脚本；`templates/page.html` 新增 `#install-row` / `#install-app` / `#update-toast` / `#update-reload` / `#update-dismiss` 与社交 meta 占位符。
+- CI 从 1 个 job 变 2 个（`check` + `e2e`）；`validate` 增补社交 meta、`viewport-fit=cover`、安装行 / snackbar DOM、`pwa.js` 脚本列表等检查（29 → **32 项**）。
+- 体积：多文件首屏 **206.8 KB / gzip 58.9 KB**（17 个请求；预算 200 → **212 KB**，理由是 pwa.js + 安装行 + 社交 meta + 安全区，gzip 只 +3.4 KB）；单文件 **207.0 KB / gzip 50.4 KB**（上限 260 KB 不变）。
+- 门禁基线：`npm test` **215 例**、`npm run validate` **32 项**、`npm run e2e` **183 项**全绿（P 段新增 11 条：社交 meta / viewport / 安装入口 / appinstalled / 更新提示 / 导入上限 / 无控制台错误）。
+
 ## 2.10.2（未发布）
 
 ### 文档

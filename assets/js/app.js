@@ -544,6 +544,16 @@
 
   // ---------------------------------------------------------------- PWA
   function registerServiceWorker() {
+    // v2.11：SW 注册、安装引导、新版本提示都由 pwa.js 负责；
+    // pwa.js 未加载（旧产物 / 极端情况）时回退到下面的内联逻辑。
+    if (SS.pwa && typeof SS.pwa.init === 'function') {
+      try {
+        SS.pwa.init()
+        return
+      } catch (error) {
+        // 初始化失败就继续走回退逻辑，不影响页面
+      }
+    }
     try {
       // 单文件便携版没有 sw.js / manifest，不注册
       if (window.__SS_SINGLE_FILE) return

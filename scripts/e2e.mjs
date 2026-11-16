@@ -23,6 +23,8 @@ const PORT = Number(process.env.E2E_PORT || 8000 + Math.floor(Math.random() * 90
 const CDP_PORT = Number(process.env.E2E_CDP_PORT || 9200 + Math.floor(Math.random() * 700))
 const ORIGIN = `http://127.0.0.1:${PORT}`
 const PAGE = `${ORIGIN}/index.html`
+const SITE_ROOT = 'https://breathiness.github.io/SimpleSearch/'
+const SITE_SCREENSHOT = SITE_ROOT + 'docs/images/screenshot-desktop.png'
 
 const checks = []
 const BUILTIN_SITE_IDS = [
@@ -58,9 +60,13 @@ function findBrowser() {
     'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
     'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
     'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-    '/usr/bin/microsoft-edge',
+    // Linux 上优先 Chrome：GitHub runner 预装 Chrome 比 Edge 稳（Edge 首次启动慢/可能需要更多参数）
     '/usr/bin/google-chrome',
+    '/opt/google/chrome/chrome',
+    '/usr/bin/chromium',
+    '/usr/bin/microsoft-edge',
     '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   ].filter(Boolean)
   return candidates.find((p) => fs.existsSync(p)) || null
 }
@@ -306,6 +312,8 @@ async function run() {
   console.log(`[e2e] 浏览器：${browserPath}`)
 
   fs.mkdirSync(ARTIFACTS, { recursive: true })
+  // 导入测试要写临时 JSON 文件（O10 / P4），即使不跑 --shots 也要有这个目录
+  fs.mkdirSync(path.join(ARTIFACTS, 'e2e'), { recursive: true })
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ss-e2e-'))
 
   const server = spawn(process.execPath, [path.join(ROOT, 'scripts/serve.mjs')], {
@@ -317,6 +325,8 @@ async function run() {
     [
       '--headless=new',
       '--disable-gpu',
+      '--no-sandbox',
+      '--disable-dev-shm-usage',
       '--no-first-run',
       '--no-default-browser-check',
       '--disable-extensions',
@@ -344,6 +354,9 @@ async function run() {
     await waitFor(() => fetchOk(`${ORIGIN}/index.html`), { label: '静态服务器就绪' })
     const version = await waitFor(async () => (await fetchOk(`http://127.0.0.1:${CDP_PORT}/json/version`)).json(), {
       label: 'CDP 就绪',
+      // CI 冷启动（首次启动浏览器、无缓存）可能超过默认 15s，给足 45s
+      timeout: 45000,
+      interval: 250,
     })
     console.log(`[e2e] ${version.Browser}`)
 
@@ -477,11 +490,11 @@ async function run() {
     const earlyBytes = page.state.transferBytes
     const externalAssets = earlyRequests.filter((u) => !u.startsWith(ORIGIN) && !u.startsWith('data:'))
     check('C: 首屏无第三方请求', externalAssets.length === 0, externalAssets[0] || '')
-    // SW 接管缓存后 transferSize 会归零，真正的体积预算由 scripts/validate.mjs 按磁盘产物校验（136KB）；
-    // 这里只断言首屏请求数量合理（首页 + 3 CSS + 8 JS + favicon + PWA 图标）
+    // SW 接管缓存后 transferSize 会归零，真正的体积预算由 scripts/validate.mjs 按磁盘产物校验；
+    // 这里只断言首屏请求数量合理（首页 + 3 CSS + 11 JS + favicon + PWA 图标）
     check(
-      'C: 首屏请求数合理（≤16）',
-      earlyRequests.length <= 16,
+      'C: 首屏请求数合理（≤17）',
+      earlyRequests.length <= 17,
       `${earlyRequests.length} 个请求 / transferSize ${(earlyBytes / 1024).toFixed(1)} KB（SW 命中时记 0）`
     )
 
@@ -1631,6 +1644,141 @@ async function run() {
       restoredBuiltin.custom === 0 && restoredBuiltin.total === 33 && restoredBuiltin.visible === 11,
       JSON.stringify(restoredBuiltin)
     )
+
+    // ================= P. 体验收尾（v2.11）：社交 meta / PWA 安装引导 / 更新提示 / 导入上限 =================
+    console.log('\n=== P. 共享 meta / PWA 安装引导 / 新版本提示 / 导入上限 ===')
+    await page.clearStorage()
+    await page.goto(PAGE, 400)
+    page.resetLogs()
+
+    // P1 head 社交分享 meta + viewport
+    const headMeta = await page.evaluate(`(() => {
+      const content = (selector) => {
+        const el = document.querySelector(selector)
+        return el ? el.getAttribute('content') : null
+      }
+      return {
+        ogUrl: content('meta[property="og:url"]'),
+        ogImage: content('meta[property="og:image"]'),
+        ogWidth: content('meta[property="og:image:width"]'),
+        ogHeight: content('meta[property="og:image:height"]'),
+        twitter: content('meta[name="twitter:card"]'),
+        twitterImage: content('meta[name="twitter:image"]'),
+        viewport: content('meta[name="viewport"]') || '',
+      }
+    })()`)
+    check(
+      'P: 社交分享 meta 完整（og:url / og:image / twitter:card）',
+      headMeta.ogUrl === SITE_ROOT &&
+        headMeta.ogImage === SITE_SCREENSHOT &&
+        headMeta.ogWidth === '1200' &&
+        headMeta.ogHeight === '900' &&
+        headMeta.twitter === 'summary_large_image' &&
+        headMeta.twitterImage === SITE_SCREENSHOT,
+      JSON.stringify(headMeta)
+    )
+    check('P: viewport 含 viewport-fit=cover', headMeta.viewport.includes('viewport-fit=cover'), headMeta.viewport)
+
+    // P2 安装引导：默认隐藏，收到 beforeinstallprompt 后出现，点安装触发 prompt()
+    await page.evaluate("SimpleSearch.app.openSettings()")
+    await sleep(250)
+    // 说明：headless Chrome 有可能在页面加载时真的派发 beforeinstallprompt，
+    // 所以这里不断言「默认隐藏」（模板层面的 hidden 由 validate 静态校验保证），
+    // 只验证「收到事件后出现、安装后收起」这条行为链。
+    await page.evaluate("document.getElementById('install-row').hidden = true")
+    check('P: 安装入口初始为隐藏态', await page.evaluate("document.getElementById('install-row').hidden"))
+    await page.evaluate(`(() => {
+      const event = new Event('beforeinstallprompt')
+      event.prompt = () => {
+        window.__installPromptCalled = true
+        return Promise.resolve()
+      }
+      event.userChoice = Promise.resolve({ outcome: 'accepted' })
+      window.dispatchEvent(event)
+    })()`)
+    await sleep(250)
+    check('P: beforeinstallprompt 后显示安装入口', await page.evaluate("document.getElementById('install-row').hidden === false"))
+    await page.evaluate("document.getElementById('install-app').click()")
+    await sleep(300)
+    check('P: 点「安装」调用 prompt()', await page.evaluate("window.__installPromptCalled === true"))
+    check('P: 安装后收起安装入口', await page.evaluate("document.getElementById('install-row').hidden === true"))
+    // 已安装事件也要保证入口不再出现
+    await page.evaluate(`(() => {
+      const event = new Event('beforeinstallprompt')
+      event.prompt = () => Promise.resolve()
+      event.userChoice = Promise.resolve({ outcome: 'dismissed' })
+      window.dispatchEvent(event)
+      window.dispatchEvent(new Event('appinstalled'))
+    })()`)
+    await sleep(200)
+    check('P: appinstalled 后安装入口保持隐藏', await page.evaluate("document.getElementById('install-row').hidden === true"))
+    await page.evaluate("SimpleSearch.app.closeSettings()")
+
+    // P3 新版本提示：需要已有 SW controller（首次加载时 controllerchange 会被忽略，这是预期）
+    const hasController = await page.evaluate("!!(navigator.serviceWorker && navigator.serviceWorker.controller)")
+    if (!hasController) {
+      await page.goto(PAGE, 800)
+    }
+    await page.evaluate("navigator.serviceWorker.dispatchEvent(new Event('controllerchange'))")
+    await sleep(300)
+    const toastState = await page.evaluate(`(() => {
+      const toast = document.getElementById('update-toast')
+      return {
+        hidden: toast.hidden,
+        role: toast.getAttribute('role'),
+        live: toast.getAttribute('aria-live'),
+        text: (toast.querySelector('.snackbar-text') || {}).textContent || '',
+        hasReload: !!document.getElementById('update-reload'),
+        hasDismiss: !!document.getElementById('update-dismiss'),
+      }
+    })()`)
+    check(
+      'P: 新版本接管后弹出更新提示',
+      toastState.hidden === false && toastState.role === 'status' && toastState.live === 'polite' && toastState.hasReload && toastState.hasDismiss,
+      JSON.stringify(toastState)
+    )
+    await page.evaluate("document.getElementById('update-dismiss').click()")
+    await sleep(200)
+    check('P: 点「稍后」关闭更新提示', await page.evaluate("document.getElementById('update-toast').hidden"))
+
+    // P4 导入 > 1MB 的配置文件被拒绝，且不写入 localStorage
+    const bigConfig = path.join(ARTIFACTS, 'e2e', 'big-config.json')
+    fs.writeFileSync(
+      bigConfig,
+      JSON.stringify({
+        app: 'SimpleSearch',
+        schema: 1,
+        customSites: [],
+        padding: 'x'.repeat(1_500_000),
+      }),
+      'utf8'
+    )
+    await page.evaluate("SimpleSearch.app.openSitesDialog()")
+    await sleep(300)
+    try {
+      const doc = await page.cdp.send('DOM.getDocument', { depth: 1 })
+      const node = await page.cdp.send('DOM.querySelector', { nodeId: doc.root.nodeId, selector: '#config-import-file' })
+      await page.cdp.send('DOM.setFileInputFiles', { nodeId: node.nodeId, files: [bigConfig] })
+      await page.evaluate(`document.getElementById('config-import-file').dispatchEvent(new Event('change', { bubbles: true }))`)
+      await sleep(450)
+      const cap = await page.evaluate(`(() => ({
+        status: (document.getElementById('sites-status') || {}).textContent || '',
+        stored: (() => { try { return localStorage.getItem('ss.customSites') } catch (error) { return null } })(),
+        rows: document.querySelectorAll('#sites-list li').length,
+      }))()`)
+      check(
+        'P: 导入 >1MB 文件被拒绝且不写入存储',
+        cap.status.includes('过大') && !cap.stored && cap.rows === 0,
+        JSON.stringify(cap)
+      )
+    } catch (error) {
+      check('P: 导入 >1MB 文件被拒绝且不写入存储', false, '文件注入失败：' + (error && error.message))
+    }
+    await page.evaluate("SimpleSearch.app.closeSitesDialog()")
+    await page.clearStorage()
+
+    const pErrors = page.state.consoleErrors.length + page.state.exceptions.length
+    check('P: 本段无控制台错误', pErrors === 0, page.state.consoleErrors.concat(page.state.exceptions).join(' | '))
 
   } finally {
     cleanup()

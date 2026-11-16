@@ -16,6 +16,10 @@ const CHECK_ONLY = process.argv.includes('--check')
 const DESCRIPTION =
   '一款超简单的聚合搜索网站：输入关键词，点击网站即可在该站内搜索；不输入则直接打开网站。自动跟随系统深浅色，也可一键切换。'
 
+// 分享卡片（og:image / og:url）用的绝对地址：相对路径在社交平台里抓不到图
+const SITE_URL = 'https://breathiness.github.io/SimpleSearch/'
+const SITE_IMAGE = `${SITE_URL}docs/images/screenshot-desktop.png`
+
 // 唯一真实页面
 const PAGE = {
   template: 'templates/page.html',
@@ -25,6 +29,8 @@ const PAGE = {
     '{{TITLE}}': '简单搜索',
     '{{DESCRIPTION}}': DESCRIPTION,
     '{{THEME_COLOR}}': '#f5f5f5',
+    '{{SITE_URL}}': SITE_URL,
+    '{{SITE_IMAGE}}': SITE_IMAGE,
   },
 }
 

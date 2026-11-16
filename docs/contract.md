@@ -732,3 +732,44 @@ README 增加「书签小工具」小节：一段可复制的 `javascript:` 书�
   - 无基线时提示先跑 `--update`，优雅跳过（退出码 0）。
 - `package.json` 增加 `visual` / `visual:update` 两个 script。
 - 基线 PNG 提交入库；视觉回归**不进 CI**（跨平台字体渲染差异大），文档说明「改 UI 后在本地跑」。
+
+## 22. v2.11：体验与工程收尾（批次 E）
+
+### 22.1 E2E 进 CI
+
+- `.github/workflows/ci.yml` 新增 `e2e` job：`runs-on: ubuntu-latest`，checkout + setup-node 22（无 npm install）→ `node scripts/e2e.mjs`。
+- 依赖 Ubuntu runner 预装 Chrome（`findBrowser()` 已支持 `/usr/bin/google-chrome`）；不加任何第三方 action、不装依赖。
+- 与现有 `check` job 并行（都跑在 push / pull_request 上）。
+
+### 22.2 PWA 安装引导
+
+- 新模块 `assets/js/pwa.js`（经典脚本 IIFE + `globalThis`）：`SS.pwa.init()` 负责
+  1. Service Worker 注册（从 app.js 移过来；`file://` 与单文件版不注册）；
+  2. `beforeinstallprompt` → 记住事件并显示设置面板里的「安装到桌面」行；
+  3. 点击「安装」→ 调 `prompt()`；`appinstalled` / 不可用时隐藏该行；
+  4. `controllerchange`（新 SW 接管）→ 显示底部 snackbar「新版本已就绪」+「刷新」「稍后」按钮；「刷新」`location.reload()`、「稍后」隐藏且本次会话不再提示。
+- app.js 启动改为调 `SS.pwa.init()`（缺失时回退到原来的内联注册逻辑，保持向后兼容）。
+- 模板新增：
+  - 设置面板行 `#install-row`（`hidden`）+ `#install-app` 按钮；
+  - 底部 snackbar `#update-toast`（`role="status" aria-live="polite"`，`hidden`）+ `#update-reload` / `#update-dismiss`。
+
+### 22.3 社交分享 meta（build 注入）
+
+- `templates/page.html` 补：`og:url`、`og:image`、`og:image:width`(1200)、`og:image:height`(900)、`twitter:card=summary_large_image`、`twitter:title`、`twitter:description`、`twitter:image`。
+- build 注入 `{{SITE_URL}}`（`https://breathiness.github.io/SimpleSearch/`）与 `{{SITE_IMAGE}}`（`{{SITE_URL}}docs/images/screenshot-desktop.png`）；单文件版同样使用绝对 URL（分享出去才有图）。
+
+### 22.4 导入配置大小上限
+
+- `sites-admin.js` 读取导入文件前判断 `file.size`，> **1 MB** 直接拒绝并提示「文件过大（上限 1 MB）」，不进入 `JSON.parse`；`sites-store.parseImport` 再加一道 `text.length > 1_000_000` 的长度保护。
+
+### 22.5 iPhone 安全区
+
+- viewport 加 `viewport-fit=cover`；
+- `base.css`：顶栏 / 分类抽屉 / 设置面板 / snackbar 使用 `env(safe-area-inset-*)`（`padding-top` / `bottom` / 左右），桌面（inset 为 0）不受影响。
+- snackbar 样式：底部固定、MD1 深色圆角条、`z-index` 高于对话框（`--z-dialog:80` → snackbar 用 90）、`role=status`。
+
+### 22.6 门禁增补
+
+- validate：页面 head 含 `og:url`/`og:image`/`twitter:card`；viewport 含 `viewport-fit=cover`；`#install-row`/`#install-app`/`#update-toast`/`#update-reload`/`#update-dismiss` 存在且初始 `hidden`；`pwa.js` 在脚本列表且无 `eval(`/`new Function(`。
+- e2e（新增 P 段）：默认安装行隐藏 → 手动派发 `beforeinstallprompt` → 行出现 → 点击后记录 prompt 被调用；派发 `controllerchange` → snackbar 出现 → 点「稍后」隐藏；导入 1.5 MB 文件被拒绝且不写入存储；head meta 断言。
+- CI：e2e job 必须绿。

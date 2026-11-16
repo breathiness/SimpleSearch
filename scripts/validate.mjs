@@ -1,4 +1,4 @@
-// SimpleSearch v2.9 静态校验与产物一致性门禁。
+// SimpleSearch v2.11 静态校验与产物一致性门禁。
 // 用法：node scripts/validate.mjs（npm run validate）
 //
 // 产物模型（docs/contract.md §7、§12-§17）：npm run build 生成 5 个产物
@@ -15,7 +15,7 @@
 //   3. index.html head：charset / lang / viewport / theme-color / favicon / data-theme / data-theme-default=auto
 //   4. index.html 硬约束：无 type="module"、无内联 on* 事件、无未替换 {{...}}、无重复 id、DOM 契约 id 齐全
 //   5. index.html 引用的所有本地 resources 真实存在
-//   6. index.html 按契约顺序引用 10 个经典脚本（remote.js 在 input.js 之前；sites-store/sites-admin 在 app.js 之前）
+//   6. index.html 按契约顺序引用 11 个经典脚本（pwa.js 在 sites-admin.js 之后、app.js 之前）
 //   7. index.html 的 data-site 与 SS.sites 一一对应（顺序/label/数量/data-group）
 //   8. 文档站骨架：.appbar（含 .appbar-logo→#i-logo）/.shell/#main-content/.card、
 //      设置面板（dialog/hidden/#theme-mode 三段式/唯一 .switch-row/.settings-row+空 #color-swatches）、
@@ -37,8 +37,10 @@
 //      壳不得包含真实页内容（#buttons-container / data-site / assets/js bundle），体积 < 1KB
 //  21. 唯一性：只有 index.html 是真实页
 //  22. CSS 不含 !important（契约 §6）
-//  23. 体积门禁（§21.2）：index.html 单页加载资源合计 > BUDGET_KB（200KB，gzip 前）→ 失败；
+//  23. 体积门禁（§21.2 + §9.9）：index.html 单页加载资源合计 > BUDGET_KB（212KB，gzip 前）→ 失败；
 //      gzip 数值仅作信息输出（真实成本口径），不单独卡；sw.js / manifest / PWA 图标不计入首屏
+//      预算 200→212 的理由（v2.11）：新增 pwa.js（安装引导 + 新版本提示，5.7KB）、snackbar/安装行/
+//      社交 meta/安全区 ≈ +4.7KB，首屏 196.4→206.8KB；但 gzip 只 +3.4KB（55.5→58.9）。
 //  24. 单文件便携版 SimpleSearch.html：build 生成 + CSS/JS 全内联 + 零 assets/manifest/apple-touch-icon 引用
 //  25. 单文件体积门禁（§21.2）：SimpleSearch.html > 260KB → 失败；gzip 数值仅作信息输出
 //  26. v2.7 站点库规模：总站点数 ≥30、每分组 ≥3、DOM 含全部 data-site 按钮（可见性由 JS 控制）
@@ -47,6 +49,10 @@
 //      标题）+ 表单/列表/按钮 id 齐全
 //  29. v2.9 data-icon：内置按钮带 data-icon（非空时 #i-xxx 且命中 sprite）；sites-store/sites-admin 在 app.js 之前；
 //      新脚本无 eval / new Function
+//  30. v2.11 社交 meta：og:url= SITE_URL、og:image= SITE_IMAGE(1200x900)、twitter:card=summary_large_image、twitter:image
+//  31. v2.11 viewport-fit=cover + PWA 安装/更新 DOM（#install-row[hidden]/#install-app/#update-toast[hidden,status]/
+//      #update-reload/#update-dismiss）
+//  32. v2.11 pwa.js：脚本列表含 pwa.js 且在 app.js 之前；经典脚本、无 eval/new Function
 // 任一失败 → 退出码 1，并打印失败详情。
 import fs from 'node:fs'
 import path from 'node:path'
@@ -64,7 +70,7 @@ const SHELLS = [
   { file: 'SimpleSearch-Dark.html', theme: 'dark' },
 ]
 
-// 契约 §6 / §20：入口页脚本顺序（v2.9 起 sites-store / sites-admin 在 app.js 之前）
+// 契约 §6 / §20 / §22：入口页脚本顺序（v2.11 起 pwa.js 在 sites-admin.js 之后、app.js 之前）
 const EXPECTED_SCRIPTS = [
   'assets/js/sites.js',
   'assets/js/search.js',
@@ -75,8 +81,13 @@ const EXPECTED_SCRIPTS = [
   'assets/js/input.js',
   'assets/js/sites-store.js',
   'assets/js/sites-admin.js',
+  'assets/js/pwa.js',
   'assets/js/app.js',
 ]
+
+// 契约 §22.3：build 注入的站点绝对地址（社交 meta）
+const SITE_URL = 'https://breathiness.github.io/SimpleSearch/'
+const SITE_IMAGE = `${SITE_URL}docs/images/screenshot-desktop.png`
 
 // 契约 §6 / §14.1：真实页必须存在的 DOM 挂载点（v2.3 移除 #site-footer，新增文档站骨架与设置面板）
 const REQUIRED_IDS = [
@@ -127,6 +138,12 @@ const REQUIRED_IDS = [
   'order-title',
   'order-close',
   'order-list',
+  // v2.11 PWA 安装引导 / 更新 snackbar
+  'install-row',
+  'install-app',
+  'update-toast',
+  'update-reload',
+  'update-dismiss',
   'scrim',
 ]
 
@@ -187,9 +204,10 @@ const BUILTIN_IDS = [
 const BUILD_MARKER = /<!--\s*由 scripts\/build\.mjs/
 // v2.6 PWA 唯一允许被引用的图片（apple-touch-icon / manifest icons / sw precache）
 const PWA_ICON_PATHS = ['assets/img/icon-192.png', 'assets/img/icon-512.png']
-// 体积预算口径（lead 2026-11-13 v2.9）：单页加载 < 200 KB（gzip 前；契约 §9.9 以 gzip 为真实成本口径；
-// sw.js / manifest / PWA 图标不计入首屏）
-const BUDGET_KB = 200
+// 体积预算口径（lead 2026-11-16 v2.11）：单页加载 < 212 KB（gzip 前；契约 §9.9 以 gzip 为真实成本口径）。
+// 200→212 显式上调原因：v2.11 新增 pwa.js（5.7KB，安装引导+新版本提示）+ snackbar/安装行/社交 meta/安全区
+// ≈ +4.7KB，首屏 196.4→206.8KB；gzip 仅 55.5→58.9KB（+3.4KB，这才是真实下载成本）。
+const BUDGET_KB = 212
 const SHELL_MAX_BYTES = 1024
 
 // ---------------------------------------------------------------- 通用工具
@@ -246,6 +264,15 @@ function findMetaByHttpEquiv(html, value) {
   for (const match of findAll(stripHtmlComments(html), /<meta\b[^>]*>/gi)) {
     const tag = match[0]
     if (getAttr(tag, 'http-equiv')?.toLowerCase() === value.toLowerCase()) return tag
+  }
+  return null
+}
+
+/** 从 <meta ...> 里按 property= 查找（Open Graph 用）。 */
+function findMetaByProperty(html, property) {
+  for (const match of findAll(stripHtmlComments(html), /<meta\b[^>]*>/gi)) {
+    const tag = match[0]
+    if (getAttr(tag, 'property')?.toLowerCase() === property.toLowerCase()) return tag
   }
   return null
 }
@@ -846,7 +873,7 @@ check('index.html 引用的本地资源全部存在', () => {
 
 // ---------------------------------------------------------------- 6. 脚本顺序
 
-check('index.html 按契约顺序引用 10 个经典脚本（sites-store/sites-admin 在 app.js 之前）', () => {
+check('index.html 按契约顺序引用 11 个经典脚本（pwa.js 在 sites-admin.js 之后、app.js 之前）', () => {
   if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
   const localScripts = extractScriptSrcs(realPage.html).filter((src) => !isExternalUrl(src))
   if (localScripts.join(',') !== EXPECTED_SCRIPTS.join(',')) {
@@ -1754,7 +1781,7 @@ check('CSS 不含 !important（契约 §6）', () => {
 
 // ---------------------------------------------------------------- 23. 体积门禁（§21.2，超限阻断）
 
-check('体积门禁（index.html 单页 < 200KB，超限阻断；gzip 仅信息输出）', () => {
+check('体积门禁（index.html 单页 < 212KB，超限阻断；gzip 仅信息输出）', () => {
   if (!realPage.exists) return [`${REAL_PAGE} 不存在，无法统计首屏体积`]
 
   const notes = []
@@ -2110,13 +2137,144 @@ check('v2.9 data-icon 与脚本：内置按钮带 data-icon（非空时形如 #i
   }
 })
 
+// ---------------------------------------------------------------- 30. v2.11 社交分享 meta（§22.3）
+
+check('v2.11 社交 meta：og:url/og:image(1200x900)/twitter:card=summary_large_image/twitter:image，og:url 与 SITE_URL 一致', () => {
+  if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
+  const clean = stripHtmlComments(realPage.html)
+  const problems = []
+
+  const metaSpecs = [
+    ['property', 'og:url'],
+    ['property', 'og:image'],
+    ['property', 'og:image:width'],
+    ['property', 'og:image:height'],
+    ['name', 'twitter:card'],
+    ['name', 'twitter:image'],
+  ]
+  const metas = new Map()
+  for (const [attrName, key] of metaSpecs) {
+    const tag = attrName === 'property' ? findMetaByProperty(clean, key) : findMetaByName(clean, key)
+    if (!tag) {
+      problems.push(`${REAL_PAGE} 缺少 meta ${attrName}="${key}"`)
+      continue
+    }
+    metas.set(key, (getAttr(tag, 'content') || '').trim())
+  }
+
+  const normalizeUrl = (value) => String(value || '').replace(/\/+$/, '')
+  const ogUrl = metas.get('og:url')
+  if (ogUrl !== undefined && normalizeUrl(ogUrl) !== normalizeUrl(SITE_URL)) {
+    problems.push(`og:url 应为 ${SITE_URL}（SITE_URL 注入），实际 ${JSON.stringify(ogUrl)}`)
+  }
+
+  for (const key of ['og:image', 'twitter:image']) {
+    const value = metas.get(key)
+    if (value === undefined) continue
+    if (!/^https:\/\//.test(value)) {
+      problems.push(`${key} 必须是 https 绝对地址，实际 ${JSON.stringify(value)}`)
+    } else if (value !== SITE_IMAGE) {
+      problems.push(`${key} 应指向 ${SITE_IMAGE}，实际 ${JSON.stringify(value)}`)
+    }
+  }
+
+  const expectedExact = [
+    ['og:image:width', '1200'],
+    ['og:image:height', '900'],
+    ['twitter:card', 'summary_large_image'],
+  ]
+  for (const [key, value] of expectedExact) {
+    if (metas.get(key) !== value) {
+      problems.push(`${key} 应为 ${JSON.stringify(value)}，实际 ${JSON.stringify(metas.get(key))}`)
+    }
+  }
+
+  return problems
+})
+
+// ---------------------------------------------------------------- 31. v2.11 viewport-fit + PWA 安装/更新 DOM（§22.2/§22.5）
+
+check('v2.11 viewport 含 viewport-fit=cover；#install-row[hidden]/#install-app/#update-toast[hidden,role=status,aria-live=polite]/刷新/稍后按钮', () => {
+  if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
+  const clean = stripHtmlComments(realPage.html)
+  const problems = []
+
+  const viewportMeta = findMetaByName(clean, 'viewport')
+  if (!viewportMeta) {
+    problems.push(`${REAL_PAGE} 缺少 <meta name="viewport">`)
+  } else if (!/viewport-fit\s*=\s*cover/i.test(getAttr(viewportMeta, 'content') || '')) {
+    problems.push(`v2.11 §22.5：viewport 应含 viewport-fit=cover，实际 ${JSON.stringify(getAttr(viewportMeta, 'content'))}`)
+  }
+
+  const installRow = findTagById(clean, 'install-row')
+  if (!installRow) {
+    problems.push(`${REAL_PAGE} 缺少 #install-row`)
+  } else if (!hasHiddenAttr(installRow)) {
+    problems.push('#install-row 初始应带 hidden（beforeinstallprompt 前不显示）')
+  }
+  if (!findTagById(clean, 'install-app')) problems.push(`${REAL_PAGE} 缺少 #install-app`)
+
+  const toast = findTagById(clean, 'update-toast')
+  if (!toast) {
+    problems.push(`${REAL_PAGE} 缺少 #update-toast`)
+  } else {
+    if (!hasHiddenAttr(toast)) problems.push('#update-toast 初始应带 hidden')
+    if ((getAttr(toast, 'role') || '').toLowerCase() !== 'status') {
+      problems.push(`#update-toast 的 role 应为 status，实际 ${JSON.stringify(getAttr(toast, 'role'))}`)
+    }
+    if (getAttr(toast, 'aria-live') !== 'polite') {
+      problems.push(`#update-toast 的 aria-live 应为 polite，实际 ${JSON.stringify(getAttr(toast, 'aria-live'))}`)
+    }
+  }
+
+  for (const id of ['update-reload', 'update-dismiss']) {
+    if (!findTagById(clean, id)) problems.push(`${REAL_PAGE} 缺少 #${id}`)
+  }
+
+  return problems
+})
+
+// ---------------------------------------------------------------- 32. v2.11 pwa.js 顺序与安全（§22.2）
+
+check('v2.11 pwa.js：脚本列表含 assets/js/pwa.js 且位于 app.js 之前；经典脚本、无 eval/new Function', () => {
+  if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
+  const clean = stripHtmlComments(realPage.html)
+  const problems = []
+
+  const localScripts = extractScriptSrcs(clean).filter((src) => !isExternalUrl(src))
+  const pwaIndex = localScripts.indexOf('assets/js/pwa.js')
+  const appIndex = localScripts.indexOf('assets/js/app.js')
+  if (pwaIndex === -1) problems.push(`${REAL_PAGE} 脚本列表缺少 assets/js/pwa.js`)
+  if (appIndex === -1) problems.push(`${REAL_PAGE} 脚本列表缺少 assets/js/app.js`)
+  if (pwaIndex !== -1 && appIndex !== -1 && pwaIndex > appIndex) {
+    problems.push(`${REAL_PAGE} 的 assets/js/pwa.js 应排在 app.js 之前`)
+  }
+
+  const pwaPath = path.join(ROOT, 'assets', 'js', 'pwa.js')
+  if (!fs.existsSync(pwaPath)) {
+    problems.push('缺少 assets/js/pwa.js（v2.11 新增模块）')
+  } else {
+    const source = fs.readFileSync(pwaPath, 'utf8')
+    try {
+      new vm.Script(source, { filename: 'assets/js/pwa.js' })
+    } catch (error) {
+      problems.push(`pwa.js 不是合法经典脚本（含 import/export 等 ESM 语法）：${error.message}`)
+    }
+    const stripped = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    if (/\beval\s*\(/.test(stripped)) problems.push('pwa.js 使用了 eval(（禁止）')
+    if (/\bnew\s+Function\s*\(/.test(stripped)) problems.push('pwa.js 使用了 new Function(（禁止）')
+  }
+
+  return problems
+})
+
 // ---------------------------------------------------------------- 输出摘要
 
 function printReport() {
   const failed = checks.filter((item) => item.problems.length > 0)
   const passed = checks.length - failed.length
 
-  console.log('SimpleSearch v2.9 静态校验（validate）')
+  console.log('SimpleSearch v2.11 静态校验（validate）')
   console.log(`仓库：${ROOT}`)
   console.log(`产物：${REAL_PAGE}（真实页）+ ${SHELLS.map((shell) => shell.file).join(' + ')}（重定向壳）`)
   console.log('')

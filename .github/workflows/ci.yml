@@ -33,3 +33,22 @@ jobs:
 
       - name: 构建、单元测试、静态校验
         run: npm run check
+
+  e2e:
+    name: 真实浏览器 E2E
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # ubuntu-latest 自带 Google Chrome，scripts/e2e.mjs 的 findBrowser() 会找到
+      # /usr/bin/google-chrome，所以这里同样不需要 npm install、不装任何依赖。
+      # 只做行为断言（DOM/交互/网络），不做截图对比——跨平台字体差异只影响视觉，
+      # 视觉回归留在本地按需跑（npm run visual）。
+      - name: 真实浏览器端到端检查
+        run: node scripts/e2e.mjs
