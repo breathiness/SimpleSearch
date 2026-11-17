@@ -147,7 +147,7 @@ function renderNavItem(group, label, current) {
   return (
     `        <button class="nav-item" type="button" data-group="${escapeHtml(group)}" aria-current="${current ? 'true' : 'false'}">` +
     `<svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-${escapeHtml(group)}"></use></svg>` +
-    `<span class="nav-label">${escapeHtml(label)}</span></button>`
+    `<span class="nav-label" data-i18n="nav.${escapeHtml(group)}">${escapeHtml(label)}</span></button>`
   )
 }
 
@@ -338,6 +338,13 @@ async function main() {
     if (CHECK_ONLY) {
       if (current !== html) {
         console.error(`[build] ${file} 与模板/注册表不一致，请运行 npm run build`)
+        if (process.env.BUILD_DEBUG) {
+          let i = 0
+          while (i < current.length && i < html.length && current[i] === html[i]) i += 1
+          console.error(`  first diff @${i} len=${current.length}/${html.length}`)
+          console.error(`  disk: ${JSON.stringify(current.slice(Math.max(0, i - 60), i + 60))}`)
+          console.error(`  want: ${JSON.stringify(html.slice(Math.max(0, i - 60), i + 60))}`)
+        }
         drift += 1
       }
       continue

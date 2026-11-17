@@ -49,6 +49,24 @@
       // 只接受形如 indigo / deep-purple 的合法 id，其余落回默认色
       if (!/^[a-z][a-z-]{2,11}$/.test(color || '')) color = 'indigo'
       el.setAttribute('data-color', color)
+      // 语言：同样在样式表生效前贴到 <html lang>，避免读屏语言错乱
+      var lang = null
+      try {
+        var m = /[?&]lang=(zh|en)(?:&|$)/.exec(location.search || '')
+        if (m) lang = m[1]
+      } catch (e) {}
+      if (!lang) {
+        try {
+          var storedLang = localStorage.getItem('ss.lang')
+          if (storedLang === 'zh' || storedLang === 'en') lang = storedLang
+        } catch (e) {}
+      }
+      if (!lang) {
+        try {
+          lang = /^zh/i.test(navigator.language || '') ? 'zh' : 'en'
+        } catch (e) {}
+      }
+      el.setAttribute('lang', lang === 'zh' ? 'zh-CN' : 'en')
     })()
   </script>
   <style>
@@ -277,6 +295,24 @@ kbd{display:inline-flex;align-items:center;justify-content:center;min-width:24px
 .form-error{margin:0;color:var(--danger);font-size:13px}
 .form-actions{display:flex;justify-content:flex-end;gap:8px}
 
+/* v2.12 */
+.visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.palette{width:min(560px,92vw);top:12vh;transform:translateX(-50%);max-height:70vh}
+.palette:not([hidden]){display:flex;flex-flow:column}
+.palette-input{flex:none;height:48px;padding:0 16px;border:0;border-bottom:1px solid var(--divider);background-color:transparent;color:var(--text);font:inherit}
+.palette-input:focus-visible{outline:none;box-shadow:inset 0 -2px 0 var(--primary-bg)}
+.palette-list{flex:1;margin:0;padding:4px 0;list-style:none;overflow:auto}
+.palette-item{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 16px;border-radius:2px;cursor:pointer}
+.palette-item:hover{background-color:var(--overlay-hover)}
+.palette-item[aria-selected='true']{background-color:var(--overlay-active);box-shadow:inset 2px 0 0 var(--primary-bg)}
+.palette-icon{display:inline-flex;flex:none;width:18px;height:18px}
+.palette-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.palette-kind{font-size:12px;color:var(--text-secondary)}
+#palette-hint{padding:0 16px 12px}
+.settings-select,#suggest-url{height:36px;padding:0 8px;border:1px solid var(--divider);border-radius:2px;background-color:var(--surface);color:var(--text);font:inherit}
+.settings-select{max-width:150px;margin-left:auto}
+.settings-row-stack{gap:6px;padding:8px 0}
+
 /* ------------------------------------------------------------ skip-link / 焦点 / 兜底 */
 .skip-link{position:fixed;top:var(--space-2);left:var(--space-2);z-index:var(--z-skip-link);padding:var(--space-2) var(--space-4);border-radius:var(--radius-sm);background-color:var(--primary-bg);color:var(--on-primary);font-size:var(--font-size-sm);font-weight:var(--font-weight-medium);text-decoration:none;box-shadow:var(--elevation-2);transform:translateY(calc(-100% - var(--space-4)));transition:transform var(--transition-base) var(--ease)}
 .skip-link:focus{transform:translateY(0)}
@@ -320,6 +356,8 @@ body.nav-open .site-nav{transform:none}
 .dialog-body{padding:8px 16px 16px}
 .shortcut-list{padding:8px 16px 16px}
 #engine-mode .segmented-item{padding:0 10px}
+.palette{width:calc(100vw - 24px);top:8vh;max-height:76vh}
+.palette-item{min-height:48px}
 }
 
 /* reduced motion：关闭涟漪与过渡 */
@@ -652,54 +690,55 @@ body.nav-open .site-nav{transform:none}
     <symbol id="i-cat-shopping" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5.6 8h12.8l-1.2 11.5H6.8z"/><path d="M9 8V6.4a3 3 0 0 1 6 0V8"/></symbol>
     <symbol id="i-cat-content" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5h3.4L9 6.5h6l1.6 2H20v10H4z"/><circle cx="12" cy="13.5" r="3"/></symbol>
   </svg>
-  <a class="skip-link" href="#search-input">跳到搜索框</a>
+  <a class="skip-link" href="#search-input" data-i18n="app.skip">跳到搜索框</a>
 
   <header class="appbar">
-    <button id="nav-toggle" class="appbar-icon" type="button" aria-label="打开站点分类"
-            aria-expanded="false" aria-controls="site-nav">
+    <button id="nav-toggle" class="appbar-icon" type="button" data-i18n-attr="aria-label:nav.group"
+            aria-label="打开站点分类" aria-expanded="false" aria-controls="site-nav">
       <svg class="appbar-icon-svg" aria-hidden="true" focusable="false"><use href="#i-menu"></use></svg>
     </button>
     <span class="appbar-logo" aria-hidden="true"><svg class="appbar-logo-svg" focusable="false"><use href="#i-logo"></use></svg></span>
-    <span class="appbar-title">简单搜索</span>
-    <button id="settings-toggle" class="appbar-icon" type="button" aria-label="设置"
-            aria-expanded="false" aria-controls="settings-panel">
+    <span class="appbar-title" data-i18n="app.title">简单搜索</span>
+    <button id="settings-toggle" class="appbar-icon" type="button" data-i18n-attr="aria-label:set.title"
+            aria-label="设置" aria-expanded="false" aria-controls="settings-panel">
       <svg class="appbar-icon-svg" aria-hidden="true" focusable="false"><use href="#i-settings"></use></svg>
     </button>
   </header>
 
   <div class="shell">
-    <aside id="site-nav" class="site-nav" aria-label="站点分类">
-      <p class="nav-group-title">站点分类</p>
-      <nav id="group-chips" class="nav-list" aria-label="按分类筛选站点">
-        <button class="nav-item" type="button" data-group="all" aria-current="true"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-all"></use></svg><span class="nav-label">常用</span></button>
-        <button class="nav-item" type="button" data-group="tech" aria-current="false"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-tech"></use></svg><span class="nav-label">技术开发</span></button>
-        <button class="nav-item" type="button" data-group="community" aria-current="false"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-community"></use></svg><span class="nav-label">社区问答</span></button>
-        <button class="nav-item" type="button" data-group="media" aria-current="false"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-media"></use></svg><span class="nav-label">影音游戏</span></button>
-        <button class="nav-item" type="button" data-group="shopping" aria-current="false"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-shopping"></use></svg><span class="nav-label">购物</span></button>
-        <button class="nav-item" type="button" data-group="content" aria-current="false"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-content"></use></svg><span class="nav-label">素材资讯</span></button>
+    <aside id="site-nav" class="site-nav" data-i18n-attr="aria-label:nav.group" aria-label="站点分类">
+      <p class="nav-group-title" data-i18n="nav.group">站点分类</p>
+      <nav id="group-chips" class="nav-list" data-i18n-attr="aria-label:nav.filter" aria-label="按分类筛选站点">
+        <button class="nav-item" type="button" data-group="all" aria-current="true"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-all"></use></svg><span class="nav-label" data-i18n="nav.all">常用</span></button>
+        <button class="nav-item" type="button" data-group="tech" aria-current="false"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-tech"></use></svg><span class="nav-label" data-i18n="nav.tech">技术开发</span></button>
+        <button class="nav-item" type="button" data-group="community" aria-current="false"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-community"></use></svg><span class="nav-label" data-i18n="nav.community">社区问答</span></button>
+        <button class="nav-item" type="button" data-group="media" aria-current="false"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-media"></use></svg><span class="nav-label" data-i18n="nav.media">影音游戏</span></button>
+        <button class="nav-item" type="button" data-group="shopping" aria-current="false"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-shopping"></use></svg><span class="nav-label" data-i18n="nav.shopping">购物</span></button>
+        <button class="nav-item" type="button" data-group="content" aria-current="false"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-content"></use></svg><span class="nav-label" data-i18n="nav.content">素材资讯</span></button>
       </nav>
     </aside>
 
     <main id="main-content">
-      <section class="card card-search" aria-label="搜索">
+      <section class="card card-search" data-i18n-attr="aria-label:search.submit" aria-label="搜索">
         <form id="search-form" role="search" action="https://www.bing.com/search" method="get" autocomplete="off">
           <div class="search-field">
-            <input id="search-input" name="q" type="text" placeholder="搜索…" aria-label="搜索关键词"
+            <input id="search-input" name="q" type="text" placeholder="搜索…"
+                   data-i18n-attr="placeholder:search.placeholder,aria-label:search.aria" aria-label="搜索关键词"
                    aria-autocomplete="list" aria-controls="suggest-list" aria-expanded="false"
                    enterkeyhint="search" autocomplete="off" spellcheck="false" maxlength="512">
-            <button id="clear-button" class="icon-button" type="button" aria-label="清除输入内容" hidden>✕</button>
-            <ul id="suggest-list" class="suggest-list" role="listbox" aria-label="搜索建议" hidden></ul>
+            <button id="clear-button" class="icon-button" type="button" data-i18n-attr="aria-label:search.clear" aria-label="清除输入内容" hidden>✕</button>
+            <ul id="suggest-list" class="suggest-list" role="listbox" data-i18n-attr="aria-label:search.suggest" aria-label="搜索建议" hidden></ul>
           </div>
-          <button id="search-submit" class="submit-button" type="submit">搜索</button>
+          <button id="search-submit" class="submit-button" type="submit" data-i18n="search.submit">搜索</button>
         </form>
         <noscript>
-          <p class="noscript-hint">JavaScript 未启用：直接在输入框回车仍可用 Bing 搜索。</p>
+          <p class="noscript-hint" data-i18n="search.noscript">JavaScript 未启用：直接在输入框回车仍可用 Bing 搜索。</p>
         </noscript>
       </section>
 
-      <section class="card card-sites" aria-label="常用网站">
-        <h2 class="card-title">常用网站</h2>
-        <nav id="buttons-container" aria-label="站点快捷按钮">
+      <section class="card card-sites" data-i18n-attr="aria-label:card.common" aria-label="常用网站">
+        <h2 class="card-title" data-i18n="card.common">常用网站</h2>
+        <nav id="buttons-container" data-i18n-attr="aria-label:card.buttons" aria-label="站点快捷按钮">
       <button class="button" type="button" data-site="github" data-icon="#i-github" data-group="tech" data-keywords="gh git 代码 开源" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-github"></use></svg><span class="button-label">GitHub</span></button>
       <button class="button" type="button" data-site="unsplash" data-icon="#i-unsplash" data-group="content" data-keywords="图片 壁纸 摄影 photo wallpaper" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-unsplash"></use></svg><span class="button-label">Unsplash</span></button>
       <button class="button" type="button" data-site="bilibili" data-icon="#i-bilibili" data-group="media" data-keywords="b站 哔哩 视频 弹幕 bilibili" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-bilibili"></use></svg><span class="button-label">哔哩哔哩</span></button>
@@ -743,106 +782,138 @@ body.nav-open .site-nav{transform:none}
   <aside id="settings-panel" class="settings-panel" role="dialog" aria-modal="true"
          aria-labelledby="settings-title" hidden>
     <div class="panel-header">
-      <h2 id="settings-title" class="panel-title">设置</h2>
-      <button id="settings-close" class="icon-button panel-close" type="button" aria-label="关闭设置">
+      <h2 id="settings-title" class="panel-title" data-i18n="set.title">设置</h2>
+      <button id="settings-close" class="icon-button panel-close" type="button" data-i18n-attr="aria-label:set.close" aria-label="关闭设置">
         <svg class="panel-close-svg" aria-hidden="true" focusable="false"><use href="#i-close"></use></svg>
       </button>
     </div>
     <div class="panel-body">
       <div class="settings-row">
-        <span class="settings-label">主题模式</span>
-        <div id="theme-mode" class="segmented" role="group" aria-label="主题模式">
-          <button class="segmented-item" type="button" data-mode="auto" aria-pressed="true">跟随系统</button>
-          <button class="segmented-item" type="button" data-mode="light" aria-pressed="false">浅色</button>
-          <button class="segmented-item" type="button" data-mode="dark" aria-pressed="false">深色</button>
+        <span class="settings-label" data-i18n="set.theme">主题模式</span>
+        <div id="theme-mode" class="segmented" role="group" data-i18n-attr="aria-label:set.theme" aria-label="主题模式">
+          <button class="segmented-item" type="button" data-mode="auto" aria-pressed="true" data-i18n="mode.auto">跟随系统</button>
+          <button class="segmented-item" type="button" data-mode="light" aria-pressed="false" data-i18n="mode.light">浅色</button>
+          <button class="segmented-item" type="button" data-mode="dark" aria-pressed="false" data-i18n="mode.dark">深色</button>
         </div>
       </div>
       <div class="settings-row">
-        <span class="settings-label">主题色</span>
-        <div id="color-swatches" class="swatches" role="group" aria-label="主题色"></div>
+        <span class="settings-label" data-i18n="set.colors">主题色</span>
+        <div id="color-swatches" class="swatches" role="group" data-i18n-attr="aria-label:set.colors" aria-label="主题色"></div>
       </div>
       <div class="settings-row">
-        <span class="settings-label">搜索引擎</span>
-        <div id="engine-mode" class="segmented" role="group" aria-label="搜索引擎">
+        <span class="settings-label" data-i18n="set.engine">搜索引擎</span>
+        <div id="engine-mode" class="segmented" role="group" data-i18n-attr="aria-label:set.engine" aria-label="搜索引擎">
           <button class="segmented-item" type="button" data-engine="bing" aria-pressed="true">Bing</button>
           <button class="segmented-item" type="button" data-engine="google" aria-pressed="false">Google</button>
           <button class="segmented-item" type="button" data-engine="ddg" aria-pressed="false">DDG</button>
-          <button class="segmented-item" type="button" data-engine="baidu" aria-pressed="false">百度</button>
+          <button class="segmented-item" type="button" data-engine="baidu" aria-pressed="false" data-i18n="engine.baidu">百度</button>
         </div>
       </div>
-      <button id="suggest-source-toggle" class="switch-row" type="button" aria-pressed="true">联网联想</button>
+      <button id="suggest-source-toggle" class="switch-row" type="button" aria-pressed="true" data-i18n="set.remote">联网联想</button>
       <div class="settings-row settings-row-inline">
-        <span class="settings-label">搜索历史 <span id="history-count" class="settings-value">0 条</span></span>
-        <button id="history-clear" class="text-button" type="button" disabled>清空</button>
+        <span class="settings-label" data-i18n="set.suggest">联想源</span>
+        <select id="suggest-provider" class="settings-select" aria-label="联想源">
+          <option value="baidu" data-i18n="prov.baidu">百度</option>
+          <option value="custom" data-i18n="prov.custom">自定义</option>
+          <option value="off" data-i18n="prov.off">关闭</option>
+        </select>
       </div>
-      <a class="panel-link" href="https://github.com/breathiness/SimpleSearch">GitHub 仓库 · 关于</a>
-      <div class="settings-row settings-row-inline">
-        <span class="settings-label">键盘快捷键</span>
-        <button id="shortcuts-open" class="text-button" type="button">查看</button>
+      <div id="suggest-custom-row" class="settings-row settings-row-stack" hidden>
+        <label class="field"><span data-i18n="set.suggestUrl">联想接口地址（{q} 表示关键词）</span>
+          <input id="suggest-url" type="text" placeholder="https://example.com/suggest?q={q}">
+        </label>
       </div>
       <div class="settings-row settings-row-inline">
-        <span class="settings-label">我的站点</span>
-        <button id="custom-sites-open" class="text-button" type="button">管理</button>
+        <span class="settings-label" data-i18n="set.lang">语言</span>
+        <select id="lang-mode" class="settings-select" aria-label="语言">
+          <option value="auto" data-i18n="lang.auto">跟随系统</option>
+          <option value="zh" data-i18n="lang.zh">中文</option>
+          <option value="en" data-i18n="lang.en">English</option>
+        </select>
       </div>
       <div class="settings-row settings-row-inline">
-        <span class="settings-label">常用排序</span>
-        <button id="order-open" class="text-button" type="button">调整</button>
+        <span class="settings-label"><span data-i18n="set.history">搜索历史</span> <span id="history-count" class="settings-value">0 条</span></span>
+        <button id="history-clear" class="text-button" type="button" disabled data-i18n="set.clear">清空</button>
+      </div>
+      <a class="panel-link" href="https://github.com/breathiness/SimpleSearch" data-i18n="set.about">GitHub 仓库 · 关于</a>
+      <div class="settings-row settings-row-inline">
+        <span class="settings-label" data-i18n="set.shortcuts">键盘快捷键</span>
+        <button id="shortcuts-open" class="text-button" type="button" data-i18n="set.view">查看</button>
+      </div>
+      <div class="settings-row settings-row-inline">
+        <span class="settings-label" data-i18n="set.sites">我的站点</span>
+        <button id="custom-sites-open" class="text-button" type="button" data-i18n="set.manage">管理</button>
+      </div>
+      <div class="settings-row settings-row-inline">
+        <span class="settings-label" data-i18n="set.order">常用排序</span>
+        <button id="order-open" class="text-button" type="button" data-i18n="set.adjust">调整</button>
       </div>
       <div id="install-row" class="settings-row settings-row-inline" hidden>
-        <span class="settings-label">安装到桌面</span>
-        <button id="install-app" class="text-button" type="button">安装</button>
+        <span class="settings-label" data-i18n="set.install">安装到桌面</span>
+        <button id="install-app" class="text-button" type="button" data-i18n="set.installBtn">安装</button>
       </div>
-      <p class="panel-version">简单搜索 v2.11.0</p>
+      <p class="panel-version">简单搜索 v2.12.0</p>
     </div>
   </aside>
+
+  <section id="palette" class="dialog palette" role="dialog" aria-modal="true"
+           aria-labelledby="palette-title" hidden>
+    <h2 id="palette-title" class="visually-hidden" data-i18n="dlg.palette">命令面板</h2>
+    <input id="palette-input" class="palette-input" type="text" role="combobox" aria-expanded="false"
+           aria-controls="palette-list" aria-autocomplete="list" data-i18n-attr="placeholder:palette.placeholder"
+           placeholder="搜索站点或命令…" autocomplete="off" spellcheck="false">
+    <ul id="palette-list" class="palette-list" role="listbox" aria-labelledby="palette-title"></ul>
+    <p id="palette-hint" class="dialog-hint" data-i18n="palette.hint">↑↓ 选择 · Enter 执行 · Esc 关闭</p>
+  </section>
 
   <section id="shortcuts-dialog" class="dialog" role="dialog" aria-modal="true"
            aria-labelledby="shortcuts-title" hidden>
     <div class="dialog-header">
-      <h2 id="shortcuts-title" class="dialog-title">键盘快捷键</h2>
-      <button id="shortcuts-close" class="icon-button dialog-close" type="button" aria-label="关闭">✕</button>
+      <h2 id="shortcuts-title" class="dialog-title" data-i18n="dlg.shortcuts">键盘快捷键</h2>
+      <button id="shortcuts-close" class="icon-button dialog-close" type="button" data-i18n-attr="aria-label:set.close" aria-label="关闭">✕</button>
     </div>
     <dl class="shortcut-list">
-      <div><dt><kbd>/</kbd></dt><dd>聚焦搜索框</dd></div>
-      <div><dt><kbd>↑</kbd><kbd>↓</kbd></dt><dd>在联想列表里移动</dd></div>
-      <div><dt><kbd>Enter</kbd></dt><dd>采用高亮项或提交搜索</dd></div>
-      <div><dt><kbd>Esc</kbd></dt><dd>关闭联想、抽屉或对话框</dd></div>
-      <div><dt><kbd>Tab</kbd></dt><dd>移出搜索框（自动收起联想）</dd></div>
-      <div><dt><kbd>Delete</kbd></dt><dd>删除高亮的历史项</dd></div>
-      <div><dt><kbd>?</kbd></dt><dd>打开这个快捷键说明</dd></div>
-      <div><dt><kbd>!</kbd></dt><dd>站点快捷搜索，例如 !gh rust</dd></div>
-      <div><dt><kbd>Ctrl</kbd><kbd>⌘</kbd></dt><dd>按住再点击站点按钮：新标签页打开</dd></div>
+      <div><dt><kbd>/</kbd></dt><dd data-i18n="shortcut.focus">聚焦搜索框</dd></div>
+      <div><dt><kbd>↑</kbd><kbd>↓</kbd></dt><dd data-i18n="shortcut.move">在联想列表里移动</dd></div>
+      <div><dt><kbd>Enter</kbd></dt><dd data-i18n="shortcut.enter">采用高亮项或提交搜索</dd></div>
+      <div><dt><kbd>Esc</kbd></dt><dd data-i18n="shortcut.esc">关闭联想、抽屉或对话框</dd></div>
+      <div><dt><kbd>Tab</kbd></dt><dd data-i18n="shortcut.tab">移出搜索框（自动收起联想）</dd></div>
+      <div><dt><kbd>Delete</kbd></dt><dd data-i18n="shortcut.del">删除高亮的历史项</dd></div>
+      <div><dt><kbd>?</kbd></dt><dd data-i18n="shortcut.help">打开这个快捷键说明</dd></div>
+      <div><dt><kbd>!</kbd></dt><dd data-i18n="shortcut.bang">站点快捷搜索，例如 !gh rust</dd></div>
+      <div><dt><kbd>Ctrl</kbd><kbd>⌘</kbd><kbd>K</kbd></dt><dd data-i18n="shortcut.palette">打开命令面板</dd></div>
+      <div><dt><kbd>Ctrl</kbd><kbd>⌘</kbd></dt><dd data-i18n="shortcut.newtab">按住再点击站点按钮：新标签页打开</dd></div>
     </dl>
   </section>
 
   <section id="sites-dialog" class="dialog dialog-wide" role="dialog" aria-modal="true"
            aria-labelledby="sites-title" hidden>
     <div class="dialog-header">
-      <h2 id="sites-title" class="dialog-title">我的站点</h2>
-      <button id="sites-close" class="icon-button dialog-close" type="button" aria-label="关闭">✕</button>
+      <h2 id="sites-title" class="dialog-title" data-i18n="dlg.sites">我的站点</h2>
+      <button id="sites-close" class="icon-button dialog-close" type="button" data-i18n-attr="aria-label:set.close" aria-label="关闭">✕</button>
     </div>
     <div class="dialog-body">
-      <p id="sites-empty" class="dialog-hint">还没有自定义站点。它们只保存在你的浏览器里。</p>
-      <ul id="sites-list" class="sites-list" aria-label="自定义站点列表"></ul>
+      <p id="sites-empty" class="dialog-hint" data-i18n="sites.empty">还没有自定义站点。它们只保存在你的浏览器里。</p>
+      <ul id="sites-list" class="sites-list" data-i18n-attr="aria-label:dlg.sites" aria-label="自定义站点列表"></ul>
       <div class="sites-actions">
-        <button id="site-add" class="text-button" type="button">新增站点</button>
-        <button id="config-export" class="text-button" type="button">导出配置</button>
-        <button id="config-import-open" class="text-button" type="button">导入配置</button>
+        <button id="site-add" class="text-button" type="button" data-i18n="sites.add">新增站点</button>
+        <button id="config-export" class="text-button" type="button" data-i18n="sites.export">导出配置</button>
+        <button id="config-import-open" class="text-button" type="button" data-i18n="sites.import">导入配置</button>
         <input id="config-import-file" type="file" accept=".json,application/json" hidden>
       </div>
       <p id="sites-status" class="dialog-hint" role="status" aria-live="polite"></p>
       <form id="site-form" class="site-form" hidden>
-        <h3 id="site-form-title" class="site-form-title">新增站点</h3>
-        <label class="field"><span>名称</span><input id="site-label" name="label" type="text" required maxlength="24"></label>
-        <label class="field"><span>首页网址</span><input id="site-home" name="home" type="url" required placeholder="https://example.com"></label>
-        <label class="field"><span>搜索模板（用 {q} 表示关键词）</span><input id="site-search" name="search" type="text" required placeholder="https://example.com/search?q={q}"></label>
-        <label class="field"><span>分类</span><select id="site-group" name="group"></select></label>
-        <label class="field"><span>关键词（空格分隔，可选）</span><input id="site-keywords" name="keywords" type="text" placeholder="别名 关键词"></label>
-        <label class="field-inline"><input id="site-featured" name="featured" type="checkbox"><span>放进「常用」</span></label>
+        <h3 id="site-form-title" class="site-form-title" data-i18n="sites.new">新增站点</h3>
+        <label class="field"><span data-i18n="sites.name">名称</span><input id="site-label" name="label" type="text" required maxlength="24"></label>
+        <label class="field"><span data-i18n="sites.home">首页网址</span><input id="site-home" name="home" type="url" required placeholder="https://example.com"></label>
+        <label class="field"><span data-i18n="sites.search">搜索模板（用 {q} 表示关键词）</span><input id="site-search" name="search" type="text" required placeholder="https://example.com/search?q={q}"></label>
+        <label class="field"><span data-i18n="sites.group">分类</span><select id="site-group" name="group"></select></label>
+        <label class="field"><span data-i18n="sites.keywords">关键词（空格分隔，可选）</span><input id="site-keywords" name="keywords" type="text" placeholder="别名 关键词"></label>
+        <label class="field-inline"><input id="site-featured" name="featured" type="checkbox"><span data-i18n="sites.featured">放进「常用」</span></label>
         <p id="site-form-error" class="form-error" role="alert" hidden></p>
         <div class="form-actions">
-          <button id="site-save" class="text-button" type="submit">保存</button>
-          <button id="site-cancel" class="text-button" type="button">取消</button>
+          <button id="site-save" class="text-button" type="submit" data-i18n="sites.save">保存</button>
+          <button id="site-cancel" class="text-button" type="button" data-i18n="sites.cancel">取消</button>
         </div>
       </form>
     </div>
@@ -851,19 +922,19 @@ body.nav-open .site-nav{transform:none}
   <section id="order-dialog" class="dialog" role="dialog" aria-modal="true"
            aria-labelledby="order-title" hidden>
     <div class="dialog-header">
-      <h2 id="order-title" class="dialog-title">常用排序</h2>
-      <button id="order-close" class="icon-button dialog-close" type="button" aria-label="关闭">✕</button>
+      <h2 id="order-title" class="dialog-title" data-i18n="dlg.order">常用排序</h2>
+      <button id="order-close" class="icon-button dialog-close" type="button" data-i18n-attr="aria-label:set.close" aria-label="关闭">✕</button>
     </div>
     <div class="dialog-body">
-      <p class="dialog-hint">调整「常用」视图里的按钮顺序，越靠上越靠前。</p>
-      <ul id="order-list" class="order-list" aria-label="常用站点顺序"></ul>
+      <p class="dialog-hint" data-i18n="order.hint">调整「常用」视图里的按钮顺序，越靠上越靠前。</p>
+      <ul id="order-list" class="order-list" data-i18n-attr="aria-label:dlg.order" aria-label="常用站点顺序"></ul>
     </div>
   </section>
 
   <div id="update-toast" class="snackbar" role="status" aria-live="polite" hidden>
-    <span class="snackbar-text">新版本已就绪</span>
-    <button id="update-reload" class="snackbar-action" type="button">刷新</button>
-    <button id="update-dismiss" class="snackbar-action" type="button">稍后</button>
+    <span class="snackbar-text" data-i18n="toast.update">新版本已就绪</span>
+    <button id="update-reload" class="snackbar-action" type="button" data-i18n="toast.reload">刷新</button>
+    <button id="update-dismiss" class="snackbar-action" type="button" data-i18n="toast.later">稍后</button>
   </div>
 
   <script>window.__SS_SINGLE_FILE = true;</script>
@@ -1373,6 +1444,23 @@ body.nav-open .site-nav{transform:none}
   const DEFAULT_ENGINE = 'bing'
   const FALLBACK_ENGINE_LABEL = 'Bing'
 
+  // i18n 文案：SS.i18n 缺失/缺 key 时回退中文；支持 {name} 占位
+  function i18nText(key, fallback, vars) {
+    try {
+      if (SS.i18n && typeof SS.i18n.t === 'function') {
+        const value = SS.i18n.t(key, vars)
+        if (typeof value === 'string' && value !== '' && value !== key) return value
+      }
+    } catch (e) {
+      /* 回退中文 */
+    }
+    let text = fallback
+    if (vars) {
+      for (const name in vars) text = text.split('{' + name + '}').join(String(vars[name]))
+    }
+    return text
+  }
+
   // 查询词规范化：非字符串按空串；去首尾空白；连续空白折叠为一个空格
   function normalize(raw) {
     if (typeof raw !== 'string') return ''
@@ -1514,7 +1602,7 @@ body.nav-open .site-nav{transform:none}
     const engine = resolveEngine(opts)
     push({
       type: 'engine',
-      label: '用 ' + engine.label + ' 搜索：' + query,
+      label: i18nText('suggest.engine', '用 {engine} 搜索：{q}', { engine: engine.label, q: query }),
       sublabel: '搜索引擎',
       engineId: engine.id,
     })
@@ -2154,341 +2242,134 @@ body.nav-open .site-nav{transform:none}
 
 </script>
   <script>
-/* assets/js/remote.js */
-// 联网联想：百度联想 JSONP（无 CORS，file:// 可用）。
-// 契约 §5.6：永不 reject；关闭/空词/超时/失败一律 resolve([])。
+/* assets/js/i18n.js */
+// i18n：中英词表 + 语言解析/应用（经典脚本）
 ;(function (root) {
   'use strict'
-
   const SS = (root.SimpleSearch = root.SimpleSearch || {})
-
-  const KEY = 'ss.remote'
-  const DEFAULT_TIMEOUT_MS = 700
-  const DEFAULT_LIMIT = 5
-  const MAX_WORD_LENGTH = 100
-  const CACHE_TTL_MS = 10 * 60 * 1000
-  const CACHE_MAX_ENTRIES = 100
-  const MAX_REQUEST_WORDS = 10
-  const CALLBACK_PREFIX = 'ss_suggest_'
-
-  let callbackSeq = 0
-  let requestSeq = 0
-  const cache = new Map()
-  const inFlight = new Map()
-  let sessionEnabled = null
-
-  function normalize(raw) {
-    if (typeof raw !== 'string') return ''
-    return raw.trim().replace(/\s+/g, ' ')
+  const LK = 'ss.lang'
+  const KEYS = [
+    'app.title','app.skip','nav.group','nav.all','nav.tech','nav.community','nav.media','nav.shopping','nav.content','nav.filter','search.placeholder','search.submit','search.aria','search.clear',
+    'search.suggest','search.noscript','card.common','card.tech','card.community','card.media','card.shopping','card.content','card.buttons','set.title','set.theme','set.colors','set.engine','set.remote',
+    'set.lang','set.suggest','set.suggestUrl','set.history','set.install','set.shortcuts','set.sites','set.order','set.manage','set.adjust','set.view','set.clear','set.installBtn','set.about',
+    'set.close','mode.auto','mode.light','mode.dark','lang.auto','lang.zh','lang.en','prov.baidu','prov.custom','prov.off','engine.baidu','hist.count','hist.clear','panel.version',
+    'dlg.sites','dlg.order','dlg.shortcuts','dlg.palette','sites.empty','sites.add','sites.export','sites.import','sites.save','sites.cancel','sites.edit','sites.delete','sites.name','sites.home',
+    'sites.search','sites.group','sites.keywords','sites.featured','sites.new','sites.status.saved','sites.status.deleted','sites.status.imported','sites.status.importFail','sites.status.tooBig','sites.confirmDelete','order.hint','palette.placeholder','palette.hint',
+    'palette.search','palette.sites','palette.commands','toast.update','toast.reload','toast.later','cmd.settings','cmd.sites','cmd.order','cmd.theme','cmd.color','cmd.engine','cmd.lang','cmd.history',
+    'cmd.remote','shortcut.focus','shortcut.move','shortcut.enter','shortcut.esc','shortcut.tab','shortcut.del','shortcut.help','shortcut.bang','shortcut.newtab','shortcut.palette',
+  ]
+  const ZH = [
+    '简单搜索','跳到搜索','站点分类','常用','技术开发','社区问答','影音游戏','购物','素材资讯','筛选','搜索…','搜索','搜索词','清除',
+    '建议','JS 未启用，回车搜索','常用网站','技术开发','社区问答','影音游戏','购物','素材资讯','快捷','设置','主题模式','主题色','搜索引擎','联网联想',
+    '语言','联想源','联想地址（{q}）','搜索历史','安装','键盘快捷键','我的站点','常用排序','管理','调整','查看','清空','安装','GitHub · 关于',
+    '关闭','跟随系统','浅色','深色','跟随系统','中文','English','百度','自定义','关闭','百度','{n} 条','清空历史','简单搜索 v{v}',
+    '我的站点','常用排序','键盘快捷键','命令面板','还没有自定义站点。它们只保存在你的浏览器里。','新增站点','导出','导入','保存','取消','编辑','删除','名称','首页网址',
+    '模板（{q}）','分类','关键词','放进「常用」','新增站点','已保存：{name}','已删除：{name}','已导入 {n} 个自定义站点','导入失败：{reason}','文件过大（上限 {size}）','确定删除「{name}」吗？','调整「常用」视图里的按钮顺序，越靠上越靠前。','搜索站点/命令','↑↓ · Enter · Esc',
+    '搜索','站点','命令','新版本就绪','刷新','稍后','打开设置','我的站点','常用排序','切换主题','换主题色','切换引擎','切换语言','清空历史',
+    '联网联想','聚焦搜索','移动','采用高亮项','关闭联想','离开搜索','删除历史','快捷键','站点搜索 !gh rust','按住点击开新标签','命令面板',
+  ]
+  const EN = [
+    'SimpleSearch','Skip to search','Groups','Common','Tech','Community','Media','Shopping','Content','Filter','Search…','Search','Query','Clear',
+    'Suggestions','JS off: Enter searches.','Common','Tech','Community','Media','Shopping','Content','Shortcuts','Settings','Theme','Accent','Engine','Online',
+    'Language','Source','Suggest URL ({q})','History','Install','Shortcuts','My sites','Order','Manage','Adjust','View','Clear','Install','GitHub · About',
+    'Close','System','Light','Dark','System','Chinese','English','Baidu','Custom','Off','Baidu','{n} items','Clear history','SimpleSearch v{v}',
+    'My sites','Order','Shortcuts','Palette','No custom sites yet. They are stored only in your browser.','Add site','Export','Import','Save','Cancel','Edit','Delete','Name','Home URL',
+    'Search URL ({q})','Category','Keywords','Featured','New site','Saved: {name}','Deleted: {name}','Imported {n} custom site(s)','Import failed: {reason}','File too large (max {size})','Delete “{name}”?','Use the arrows or ‘Top’ to reorder the Common view; higher comes first.','Sites, commands','↑↓ · Enter · Esc',
+    'Search','Sites','Commands','Update ready','Reload','Later','Settings','My sites','Order','Theme','Accent','Engine','Language','Clear',
+    'Suggestions','Focus','Move','Accept','Close','Leave','Delete item','Help','Bang, e.g. !gh','Ctrl/⌘+click: new tab','Palette',
+  ]
+  let lang = 'zh'
+  function save(v) {
+    try { v ? root.localStorage.setItem(LK, v) : root.localStorage.removeItem(LK) } catch (e) {}
   }
-
-  function normalizeTimeout(value) {
-    const number = Number(value)
-    if (!Number.isFinite(number) || number <= 0) return DEFAULT_TIMEOUT_MS
-    return Math.max(100, Math.min(5000, Math.floor(number)))
-  }
-
-  function normalizeLimit(value) {
-    if (value === undefined || value === null) return DEFAULT_LIMIT
-    const number = Number(value)
-    if (!Number.isFinite(number) || number < 0) return DEFAULT_LIMIT
-    return Math.max(0, Math.min(20, Math.floor(number)))
-  }
-
-  function normalizeWords(words, limit) {
-    const result = []
-    const seen = new Set()
-    const source = Array.isArray(words) ? words : []
-    for (const value of source) {
-      if (typeof value !== 'string') continue
-      const word = value.trim()
-      if (word === '' || word.length > MAX_WORD_LENGTH) continue
-      const dedupeKey = word.toLowerCase()
-      if (seen.has(dedupeKey)) continue
-      seen.add(dedupeKey)
-      result.push(word)
-      if (result.length >= limit) break
-    }
-    return result
-  }
-
-  function readStorage() {
+  function fromUrl() {
     try {
-      const storage = root.localStorage
-      if (storage && typeof storage.getItem === 'function') return storage
-    } catch (e) {
-      /* 存储被禁用 */
-    }
-    return null
-  }
-
-  function enabled() {
-    if (sessionEnabled !== null) return sessionEnabled
-    const storage = readStorage()
-    if (!storage) return true
-    try {
-      const stored = storage.getItem(KEY)
-      if (stored === 'off') return false
-      if (stored === 'on') return true
-    } catch (e) {
-      /* 读取异常回落默认开启 */
-    }
-    return true
-  }
-
-  function setEnabled(value) {
-    const on = Boolean(value)
-    const storage = readStorage()
-    if (storage && typeof storage.setItem === 'function') {
+      const m = /[?&]lang=(zh|en)(?:&|$)/.exec(root.location.search || '')
+      if (!m) return ''
+      save(m[1])
       try {
-        storage.setItem(KEY, on ? 'on' : 'off')
-        if (typeof storage.getItem === 'function' && storage.getItem(KEY) === (on ? 'on' : 'off')) {
-          sessionEnabled = null
-          return on
-        }
-      } catch (e) {
-        /* 写失败退化为会话内生效 */
-      }
-    }
-    sessionEnabled = on
-    return on
+        const u = new URL(root.location.href)
+        u.searchParams.delete('lang')
+        root.history.replaceState(null, '', u.href)
+      } catch (e) {}
+      return m[1]
+    } catch (e) { return '' }
   }
-
-  // ---------------------------------------------------------------- 缓存
-
-  function readCache(cacheKey) {
-    const entry = cache.get(cacheKey)
-    if (!entry) return null
-    if (Date.now() - entry.time > CACHE_TTL_MS) {
-      cache.delete(cacheKey)
-      return null
-    }
-    cache.delete(cacheKey)
-    cache.set(cacheKey, entry)
-    return entry.words.slice()
+  function detect() {
+    const u = fromUrl()
+    if (u) return u
+    let s = ''
+    try { s = root.localStorage.getItem(LK) || '' } catch (e) {}
+    if (s === 'zh' || s === 'en') return s
+    try { s = root.navigator.language || '' } catch (e) {}
+    return /^zh/i.test(s) ? 'zh' : 'en'
   }
-
-  function writeCache(cacheKey, words) {
-    if (!words || words.length === 0) return
-    cache.delete(cacheKey)
-    cache.set(cacheKey, { time: Date.now(), words: words.slice() })
-    while (cache.size > CACHE_MAX_ENTRIES) {
-      const oldest = cache.keys().next()
-      if (oldest.done) break
-      cache.delete(oldest.value)
-    }
+  function t(key, vars) {
+    const i = KEYS.indexOf(key)
+    let s = i < 0 ? '' : (lang === 'en' ? EN[i] : ZH[i]) || ZH[i]
+    if (!s) return key
+    if (vars && typeof vars === 'object') s = s.replace(/\{(\w+)\}/g, (a, n) => (n in vars ? String(vars[n]) : a))
+    return s
   }
-
-  // ---------------------------------------------------------------- provider
-
-  function buildBaiduUrl(query, callbackName) {
-    return 'https://suggestion.baidu.com/su?wd=' + encodeURIComponent(query) +
-      '&cb=' + encodeURIComponent(callbackName)
+  function apply(scope) {
+    const doc = root.document
+    const host = scope || doc
+    if (!host || !host.querySelectorAll) return
+    host.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.getAttribute('data-i18n')) })
+    host.querySelectorAll('[data-i18n-attr]').forEach((el) => el.getAttribute('data-i18n-attr').split(',').forEach((p) => {
+      const i = p.indexOf(':')
+      if (i > 0) el.setAttribute(p.slice(0, i).trim(), t(p.slice(i + 1).trim()))
+    }))
+    host.querySelectorAll('[data-i18n-title]').forEach((el) => { el.setAttribute('title', t(el.getAttribute('data-i18n-title'))) })
+    if (!doc) return
+    if (doc.documentElement) doc.documentElement.setAttribute('lang', lang === 'zh' ? 'zh-CN' : 'en')
+    doc.title = t('app.title')
   }
-
-  function parseJsonpBody(text) {
-    let body = text.trim()
-    if (body === '') return null
-    const open = body.indexOf('(')
-    const close = body.lastIndexOf(')')
-    if (open !== -1 && close > open) body = body.slice(open + 1, close).trim()
-    body = body.replace(/;\s*$/, '')
-    try {
-      return JSON.parse(body)
-    } catch (e) {
-      /* 继续尝试 */
-    }
-    const quoted = body.replace(/([,{]\s*)([A-Za-z_$][A-Za-z0-9_$]*)\s*:/g, '$1"$2":')
-    try {
-      return JSON.parse(quoted)
-    } catch (e) {
-      return null
-    }
-  }
-
-  function parseBaiduSuggestion(input) {
-    let payload = input
-    if (typeof payload === 'string') payload = parseJsonpBody(payload)
-    if (!payload || typeof payload !== 'object') return []
-
-    const source = Array.isArray(payload.s)
-      ? payload.s
-      : (Array.isArray(payload) ? payload : [])
-    const words = []
-    for (const value of source) {
-      if (typeof value !== 'string') continue
-      const word = value.trim()
-      if (word === '' || word.length > MAX_WORD_LENGTH) continue
-      words.push(word)
-    }
-    return words
-  }
-
-  const baiduProvider = {
-    id: 'baidu',
-    label: '百度',
-    buildUrl: buildBaiduUrl,
-    parse: parseBaiduSuggestion,
-  }
-
-  function currentProvider() {
-    const candidate = SS.remote && SS.remote.provider
-    if (candidate &&
-      typeof candidate.buildUrl === 'function' &&
-      typeof candidate.parse === 'function') {
-      return candidate
-    }
-    return baiduProvider
-  }
-
-  // ---------------------------------------------------------------- JSONP
-
-  function requestJsonp(query, options) {
-    return new Promise((resolve) => {
-      const doc = root.document
-      const provider = currentProvider()
-      if (!doc || typeof doc.createElement !== 'function') {
-        resolve([])
-        return
-      }
-
-      const timeout = normalizeTimeout(options.timeout)
-      const callbackName = CALLBACK_PREFIX + (callbackSeq += 1)
-      let script = null
-      let timer = 0
-      let settled = false
-      let abortHandler = null
-
-      function cleanup() {
-        if (timer) {
-          root.clearTimeout(timer)
-          timer = 0
-        }
-        if (abortHandler && options.signal &&
-          typeof options.signal.removeEventListener === 'function') {
-          try {
-            options.signal.removeEventListener('abort', abortHandler)
-          } catch (e) {
-            /* 忽略 */
-          }
-        }
-        abortHandler = null
-        if (script) {
-          try {
-            if (script.parentNode) script.parentNode.removeChild(script)
-          } catch (e) {
-            /* 忽略 */
-          }
-          script.onerror = null
-          script.onload = null
-          script = null
-        }
-        try {
-          delete root[callbackName]
-        } catch (e) {
-          root[callbackName] = undefined
-        }
-      }
-
-      function finish(words) {
-        if (settled) return
-        settled = true
-        cleanup()
-        resolve(Array.isArray(words) ? words : [])
-      }
-
-      root[callbackName] = function (payload) {
-        let words = []
-        try {
-          words = provider.parse(payload)
-        } catch (e) {
-          words = []
-        }
-        finish(words)
-      }
-
-      if (options.signal) {
-        if (options.signal.aborted) {
-          finish([])
-          return
-        }
-        abortHandler = () => finish([])
-        try {
-          options.signal.addEventListener('abort', abortHandler, { once: true })
-        } catch (e) {
-          abortHandler = null
-        }
-      }
-
-      timer = root.setTimeout(() => finish([]), timeout)
-
-      try {
-        script = doc.createElement('script')
-        script.async = true
-        script.onerror = () => finish([])
-        script.src = provider.buildUrl(query, callbackName)
-        const parent = doc.head || doc.body || doc.documentElement
-        if (!parent) {
-          finish([])
-          return
-        }
-        parent.appendChild(script)
-      } catch (e) {
-        finish([])
-      }
-    })
-  }
-
-  // ---------------------------------------------------------------- fetch
-
-  function fetchWords(rawQuery, opts) {
-    const options = opts && typeof opts === 'object' ? opts : {}
-    const query = normalize(rawQuery)
-    const limit = normalizeLimit(options.limit)
-
-    if (query === '' || limit === 0) return Promise.resolve([])
-    if (!enabled()) return Promise.resolve([])
-    if (!root.document) return Promise.resolve([])
-
-    const cacheKey = query.toLowerCase()
-
-    const cached = readCache(cacheKey)
-    if (cached) return Promise.resolve(cached.slice(0, limit))
-
-    const pending = inFlight.get(cacheKey)
-    if (pending) {
-      return pending.then((words) => words.slice(0, limit)).catch(() => [])
-    }
-
-    const seq = (requestSeq += 1)
-    const promise = requestJsonp(query, {
-      timeout: options.timeout,
-      signal: options.signal,
-    })
-      .then((words) => {
-        const normalized = normalizeWords(words, MAX_REQUEST_WORDS)
-        if (normalized.length > 0) writeCache(cacheKey, normalized)
-        if (seq !== requestSeq) return []
-        return normalized
-      })
-      .catch(() => [])
-      .then((words) => {
-        inFlight.delete(cacheKey)
-        return words
-      })
-
-    inFlight.set(cacheKey, promise)
-    return promise.then((words) => words.slice(0, limit))
-  }
-
-  SS.remote = {
-    KEY,
-    enabled,
-    setEnabled,
-    fetch: fetchWords,
-    provider: baiduProvider,
-  }
+  function init() { return (lang = detect()), apply(), lang }
+  function setLang(v) { return save(v === 'zh' || v === 'en' ? v : ''), init() }
+  SS.i18n = { init, t, setLang, getLang: () => lang, apply, availableLangs: ['zh', 'en'] }
 })(typeof globalThis !== 'undefined' ? globalThis : this)
+
+</script>
+  <script>
+/* assets/js/remote.js */
+// 联网联想（§5.6/§23.2）：默认百度 JSONP，可切换自定义 fetch 源；永不 reject。
+;(function(root){'use strict';
+const SS=(root.SimpleSearch=root.SimpleSearch||{}),K='ss.remote',PK='ss.suggestProvider',UK='ss.suggestUrl',DT=700,DL=5,MW=100,MCW=8,TTL=600000,CMAX=100,MRW=10,CP='ss_suggest_';
+let cs=0,rs=0;const ch=new Map(),fl=new Map();
+let se=null,sp=null,su=null;
+function nq(r){return typeof r==='string'?r.trim().replace(/\s+/g,' '):''}
+function nt(v){const n=Number(v);if(!Number.isFinite(n)||n<=0)return DT;return Math.max(100,Math.min(5000,Math.floor(n)))}
+function nl(v){if(v==null)return DL;const n=Number(v);if(!Number.isFinite(n)||n<0)return DL;return Math.max(0,Math.min(20,Math.floor(n)))}
+function nw(ws,lim){const o=[],seen=new Set(),src=Array.isArray(ws)?ws:[];for(const v of src){if(typeof v!=='string')continue;const w=v.trim();if(!w||w.length>MW)continue;const k=w.toLowerCase();if(seen.has(k))continue;seen.add(k);o.push(w);if(o.length>=lim)break}return o}
+function st(){try{const s=root.localStorage;if(s&&typeof s.getItem==='function')return s}catch(e){}return null}
+function en(){if(se!==null)return se;const s=st();if(!s)return true;try{const v=s.getItem(K);if(v==='off')return false;if(v==='on')return true}catch(e){}return true}
+function setEn(v){const on=Boolean(v),s=st();if(s&&typeof s.setItem==='function'){try{s.setItem(K,on?'on':'off');if(typeof s.getItem==='function'&&s.getItem(K)===(on?'on':'off')){se=null;return on}}catch(e){}}se=on;return on}
+function rs2(s,k){if(!s||typeof s.getItem!=='function')return null;try{const v=s.getItem(k);return typeof v==='string'?v:null}catch(e){return null}}
+function np(v){return v==='custom'||v==='off'||v==='baidu'?v:'baidu'}
+function cfg(){const s=st(),p=np(sp!==null?sp:rs2(s,PK));let u=su;if(u===null)u=rs2(s,UK)||'';return{provider:p,url:String(u).trim()}}
+function configure(c){if(!c||typeof c!=='object')return cfg();const s=st();if(c.provider!==undefined){const p=np(c.provider);sp=p;if(s&&typeof s.setItem==='function'){try{s.setItem(PK,p)}catch(e){}}}if(c.url!==undefined){const u=typeof c.url==='string'?c.url.trim():'';su=u;if(s&&typeof s.setItem==='function'){try{s.setItem(UK,u)}catch(e){}}}ch.clear();fl.clear();rs+=1;return cfg()}
+function rc(k){const e=ch.get(k);if(!e)return null;if(Date.now()-e.time>TTL){ch.delete(k);return null}ch.delete(k);ch.set(k,e);return e.words.slice()}
+function wc(k,ws){if(!ws||!ws.length)return;ch.delete(k);ch.set(k,{time:Date.now(),words:ws.slice()});while(ch.size>CMAX){const x=ch.keys().next();if(x.done)break;ch.delete(x.value)}}
+function pcp(pl){let src=null;if(Array.isArray(pl))src=pl;else if(pl&&typeof pl==='object'){if(Array.isArray(pl.s))src=pl.s;else if(Array.isArray(pl.data))src=pl.data}if(!src)return[];const o=[],seen=new Set();for(const v of src){if(typeof v!=='string')continue;const w=v.trim();if(!w||w.length>MW)continue;const k=w.toLowerCase();if(seen.has(k))continue;seen.add(k);o.push(w);if(o.length>=MCW)break}return o}
+function rcustom(q,opt){const c=cfg();if(!c.url||c.url.indexOf('{q}')===-1)return Promise.resolve([]);const f=root.fetch;if(typeof f!=='function')return Promise.resolve([]);const u=c.url.split('{q}').join(encodeURIComponent(q)),to=nt(opt.timeout),ro={};try{if(root.AbortSignal&&typeof root.AbortSignal.timeout==='function')ro.signal=root.AbortSignal.timeout(to)}catch(e){}return new Promise((resolve)=>{let done=false;const fin=(ws)=>{if(done)return;done=true;root.clearTimeout(tm);resolve(Array.isArray(ws)?ws:[])};const tm=root.setTimeout(()=>fin([]),to+50);let r=null;try{r=f(u,ro)}catch(e){fin([]);return}Promise.resolve(r).then((res)=>res&&res.ok!==false?res.json():[]).then((pl)=>fin(pcp(pl))).catch(()=>fin([]))})}
+function bu(q,cb){return 'https://suggestion.baidu.com/su?wd='+encodeURIComponent(q)+'&cb='+encodeURIComponent(cb)}
+function pjb(t){let b=t.trim();if(!b)return null;const o=b.indexOf('('),c=b.lastIndexOf(')');if(o!==-1&&c>o)b=b.slice(o+1,c).trim();b=b.replace(/;\s*$/,'');try{return JSON.parse(b)}catch(e){}const q=b.replace(/([,{]\s*)([A-Za-z_$][A-Za-z0-9_$]*)\s*:/g,'$1"$2":');try{return JSON.parse(q)}catch(e){return null}}
+function pbs(inp){let p=inp;if(typeof p==='string')p=pjb(p);if(!p||typeof p!=='object')return[];const src=Array.isArray(p.s)?p.s:(Array.isArray(p)?p:[]),o=[];for(const v of src){if(typeof v!=='string')continue;const w=v.trim();if(!w||w.length>MW)continue;o.push(w)}return o}
+const bp={id:'baidu',label:'百度',buildUrl:bu,parse:pbs};
+function cp(){const c=SS.remote&&SS.remote.provider;return c&&typeof c.buildUrl==='function'&&typeof c.parse==='function'?c:bp}
+function jp(q,opt){return new Promise((resolve)=>{const d=root.document,p=cp();if(!d||typeof d.createElement!=='function'){resolve([]);return}const to=nt(opt.timeout),cb=CP+(cs+=1);let sc=null,tm=0,ok=false,ah=null;
+function clean(){if(tm){root.clearTimeout(tm);tm=0}if(ah&&opt.signal&&typeof opt.signal.removeEventListener==='function'){try{opt.signal.removeEventListener('abort',ah)}catch(e){}}ah=null;if(sc){try{if(sc.parentNode)sc.parentNode.removeChild(sc)}catch(e){}sc.onerror=null;sc.onload=null;sc=null}try{delete root[cb]}catch(e){root[cb]=undefined}}
+function fin(ws){if(ok)return;ok=true;clean();resolve(Array.isArray(ws)?ws:[])}
+root[cb]=function(pl){let ws=[];try{ws=p.parse(pl)}catch(e){ws=[]}fin(ws)};
+if(opt.signal){if(opt.signal.aborted){fin([]);return}ah=()=>fin([]);try{opt.signal.addEventListener('abort',ah,{once:true})}catch(e){ah=null}}
+tm=root.setTimeout(()=>fin([]),to);
+try{sc=d.createElement('script');sc.async=true;sc.onerror=()=>fin([]);sc.src=p.buildUrl(q,cb);const par=d.head||d.body||d.documentElement;if(!par){fin([]);return}par.appendChild(sc)}catch(e){fin([])}})}
+function fetchWords(rq,opts){const opt=opts&&typeof opts==='object'?opts:{},q=nq(rq),lim=nl(opt.limit);if(!q||lim===0)return Promise.resolve([]);if(!en())return Promise.resolve([]);const c=cfg();if(c.provider==='off')return Promise.resolve([]);
+if(c.provider==='custom'){const ck='custom:'+q.toLowerCase(),cached=rc(ck);if(cached)return Promise.resolve(cached.slice(0,lim));const pend=fl.get(ck);if(pend)return pend.then((ws)=>ws.slice(0,lim)).catch(()=>[]);const seq=(rs+=1);const pr=rcustom(q,{timeout:opt.timeout}).then((ws)=>{const n=nw(ws,MRW);if(n.length)wc(ck,n);if(seq!==rs)return[];return n}).catch(()=>[]).then((ws)=>{fl.delete(ck);return ws});fl.set(ck,pr);return pr.then((ws)=>ws.slice(0,lim))}
+if(!root.document)return Promise.resolve([]);const ck=q.toLowerCase(),cached=rc(ck);if(cached)return Promise.resolve(cached.slice(0,lim));const pend=fl.get(ck);if(pend)return pend.then((ws)=>ws.slice(0,lim)).catch(()=>[]);const seq=(rs+=1);const pr=jp(q,{timeout:opt.timeout,signal:opt.signal}).then((ws)=>{const n=nw(ws,MRW);if(n.length)wc(ck,n);if(seq!==rs)return[];return n}).catch(()=>[]).then((ws)=>{fl.delete(ck);return ws});fl.set(ck,pr);return pr.then((ws)=>ws.slice(0,lim))}
+SS.remote={KEY:K,PROVIDER_KEY:PK,URL_KEY:UK,enabled:en,setEnabled:setEn,configure,parseCustomPayload:pcp,fetch:fetchWords,provider:bp};
+})(typeof globalThis!=='undefined'?globalThis:this);
 
 </script>
   <script>
@@ -2513,6 +2394,23 @@ body.nav-open .site-nav{transform:none}
   const TOTAL_MAX = 8
   const LOCAL_ITEM_CAP = 24
   const REMOTE_WORD_MAX_LENGTH = 100
+
+  // i18n 文案：SS.i18n 缺失/缺 key 时回退中文；支持 {name} 占位
+  function i18nText(key, fallback, vars) {
+    try {
+      if (SS.i18n && typeof SS.i18n.t === 'function') {
+        const value = SS.i18n.t(key, vars)
+        if (typeof value === 'string' && value !== '' && value !== key) return value
+      }
+    } catch (e) {
+      /* 回退中文 */
+    }
+    let text = fallback
+    if (vars) {
+      for (const name in vars) text = text.split('{' + name + '}').join(String(vars[name]))
+    }
+    return text
+  }
 
   function normalize(raw) {
     if (typeof raw !== 'string') return ''
@@ -2658,7 +2556,7 @@ body.nav-open .site-nav{transform:none}
 
     function refreshHistoryCount() {
       const count = historyList().length
-      if (historyCount) historyCount.textContent = count + ' 条'
+      if (historyCount) historyCount.textContent = i18nText('hist.count', '{n} 条', { n: count })
       if (historyClear) historyClear.disabled = count === 0
       return count
     }
@@ -3826,6 +3724,23 @@ body.nav-open .site-nav{transform:none}
   // 导入配置大小上限 1 MB（契约 §22.4）；读到内存/JSON.parse 之前就拒绝
   const MAX_IMPORT_BYTES = 1024 * 1024
 
+  // i18n 文案：SS.i18n 缺失/缺 key 时回退中文；支持 {name} 占位
+  function t(key, fallback, vars) {
+    try {
+      if (SS.i18n && typeof SS.i18n.t === 'function') {
+        const value = SS.i18n.t(key, vars)
+        if (typeof value === 'string' && value !== '' && value !== key) return value
+      }
+    } catch (error) {
+      /* 回退中文 */
+    }
+    let text = fallback
+    if (vars) {
+      for (const name in vars) text = text.split('{' + name + '}').join(String(vars[name]))
+    }
+    return text
+  }
+
   let initialized = false
 
   function init() {
@@ -4001,8 +3916,8 @@ body.nav-open .site-nav{transform:none}
         row.setAttribute('data-site-id', site.id)
         row.appendChild(createElement('span', 'site-label', site.label))
         row.appendChild(createElement('span', 'site-group', groupLabel(site.group)))
-        row.appendChild(createRowAction('data-action', 'edit', 'row-action', '编辑 ' + site.label, '编辑'))
-        row.appendChild(createRowAction('data-action', 'delete', 'row-action', '删除 ' + site.label, '删除'))
+        row.appendChild(createRowAction('data-action', 'edit', 'row-action', t('sites.edit', '编辑') + ' ' + site.label, t('sites.edit', '编辑')))
+        row.appendChild(createRowAction('data-action', 'delete', 'row-action', t('sites.delete', '删除') + ' ' + site.label, t('sites.delete', '删除')))
         sitesList.appendChild(row)
       }
       if (sitesEmpty) sitesEmpty.hidden = customSites.length > 0
@@ -4088,13 +4003,13 @@ body.nav-open .site-nav{transform:none}
       hideForm()
       renderSitesList()
       refreshButtons()
-      setStatus('已保存：' + result.site.label)
+      setStatus(t('sites.status.saved', '已保存：{name}', { name: result.site.label }))
     }
 
     function deleteSite(site) {
       let confirmed = false
       try {
-        confirmed = Boolean(root.confirm('确定删除「' + site.label + '」吗？此操作不可撤销。'))
+        confirmed = Boolean(root.confirm(t('sites.confirmDelete', '确定删除「{name}」吗？此操作不可撤销。', { name: site.label })))
       } catch (error) {
         confirmed = false
       }
@@ -4107,7 +4022,7 @@ body.nav-open .site-nav{transform:none}
       if (editingId === site.id) hideForm()
       renderSitesList()
       refreshButtons()
-      setStatus('已删除：' + site.label)
+      setStatus(t('sites.status.deleted', '已删除：{name}', { name: site.label }))
     }
 
     // ------------------------------------------------------------ 导入 / 导出
@@ -4213,7 +4128,7 @@ body.nav-open .site-nav{transform:none}
       for (const site of current) merged.set(site.id, site)
       for (const site of data.customSites) merged.set(site.id, site)
       if (!store.saveCustom(safeStorage(), Array.from(merged.values()))) {
-        setStatus('导入失败：本地存储不可用')
+        setStatus(t('sites.status.importFail', '导入失败：{reason}', { reason: '本地存储不可用' }))
         return
       }
       store.saveOrder(safeStorage(), data.order)
@@ -4221,7 +4136,7 @@ body.nav-open .site-nav{transform:none}
       refreshButtons()
       renderSitesList()
       renderOrderList()
-      setStatus('已导入 ' + data.customSites.length + ' 个自定义站点')
+      setStatus(t('sites.status.imported', '已导入 {n} 个自定义站点', { n: data.customSites.length }))
     }
 
     function readFileText(file) {
@@ -4239,7 +4154,7 @@ body.nav-open .site-nav{transform:none}
       if (!file) return
       // 导入上限 1 MB（契约 §22.4）：超限直接拒绝，不读文件、不进 JSON.parse
       if (typeof file.size === 'number' && file.size > MAX_IMPORT_BYTES) {
-        setStatus('导入失败：文件过大（上限 1 MB）')
+        setStatus(t('sites.status.tooBig', '文件过大（上限 1 MB）', { size: '1 MB' }))
         try {
           importFile.value = ''
         } catch (error) {
@@ -4251,13 +4166,17 @@ body.nav-open .site-nav{transform:none}
         .then((text) => {
           const parsed = store.parseImport(text)
           if (!parsed.ok) {
-            setStatus('导入失败：' + (parsed.error || '配置文件不合法'))
+            setStatus(t('sites.status.importFail', '导入失败：{reason}', {
+              reason: parsed.error || '配置文件不合法',
+            }))
             return
           }
           applyImport(parsed)
         })
         .catch((error) => {
-          setStatus('导入失败：' + (error && error.message ? error.message : '无法读取文件'))
+          setStatus(t('sites.status.importFail', '导入失败：{reason}', {
+            reason: error && error.message ? error.message : '无法读取文件',
+          }))
         })
         .then(() => {
           if (importFile) {
@@ -4605,6 +4524,33 @@ body.nav-open .site-nav{transform:none}
 
 </script>
   <script>
+/* assets/js/palette.js */
+;(function(root){'use strict';
+const SS=(root.SimpleSearch=root.SimpleSearch||{});
+let dom=null,items=[],act=-1,opener=null;
+function t(k,f){try{const I=SS.i18n;if(I&&typeof I.t==='function'){const s=I.t(k);if(s&&s!==k)return s}}catch(e){}return f}
+function sub(q,s){q=(q||'')+'';s=(s||'')+'';q=q.toLowerCase();s=s.toLowerCase();if(q==='')return true;let i=0;for(let j=0;j<s.length&&i<q.length;j++)if(s[j]===q[i])i++;return i===q.length}
+function rank(q,vs){q=((q||'')+'').trim().toLowerCase();if(q==='')return 1;let b=0;for(const v of vs){const s=((v||'')+'').trim().toLowerCase();if(s)b=Math.max(b,s===q?5:s.indexOf(q)===0?4:s.indexOf(q)>-1?3:sub(q,s)?2:0)}return b}
+function ms(q,ss){const L=ss||[],o=[];for(let i=0;i<L.length;i++){const s=L[i];if(!s||typeof s.id!=='string')continue;const vs=[s.label,s.id,...Array.isArray(s.keywords)?s.keywords:[]];const r=rank(q,vs);if(r)o.push({s,r,i,l:String(s.label||s.id).length})}o.sort((a,b)=>b.r-a.r||a.l-b.l||a.i-b.i);return o.slice(0,8).map(x=>x.s)}
+function mc(q,cs){const L=cs||[];if(((q||'')+'').trim()==='')return L.slice();const o=[];for(let i=0;i<L.length;i++){const c=L[i];if(!c)continue;const r=rank(q,[c.label,c.id]);if(r)o.push({c,r,i})}o.sort((a,b)=>b.r-a.r||a.i-b.i);return o.map(x=>x.c)}
+function app(n){try{const A=SS.app;if(A&&typeof A[n]==='function')A[n]()}catch(e){}}
+function cycle(sel,attr,cur){const d=root.document,B=d?d.querySelectorAll(sel):[];if(!B.length)return;let x=0;for(let i=0;i<B.length;i++)if(B[i].getAttribute(attr)===cur)x=(i+1)%B.length;if(B[x]&&B[x].click)B[x].click()}
+function cmds(){return[['settings','设置',()=>app('openSettings')],['sites','站点',()=>app('openSitesDialog')],['order','排序',()=>app('openOrderDialog')],['theme','主题',()=>cycle('#theme-mode [data-mode]','data-mode',SS.theme&&SS.theme.getMode?SS.theme.getMode():'')],['color','配色',()=>cycle('#color-swatches [data-color]','data-color',SS.theme&&SS.theme.getColor?SS.theme.getColor():'')],['engine','引擎',()=>cycle('#engine-mode [data-engine]','data-engine',SS.defaultEngine)],['lang','语言',()=>{const I=SS.i18n;if(!I)return;if(typeof I.setLang==='function')I.setLang(typeof I.getLang==='function'&&I.getLang()==='zh'?'en':'zh');app('applyLang')}],['history','清空',()=>{try{const H=SS.history;if(H&&typeof H.clear==='function')H.clear();const d=root.document;if(d&&typeof root.CustomEvent==='function')d.dispatchEvent(new root.CustomEvent('ss:history-changed'))}catch(e){}}],['remote','联网',()=>{const d=root.document,b=d&&d.querySelector('#suggest-source-toggle');if(b&&b.click){b.click();return}const R=SS.remote;if(R&&typeof R.setEnabled==='function'&&typeof R.enabled==='function')R.setEnabled(!R.enabled())}]].map(a=>({id:a[0],label:t('cmd.'+a[0],a[1]),run:a[2]}))}
+function pick(it){if(!it)return;close(false);try{if(it.k==='command')it.run();else if(it.s){const d=SS.search&&SS.search.resolveSite?SS.search.resolveSite(it.s.id,''):null;if(d&&d.url)root.location.href=d.url}else if(it.q){const d=SS.search&&SS.search.resolveDefault?SS.search.resolveDefault(it.q):null;if(d&&d.url)root.location.href=d.url}}catch(e){}}
+function setActive(i){if(!dom)return;if(!items.length){act=-1;dom.i.removeAttribute('aria-activedescendant');return}let n=i;if(n<0)n=items.length-1;if(n>=items.length)n=0;act=n;const os=dom.l.children;for(let k=0;k<os.length;k++)os[k].setAttribute('aria-selected',k===n?'true':'false');dom.i.setAttribute('aria-activedescendant','po'+n);const c=os[n];if(c&&c.scrollIntoView){try{c.scrollIntoView({block:'nearest'})}catch(e){}}}
+function render(qr){if(!dom)return;const q=((qr||'')+'').trim(),next=[];if(q!=='')next.push({k:'search',label:t('palette.search','搜索：')+q,q});for(const s of ms(q,SS.sites||[]))next.push({k:'site',label:s.label||s.id,s});for(const c of mc(q,cmds()))next.push({k:'command',label:c.label,run:c.run});items=next;dom.l.textContent='';const f=root.document.createDocumentFragment();for(let i=0;i<items.length;i++){const o=root.document.createElement('li');o.className='palette-item';o.id='po'+i;o._i=i;o.setAttribute('role','option');const s=root.document.createElement('span');s.className='palette-text';s.textContent=items[i].label;o.appendChild(s);f.appendChild(o)}dom.l.appendChild(f);setActive(0)}
+function onKey(e){if(e.isComposing)return;const k=e.key;if(k==='ArrowDown'){e.preventDefault();setActive(act+1);return}if(k==='ArrowUp'){e.preventDefault();setActive(act-1);return}if(k==='Enter'){e.preventDefault();pick(items[act]);return}if(k==='Escape'){e.preventDefault();if(SS.app&&typeof SS.app.closePalette==='function'){try{SS.app.closePalette();return}catch(x){}}close();app('syncOverlays')}}
+function init(){if(dom)return;const d=root.document;if(!d||typeof d.getElementById!=='function')return;const p=d.getElementById('palette'),i=d.getElementById('palette-input'),l=d.getElementById('palette-list');if(!p||!i||!l)return;dom={p,i,l};i.addEventListener('input',()=>render(i.value));i.addEventListener('keydown',onKey);l.addEventListener('click',e=>{const tgt=e.target,o=tgt&&tgt.closest?tgt.closest('[role="option"]'):null;if(!o||!l.contains(o))return;pick(items[o._i])})}
+function open(){init();if(!dom||!dom.p.hidden)return!!dom;opener=root.document.activeElement||null;dom.p.hidden=false;dom.i.value='';render('');if(dom.i.focus)dom.i.focus();return true}
+function close(rf){if(!dom)return;dom.p.hidden=true;dom.l.textContent='';items=[];act=-1;if(rf!==false&&opener&&opener.focus)try{opener.focus()}catch(e){}opener=null}
+SS.palette={init,open,close,isSubsequence:sub,matchSites:ms,matchCommands:mc};
+})(typeof globalThis!=='undefined'?globalThis:this);
+
+
+
+
+</script>
+  <script>
 /* assets/js/app.js */
 // 应用装配层：只负责把各模块接到 DOM 上，不含业务逻辑。
 //
@@ -4836,7 +4782,7 @@ body.nav-open .site-nav{transform:none}
     }
     // 卡片标题跟随当前视图
     const title = document.querySelector('.card-title')
-    if (title) title.textContent = isAll ? '常用网站' : label || '常用网站'
+    if (title) title.textContent = isAll ? translate('card.common', '常用网站') : label || translate('card.common', '常用网站')
     // 重建按钮墙时只更新 UI，不改地址栏（否则会把 ?cat= 深链抹掉）
     if (!options || options.syncUrl !== false) syncCategoryUrl(group)
   }
@@ -4863,7 +4809,7 @@ body.nav-open .site-nav{transform:none}
   function anyOverlayOpen() {
     const panel = $('settings-panel')
     const panelOpen = Boolean(panel && !panel.hidden)
-    const dialogs = ['shortcuts-dialog', 'sites-dialog', 'order-dialog']
+    const dialogs = ['palette', 'shortcuts-dialog', 'sites-dialog', 'order-dialog']
     const dialogOpen = dialogs.some((id) => {
       const el = $(id)
       return Boolean(el && !el.hidden)
@@ -4873,7 +4819,7 @@ body.nav-open .site-nav{transform:none}
 
   // 当前打开的最上层覆盖层（用于 Esc / Tab / 遮罩点击的事件路由）
   function openOverlay() {
-    for (const id of ['sites-dialog', 'order-dialog', 'shortcuts-dialog']) {
+    for (const id of ['palette', 'sites-dialog', 'order-dialog', 'shortcuts-dialog']) {
       const el = $(id)
       if (el && !el.hidden) return { id, el }
     }
@@ -4889,6 +4835,7 @@ body.nav-open .site-nav{transform:none}
   }
 
   function openNav() {
+    closePalette(false)
     closeShortcuts(false)
     closeSettings(false)
     closeSitesDialog(false)
@@ -4908,6 +4855,7 @@ body.nav-open .site-nav{transform:none}
   }
 
   function openSettings() {
+    closePalette(false)
     closeShortcuts(false)
     closeNav(false)
     closeSitesDialog(false)
@@ -4941,6 +4889,7 @@ body.nav-open .site-nav{transform:none}
   let shortcutsTrigger = null
 
   function openShortcuts(trigger) {
+    closePalette(false)
     closeSettings(false)
     closeNav(false)
     closeSitesDialog(false)
@@ -4969,6 +4918,7 @@ body.nav-open .site-nav{transform:none}
   let orderDialogTrigger = null
 
   function openSitesDialog(trigger) {
+    closePalette(false)
     closeShortcuts(false)
     closeSettings(false)
     closeNav(false)
@@ -4993,6 +4943,7 @@ body.nav-open .site-nav{transform:none}
   }
 
   function openOrderDialog(trigger) {
+    closePalette(false)
     closeShortcuts(false)
     closeSettings(false)
     closeNav(false)
@@ -5023,7 +4974,8 @@ body.nav-open .site-nav{transform:none}
       if (document.body.classList.contains('nav-open')) closeNav(restoreFocus)
       return
     }
-    if (open.id === 'sites-dialog') closeSitesDialog(restoreFocus)
+    if (open.id === 'palette') closePalette(restoreFocus)
+    else if (open.id === 'sites-dialog') closeSitesDialog(restoreFocus)
     else if (open.id === 'order-dialog') closeOrderDialog(restoreFocus)
     else if (open.id === 'shortcuts-dialog') closeShortcuts(restoreFocus)
     else closeSettings(restoreFocus)
@@ -5075,7 +5027,14 @@ body.nav-open .site-nav{transform:none}
       const trap = open ? open.el : null
       // aria-modal 覆盖层：Tab 在内部循环，不跑到背后的页面
       if (event.key === 'Tab' && trap) {
-        const focusables = trap.querySelectorAll('button, a[href]')
+        // 命令面板：Tab 始终回到输入框，列表项不参与 Tab 序列
+        if (open && open.id === 'palette') {
+          event.preventDefault()
+          const input = $('palette-input')
+          if (input) input.focus()
+          return
+        }
+        const focusables = trap.querySelectorAll('button, a[href], input, select')
         if (focusables.length > 0) {
           const first = focusables[0]
           const last = focusables[focusables.length - 1]
@@ -5266,8 +5225,141 @@ body.nav-open .site-nav{transform:none}
     return appliedGroup
   }
 
+
+  // ---------------------------------------------------------------- i18n / 语言 / 联想源 / 命令面板（v2.12）
+  function i18nApi() {
+    return SS.i18n && typeof SS.i18n.t === 'function' ? SS.i18n : null
+  }
+
+  // t() 的安全包装：i18n 未加载或缺 key 时回退到中文常量
+  function translate(key, fallback, vars) {
+    const api = i18nApi()
+    if (!api) return fallback
+    const value = api.t(key, vars)
+    return value === key || value === undefined || value === null ? fallback : value
+  }
+
+  function initI18n() {
+    const api = i18nApi()
+    if (api && typeof api.init === 'function') api.init()
+  }
+
+  function readSetting(key, fallback) {
+    try {
+      const value = window.localStorage ? window.localStorage.getItem(key) : null
+      return value === null || value === undefined || value === '' ? fallback : value
+    } catch (error) {
+      return fallback
+    }
+  }
+
+  function initLang() {
+    const select = $('lang-mode')
+    const api = i18nApi()
+    if (!select || !api) return
+    const stored = readSetting('ss.lang', 'auto')
+    select.value = stored === 'zh' || stored === 'en' ? stored : 'auto'
+    select.addEventListener('change', () => {
+      api.setLang(select.value)
+      applyLang()
+    })
+  }
+
+  function suggestProviderConfig() {
+    const provider = readSetting('ss.suggestProvider', 'baidu')
+    const url = readSetting('ss.suggestUrl', '')
+    return {
+      provider: provider === 'custom' || provider === 'off' ? provider : 'baidu',
+      url,
+    }
+  }
+
+  function initSuggestProvider() {
+    const select = $('suggest-provider')
+    const customRow = $('suggest-custom-row')
+    const urlInput = $('suggest-url')
+    if (!select) return
+    const config = suggestProviderConfig()
+    select.value = config.provider
+    if (urlInput) urlInput.value = config.url
+    const syncRow = () => {
+      if (customRow) customRow.hidden = select.value !== 'custom'
+    }
+    const save = () => {
+      try {
+        window.localStorage.setItem('ss.suggestProvider', select.value)
+        if (urlInput) window.localStorage.setItem('ss.suggestUrl', urlInput.value.trim())
+      } catch (error) {
+        // 存储不可用时只当次生效
+      }
+      if (SS.remote && typeof SS.remote.configure === 'function') {
+        SS.remote.configure({ provider: select.value, url: urlInput ? urlInput.value.trim() : '' })
+      }
+      syncRow()
+    }
+    syncRow()
+    select.addEventListener('change', save)
+    if (urlInput) urlInput.addEventListener('change', save)
+  }
+
+  let paletteTrigger = null
+
+  function openPalette() {
+    if (!SS.palette || typeof SS.palette.open !== 'function') return
+    closeShortcuts(false)
+    closeSettings(false)
+    closeNav(false)
+    closeSitesDialog(false)
+    closeOrderDialog(false)
+    paletteTrigger = document.activeElement && document.activeElement !== document.body ? document.activeElement : null
+    SS.palette.open()
+    const paletteInput = $('palette-input')
+    if (paletteInput) paletteInput.setAttribute('aria-expanded', 'true')
+    syncScrim()
+  }
+
+  function closePalette(restoreFocus = true) {
+    if (!SS.palette || typeof SS.palette.close !== 'function') return
+    SS.palette.close()
+    const paletteInput = $('palette-input')
+    if (paletteInput) paletteInput.setAttribute('aria-expanded', 'false')
+    syncScrim()
+    const target = paletteTrigger
+    paletteTrigger = null
+    if (restoreFocus && target && typeof target.focus === 'function') target.focus()
+  }
+
+  // 语言切换后的统一刷新（命令面板与设置里的语言下拉共用）
+  function applyLang() {
+    const api = i18nApi()
+    if (api && typeof api.apply === 'function') api.apply(document)
+    applyGroupFilter(currentGroup)
+    const select = $('lang-mode')
+    if (select) {
+      const stored = readSetting('ss.lang', 'auto')
+      select.value = stored === 'zh' || stored === 'en' ? stored : 'auto'
+    }
+    try {
+      document.dispatchEvent(new CustomEvent('ss:lang-changed'))
+    } catch (error) {
+      // 老浏览器忽略
+    }
+  }
+
+  function initPalette() {
+    if (SS.palette && typeof SS.palette.init === 'function') SS.palette.init()
+    document.addEventListener('keydown', (event) => {
+      const key = String(event.key || '').toLowerCase()
+      if (key === 'k' && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey) {
+        event.preventDefault()
+        openPalette()
+      }
+    })
+  }
+
   function boot() {
     initTheme()
+    initI18n()
     initInput()
     bindGroupNav()
     bindSiteButtons()
@@ -5275,6 +5367,9 @@ body.nav-open .site-nav{transform:none}
     bindDrawers()
     bindRipple()
     bindEngines()
+    initLang()
+    initSuggestProvider()
+    initPalette()
     // v2.9：把本地自定义站点并入运行时注册表，并按常用排序重建按钮墙
     refreshSiteButtons()
     if (SS.sitesAdmin && typeof SS.sitesAdmin.init === 'function') SS.sitesAdmin.init()
@@ -5305,6 +5400,9 @@ body.nav-open .site-nav{transform:none}
     openOrderDialog,
     closeOrderDialog,
     closeTopOverlay,
+    openPalette,
+    closePalette,
+    applyLang,
     syncOverlays: syncScrim,
   }
 

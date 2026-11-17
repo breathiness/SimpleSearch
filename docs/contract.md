@@ -773,3 +773,54 @@ README 增加「书签小工具」小节：一段可复制的 `javascript:` 书�
 - validate：页面 head 含 `og:url`/`og:image`/`twitter:card`；viewport 含 `viewport-fit=cover`；`#install-row`/`#install-app`/`#update-toast`/`#update-reload`/`#update-dismiss` 存在且初始 `hidden`；`pwa.js` 在脚本列表且无 `eval(`/`new Function(`。
 - e2e（新增 P 段）：默认安装行隐藏 → 手动派发 `beforeinstallprompt` → 行出现 → 点击后记录 prompt 被调用；派发 `controllerchange` → snackbar 出现 → 点「稍后」隐藏；导入 1.5 MB 文件被拒绝且不写入存储；head meta 断言。
 - CI：e2e job 必须绿。
+
+## 23. v2.12：命令面板 + 可配置联想源 + 英文界面（体积受控）
+
+体积红线：v2.11 首屏 206.8 KB / gzip 58.9 KB。本批预算 **`BUDGET_KB` 212 → 232（硬门禁，按 raw 计）**；批末实测 **230.5 KB / gzip 67.1 KB**（原始 +23.7 KB、gzip +8.2 KB），**gzip 仅作为信息输出、不单独卡阈值**（契约 §9.9 的既有口径）。新增模块上限：i18n.js ≤7 KB、palette.js ≤5.5 KB、remote.js +2.5 KB、CSS +1.5 KB；再往上加功能前必须先决定「优化还是显式提预算」。
+
+### 23.1 命令面板（`assets/js/palette.js`，≤ 5.5 KB）
+
+- 快捷键 `Ctrl/⌘ + K`（输入框里也生效）打开 `#palette`；`Esc` / 点遮罩关闭并归还焦点。
+- 输入即过滤，结果分组：`搜索：<词>`（用当前引擎）、`站点`（匹配内置 + 自定义站点，按 label / id / keywords 做 **子序列模糊匹配**，短词前缀优先）、`命令`（打开设置 / 我的站点 / 常用排序 / 切换主题模式 / 切换主题色 / 切换搜索引擎 / 切换语言 / 清空历史 / 开关联网联想）。
+- 键盘：`↑`/`↓` 移动、`Enter` 执行、`Esc` 关闭；鼠标点击同样执行；列表复用 `role="listbox"` + `aria-activedescendant`。
+- 运行时用 `SS.i18n.t()` 取文案（i18n 未加载时回退中文）。
+- 暴露纯匹配函数便于单测：`SS.palette.matchSites(query, sites)`、`SS.palette.matchCommands(query, commands)`（不碰 DOM 的部分抽出来）。
+
+### 23.2 可配置联想源（`assets/js/remote.js` 小改 + 设置面板 UI）
+
+- 现有「联网联想」开关保留为总开关；新增「联想源」`#suggest-provider`（`baidu` 百度 / `custom` 自定义 / `off` 关闭）与 `#suggest-custom-row`（`#suggest-url` 输入，`{q}` 为关键词），存 `ss.suggestProvider` / `ss.suggestUrl`。
+- `custom` 模式：`fetch(URL.replace('{q}', encodeURIComponent(q)))`，超时 700ms；响应接受 `["a","b"]`、`{"s":["a"]}`、`{"data":["a"]}` 三种形状（各取字符串数组、去重、最多 8 条）；CORS 失败/超时/格式错 → 静默回退本地联想，不影响搜索。
+- `baidu` 行为与现在完全一致（JSONP、700ms、缓存 10 分钟/100 条）；`off` = 不发任何远程请求。
+- 设置里切换 provider 时立即保存并清空远程缓存；URL 为空时不发请求。
+
+### 23.3 英文界面（`assets/js/i18n.js`，≤ 7 KB 含中英词表）
+
+- `SS.i18n = { init(), t(key, vars), setLang(lang), getLang(), apply(root), format(n) }`：
+  - 语言解析：`?lang=zh|en`（持久化到 `ss.lang` 并 `replaceState` 去掉）→ `ss.lang` → `navigator.language` 以 `zh` 开头取 `zh`，否则 `en`。
+  - `apply(root)`：处理 `[data-i18n]`（textContent）、`[data-i18n-attr="placeholder:palette.placeholder"]`（属性）、`[data-i18n-title]`；同时更新 `<html lang>` 与 `<title>`。
+  - `t(key, vars)`：`{name}` 占位替换；缺 key 时回退中文词表，再回退 key 本身（不抛错）。
+  - 词表用**紧凑平行数组**（`KEYS` + `ZH` + `EN`），避免对象键重复占体积；至少覆盖下面 §23.4 的 key 集合。
+- 设置面板新增「语言」`#lang-mode`（跟随系统 / 中文 / English，存 `ss.lang`，切 `auto` 时删除该键），切换后立即 `apply()` 并由 app.js 重新应用当前视图标题。
+- 模板静态文案全部加 `data-i18n`；JS 动态文案（状态提示、toast、确认框、报错、卡片标题）走 `t()`。
+- 已知限制写进 Wiki：短文案已覆盖；日期/数字不做本地化。
+
+### 23.4 i18n key 覆盖（validate 会校验 zh/en 两表 key 完全一致且被模板引用）
+
+`app.title` `app.skip` `nav.group` `nav.all` `nav.tech` `nav.community` `nav.media` `nav.shopping` `nav.content`
+`search.placeholder` `search.submit` `card.common` `card.tech` `card.community` `card.media` `card.shopping` `card.content`
+`set.title` `set.theme` `set.colors` `set.engine` `set.remote` `set.lang` `set.suggest` `set.suggestUrl` `set.history` `set.install` `set.shortcuts` `set.sites` `set.order` `set.manage` `set.adjust` `set.view` `set.clear` `set.installBtn` `set.about`
+`mode.auto` `mode.light` `mode.dark` `lang.auto` `lang.zh` `lang.en` `prov.baidu` `prov.custom` `prov.off`
+`hist.count` `hist.clear` `panel.version`
+`dlg.sites` `dlg.order` `dlg.shortcuts` `dlg.palette`
+`sites.empty` `sites.add` `sites.export` `sites.import` `sites.save` `sites.cancel` `sites.edit` `sites.delete` `sites.name` `sites.home` `sites.search` `sites.group` `sites.keywords` `sites.featured` `sites.new`
+`order.hint` `palette.placeholder` `palette.hint` `palette.search` `palette.sites` `palette.commands`
+`toast.update` `toast.reload` `toast.later`
+`cmd.settings` `cmd.sites` `cmd.order` `cmd.theme` `cmd.color` `cmd.engine` `cmd.lang` `cmd.history` `cmd.remote`
+`shortcut.focus` `shortcut.move` `shortcut.enter` `shortcut.esc` `shortcut.tab` `shortcut.del` `shortcut.help` `shortcut.bang` `shortcut.newtab`
+`sites.status.saved` `sites.status.deleted` `sites.status.imported` `sites.status.importFail` `sites.status.tooBig` `sites.confirmDelete`
+
+### 23.5 门禁增补
+
+- 单测：`SS.i18n`（语言解析优先级、t 占位/回退、apply 文本与属性、zh/en key 一致）；`SS.palette.matchSites/matchCommands`（子序列、前缀优先、无匹配、中文）；`SS.remote` 自定义源解析三种响应形状（可对纯函数注入 fetch mock）。
+- validate：`#palette`/`#palette-input`/`#palette-list` 存在且 `#palette` 初始 hidden；`#lang-mode`/`#suggest-provider`/`#suggest-custom-row`(hidden)/`#suggest-url` 存在；i18n.js/palette.js 在脚本列表（13 个）且顺序在 app.js 之前；zh/en 词表 key 一致且 `data-i18n` 引用的 key 都存在；体积门禁 **232 KB**。
+- e2e（G 段）：`Ctrl+K` 打开面板 → 输入 `git` → 结果含 GitHub → `Enter` 打开站点（拦截导航断言 URL）；`Esc` 关闭；设置里切 English → 导航/设置/卡片标题变英文、`<html lang="en">`、刷新后仍英文；切回中文；联想源切 `custom` 填一个本地 mock URL（e2e 静态服务器可提供 `/suggest.json?q=xx` 假数据）→ 联想出现自定义词；`off` 时不发远程请求。

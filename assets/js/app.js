@@ -228,7 +228,7 @@
     }
     // 卡片标题跟随当前视图
     const title = document.querySelector('.card-title')
-    if (title) title.textContent = isAll ? '常用网站' : label || '常用网站'
+    if (title) title.textContent = isAll ? translate('card.common', '常用网站') : label || translate('card.common', '常用网站')
     // 重建按钮墙时只更新 UI，不改地址栏（否则会把 ?cat= 深链抹掉）
     if (!options || options.syncUrl !== false) syncCategoryUrl(group)
   }
@@ -255,7 +255,7 @@
   function anyOverlayOpen() {
     const panel = $('settings-panel')
     const panelOpen = Boolean(panel && !panel.hidden)
-    const dialogs = ['shortcuts-dialog', 'sites-dialog', 'order-dialog']
+    const dialogs = ['palette', 'shortcuts-dialog', 'sites-dialog', 'order-dialog']
     const dialogOpen = dialogs.some((id) => {
       const el = $(id)
       return Boolean(el && !el.hidden)
@@ -265,7 +265,7 @@
 
   // 当前打开的最上层覆盖层（用于 Esc / Tab / 遮罩点击的事件路由）
   function openOverlay() {
-    for (const id of ['sites-dialog', 'order-dialog', 'shortcuts-dialog']) {
+    for (const id of ['palette', 'sites-dialog', 'order-dialog', 'shortcuts-dialog']) {
       const el = $(id)
       if (el && !el.hidden) return { id, el }
     }
@@ -281,6 +281,7 @@
   }
 
   function openNav() {
+    closePalette(false)
     closeShortcuts(false)
     closeSettings(false)
     closeSitesDialog(false)
@@ -300,6 +301,7 @@
   }
 
   function openSettings() {
+    closePalette(false)
     closeShortcuts(false)
     closeNav(false)
     closeSitesDialog(false)
@@ -333,6 +335,7 @@
   let shortcutsTrigger = null
 
   function openShortcuts(trigger) {
+    closePalette(false)
     closeSettings(false)
     closeNav(false)
     closeSitesDialog(false)
@@ -361,6 +364,7 @@
   let orderDialogTrigger = null
 
   function openSitesDialog(trigger) {
+    closePalette(false)
     closeShortcuts(false)
     closeSettings(false)
     closeNav(false)
@@ -385,6 +389,7 @@
   }
 
   function openOrderDialog(trigger) {
+    closePalette(false)
     closeShortcuts(false)
     closeSettings(false)
     closeNav(false)
@@ -415,7 +420,8 @@
       if (document.body.classList.contains('nav-open')) closeNav(restoreFocus)
       return
     }
-    if (open.id === 'sites-dialog') closeSitesDialog(restoreFocus)
+    if (open.id === 'palette') closePalette(restoreFocus)
+    else if (open.id === 'sites-dialog') closeSitesDialog(restoreFocus)
     else if (open.id === 'order-dialog') closeOrderDialog(restoreFocus)
     else if (open.id === 'shortcuts-dialog') closeShortcuts(restoreFocus)
     else closeSettings(restoreFocus)
@@ -467,7 +473,14 @@
       const trap = open ? open.el : null
       // aria-modal 覆盖层：Tab 在内部循环，不跑到背后的页面
       if (event.key === 'Tab' && trap) {
-        const focusables = trap.querySelectorAll('button, a[href]')
+        // 命令面板：Tab 始终回到输入框，列表项不参与 Tab 序列
+        if (open && open.id === 'palette') {
+          event.preventDefault()
+          const input = $('palette-input')
+          if (input) input.focus()
+          return
+        }
+        const focusables = trap.querySelectorAll('button, a[href], input, select')
         if (focusables.length > 0) {
           const first = focusables[0]
           const last = focusables[focusables.length - 1]
@@ -658,8 +671,141 @@
     return appliedGroup
   }
 
+
+  // ---------------------------------------------------------------- i18n / 语言 / 联想源 / 命令面板（v2.12）
+  function i18nApi() {
+    return SS.i18n && typeof SS.i18n.t === 'function' ? SS.i18n : null
+  }
+
+  // t() 的安全包装：i18n 未加载或缺 key 时回退到中文常量
+  function translate(key, fallback, vars) {
+    const api = i18nApi()
+    if (!api) return fallback
+    const value = api.t(key, vars)
+    return value === key || value === undefined || value === null ? fallback : value
+  }
+
+  function initI18n() {
+    const api = i18nApi()
+    if (api && typeof api.init === 'function') api.init()
+  }
+
+  function readSetting(key, fallback) {
+    try {
+      const value = window.localStorage ? window.localStorage.getItem(key) : null
+      return value === null || value === undefined || value === '' ? fallback : value
+    } catch (error) {
+      return fallback
+    }
+  }
+
+  function initLang() {
+    const select = $('lang-mode')
+    const api = i18nApi()
+    if (!select || !api) return
+    const stored = readSetting('ss.lang', 'auto')
+    select.value = stored === 'zh' || stored === 'en' ? stored : 'auto'
+    select.addEventListener('change', () => {
+      api.setLang(select.value)
+      applyLang()
+    })
+  }
+
+  function suggestProviderConfig() {
+    const provider = readSetting('ss.suggestProvider', 'baidu')
+    const url = readSetting('ss.suggestUrl', '')
+    return {
+      provider: provider === 'custom' || provider === 'off' ? provider : 'baidu',
+      url,
+    }
+  }
+
+  function initSuggestProvider() {
+    const select = $('suggest-provider')
+    const customRow = $('suggest-custom-row')
+    const urlInput = $('suggest-url')
+    if (!select) return
+    const config = suggestProviderConfig()
+    select.value = config.provider
+    if (urlInput) urlInput.value = config.url
+    const syncRow = () => {
+      if (customRow) customRow.hidden = select.value !== 'custom'
+    }
+    const save = () => {
+      try {
+        window.localStorage.setItem('ss.suggestProvider', select.value)
+        if (urlInput) window.localStorage.setItem('ss.suggestUrl', urlInput.value.trim())
+      } catch (error) {
+        // 存储不可用时只当次生效
+      }
+      if (SS.remote && typeof SS.remote.configure === 'function') {
+        SS.remote.configure({ provider: select.value, url: urlInput ? urlInput.value.trim() : '' })
+      }
+      syncRow()
+    }
+    syncRow()
+    select.addEventListener('change', save)
+    if (urlInput) urlInput.addEventListener('change', save)
+  }
+
+  let paletteTrigger = null
+
+  function openPalette() {
+    if (!SS.palette || typeof SS.palette.open !== 'function') return
+    closeShortcuts(false)
+    closeSettings(false)
+    closeNav(false)
+    closeSitesDialog(false)
+    closeOrderDialog(false)
+    paletteTrigger = document.activeElement && document.activeElement !== document.body ? document.activeElement : null
+    SS.palette.open()
+    const paletteInput = $('palette-input')
+    if (paletteInput) paletteInput.setAttribute('aria-expanded', 'true')
+    syncScrim()
+  }
+
+  function closePalette(restoreFocus = true) {
+    if (!SS.palette || typeof SS.palette.close !== 'function') return
+    SS.palette.close()
+    const paletteInput = $('palette-input')
+    if (paletteInput) paletteInput.setAttribute('aria-expanded', 'false')
+    syncScrim()
+    const target = paletteTrigger
+    paletteTrigger = null
+    if (restoreFocus && target && typeof target.focus === 'function') target.focus()
+  }
+
+  // 语言切换后的统一刷新（命令面板与设置里的语言下拉共用）
+  function applyLang() {
+    const api = i18nApi()
+    if (api && typeof api.apply === 'function') api.apply(document)
+    applyGroupFilter(currentGroup)
+    const select = $('lang-mode')
+    if (select) {
+      const stored = readSetting('ss.lang', 'auto')
+      select.value = stored === 'zh' || stored === 'en' ? stored : 'auto'
+    }
+    try {
+      document.dispatchEvent(new CustomEvent('ss:lang-changed'))
+    } catch (error) {
+      // 老浏览器忽略
+    }
+  }
+
+  function initPalette() {
+    if (SS.palette && typeof SS.palette.init === 'function') SS.palette.init()
+    document.addEventListener('keydown', (event) => {
+      const key = String(event.key || '').toLowerCase()
+      if (key === 'k' && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey) {
+        event.preventDefault()
+        openPalette()
+      }
+    })
+  }
+
   function boot() {
     initTheme()
+    initI18n()
     initInput()
     bindGroupNav()
     bindSiteButtons()
@@ -667,6 +813,9 @@
     bindDrawers()
     bindRipple()
     bindEngines()
+    initLang()
+    initSuggestProvider()
+    initPalette()
     // v2.9：把本地自定义站点并入运行时注册表，并按常用排序重建按钮墙
     refreshSiteButtons()
     if (SS.sitesAdmin && typeof SS.sitesAdmin.init === 'function') SS.sitesAdmin.init()
@@ -697,6 +846,9 @@
     openOrderDialog,
     closeOrderDialog,
     closeTopOverlay,
+    openPalette,
+    closePalette,
+    applyLang,
     syncOverlays: syncScrim,
   }
 
