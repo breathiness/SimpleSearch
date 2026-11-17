@@ -10,6 +10,23 @@
   const DEFAULT_ENGINE = 'bing'
   const FALLBACK_ENGINE_LABEL = 'Bing'
 
+  // i18n 文案：SS.i18n 缺失/缺 key 时回退中文；支持 {name} 占位
+  function i18nText(key, fallback, vars) {
+    try {
+      if (SS.i18n && typeof SS.i18n.t === 'function') {
+        const value = SS.i18n.t(key, vars)
+        if (typeof value === 'string' && value !== '' && value !== key) return value
+      }
+    } catch (e) {
+      /* 回退中文 */
+    }
+    let text = fallback
+    if (vars) {
+      for (const name in vars) text = text.split('{' + name + '}').join(String(vars[name]))
+    }
+    return text
+  }
+
   // 查询词规范化：非字符串按空串；去首尾空白；连续空白折叠为一个空格
   function normalize(raw) {
     if (typeof raw !== 'string') return ''
@@ -151,7 +168,7 @@
     const engine = resolveEngine(opts)
     push({
       type: 'engine',
-      label: '用 ' + engine.label + ' 搜索：' + query,
+      label: i18nText('suggest.engine', '用 {engine} 搜索：{q}', { engine: engine.label, q: query }),
       sublabel: '搜索引擎',
       engineId: engine.id,
     })

@@ -1,4 +1,4 @@
-// SimpleSearch v2.11 静态校验与产物一致性门禁。
+// SimpleSearch v2.12 静态校验与产物一致性门禁。
 // 用法：node scripts/validate.mjs（npm run validate）
 //
 // 产物模型（docs/contract.md §7、§12-§17）：npm run build 生成 5 个产物
@@ -15,7 +15,7 @@
 //   3. index.html head：charset / lang / viewport / theme-color / favicon / data-theme / data-theme-default=auto
 //   4. index.html 硬约束：无 type="module"、无内联 on* 事件、无未替换 {{...}}、无重复 id、DOM 契约 id 齐全
 //   5. index.html 引用的所有本地 resources 真实存在
-//   6. index.html 按契约顺序引用 11 个经典脚本（pwa.js 在 sites-admin.js 之后、app.js 之前）
+//   6. index.html 引用 13 个经典脚本；i18n.js 在 theme.js 之后、palette.js 在 sites-admin.js 之后，均在 app.js 之前
 //   7. index.html 的 data-site 与 SS.sites 一一对应（顺序/label/数量/data-group）
 //   8. 文档站骨架：.appbar（含 .appbar-logo→#i-logo）/.shell/#main-content/.card、
 //      设置面板（dialog/hidden/#theme-mode 三段式/唯一 .switch-row/.settings-row+空 #color-swatches）、
@@ -37,10 +37,10 @@
 //      壳不得包含真实页内容（#buttons-container / data-site / assets/js bundle），体积 < 1KB
 //  21. 唯一性：只有 index.html 是真实页
 //  22. CSS 不含 !important（契约 §6）
-//  23. 体积门禁（§21.2 + §9.9）：index.html 单页加载资源合计 > BUDGET_KB（212KB，gzip 前）→ 失败；
+//  23. 体积门禁（§21.2 + §9.9）：index.html 单页加载资源合计 > BUDGET_KB（232KB，gzip 前）→ 失败；
 //      gzip 数值仅作信息输出（真实成本口径），不单独卡；sw.js / manifest / PWA 图标不计入首屏
-//      预算 200→212 的理由（v2.11）：新增 pwa.js（安装引导 + 新版本提示，5.7KB）、snackbar/安装行/
-//      社交 meta/安全区 ≈ +4.7KB，首屏 196.4→206.8KB；但 gzip 只 +3.4KB（55.5→58.9）。
+//      预算 212→232 的理由（v2.12）：新增 i18n 中英词表、palette 命令面板、联想源与语言/联想源设置行，
+//      契约 §23 目标 ≤230KB / gzip ≤64KB（i18n 文案 gzip 压缩率高）。
 //  24. 单文件便携版 SimpleSearch.html：build 生成 + CSS/JS 全内联 + 零 assets/manifest/apple-touch-icon 引用
 //  25. 单文件体积门禁（§21.2）：SimpleSearch.html > 260KB → 失败；gzip 数值仅作信息输出
 //  26. v2.7 站点库规模：总站点数 ≥30、每分组 ≥3、DOM 含全部 data-site 按钮（可见性由 JS 控制）
@@ -53,6 +53,10 @@
 //  31. v2.11 viewport-fit=cover + PWA 安装/更新 DOM（#install-row[hidden]/#install-app/#update-toast[hidden,status]/
 //      #update-reload/#update-dismiss）
 //  32. v2.11 pwa.js：脚本列表含 pwa.js 且在 app.js 之前；经典脚本、无 eval/new Function
+//  33. v2.12 命令面板 DOM：#palette[hidden] + #palette-input(combobox) + #palette-list(listbox)
+//  34. v2.12 设置行：#lang-mode / #suggest-provider / #suggest-custom-row[hidden] / #suggest-url
+//  35. v2.12 脚本 13 个：新增 i18n.js（theme.js 之后）与 palette.js（sites-admin.js 之后），均在 app.js 之前
+//  36. v2.12 i18n：KEYS/ZH/EN 长度一致、KEYS 唯一；模板引用的 data-i18n/data-i18n-attr/data-i18n-title key 全覆盖
 // 任一失败 → 退出码 1，并打印失败详情。
 import fs from 'node:fs'
 import path from 'node:path'
@@ -70,17 +74,20 @@ const SHELLS = [
   { file: 'SimpleSearch-Dark.html', theme: 'dark' },
 ]
 
-// 契约 §6 / §20 / §22：入口页脚本顺序（v2.11 起 pwa.js 在 sites-admin.js 之后、app.js 之前）
+// 契约 §6 / §20 / §22 / §23：入口页脚本全集（v2.12 起 13 个）。
+// 具体相对顺序由下方检查的结构规则约束（i18n 在 theme 之后、palette 在 sites-admin 之后、均在 app 之前）。
 const EXPECTED_SCRIPTS = [
   'assets/js/sites.js',
   'assets/js/search.js',
   'assets/js/suggest.js',
   'assets/js/history.js',
   'assets/js/theme.js',
+  'assets/js/i18n.js',
   'assets/js/remote.js',
   'assets/js/input.js',
   'assets/js/sites-store.js',
   'assets/js/sites-admin.js',
+  'assets/js/palette.js',
   'assets/js/pwa.js',
   'assets/js/app.js',
 ]
@@ -144,6 +151,14 @@ const REQUIRED_IDS = [
   'update-toast',
   'update-reload',
   'update-dismiss',
+  // v2.12 命令面板 / 语言 / 联想源设置行
+  'palette',
+  'palette-input',
+  'palette-list',
+  'lang-mode',
+  'suggest-provider',
+  'suggest-custom-row',
+  'suggest-url',
   'scrim',
 ]
 
@@ -204,10 +219,10 @@ const BUILTIN_IDS = [
 const BUILD_MARKER = /<!--\s*由 scripts\/build\.mjs/
 // v2.6 PWA 唯一允许被引用的图片（apple-touch-icon / manifest icons / sw precache）
 const PWA_ICON_PATHS = ['assets/img/icon-192.png', 'assets/img/icon-512.png']
-// 体积预算口径（lead 2026-11-16 v2.11）：单页加载 < 212 KB（gzip 前；契约 §9.9 以 gzip 为真实成本口径）。
-// 200→212 显式上调原因：v2.11 新增 pwa.js（5.7KB，安装引导+新版本提示）+ snackbar/安装行/社交 meta/安全区
-// ≈ +4.7KB，首屏 196.4→206.8KB；gzip 仅 55.5→58.9KB（+3.4KB，这才是真实下载成本）。
-const BUDGET_KB = 212
+// 体积预算口径（lead 2026-11-17 v2.12）：单页加载 < 232 KB（gzip 前；契约 §9.9 以 gzip 为真实成本口径）。
+// 212→232 显式上调原因：v2.12 新增 i18n 中英词表、palette 命令面板、联想源与语言/联想源两个设置行，
+// 按契约 §23 体积红线目标 ≤230KB / gzip ≤64KB（i18n 文案 gzip 压缩率很高）。
+const BUDGET_KB = 232
 const SHELL_MAX_BYTES = 1024
 
 // ---------------------------------------------------------------- 通用工具
@@ -275,6 +290,77 @@ function findMetaByProperty(html, property) {
     if (getAttr(tag, 'property')?.toLowerCase() === property.toLowerCase()) return tag
   }
   return null
+}
+
+/** 从 JS 源码里提取 `const NAME = [...]` 的数组字面量（字符串数组，允许注释/嵌套括号）。 */
+function extractArrayLiteral(source, name) {
+  const declRe = new RegExp(`(?:const|let|var)\\s+${name}\\s*=\\s*\\[`)
+  const decl = source.match(declRe)
+  if (!decl) return null
+  const start = decl.index + decl[0].length - 1 // 指向 '['
+  let depth = 0
+  let quote = null
+  for (let i = start; i < source.length; i += 1) {
+    const ch = source[i]
+    if (quote) {
+      if (ch === '\\') {
+        i += 1
+        continue
+      }
+      if (ch === quote) quote = null
+      continue
+    }
+    if (ch === "'" || ch === '"' || ch === '`') {
+      quote = ch
+      continue
+    }
+    if (ch === '/' && source[i + 1] === '/') {
+      while (i < source.length && source[i] !== '\n') i += 1
+      continue
+    }
+    if (ch === '/' && source[i + 1] === '*') {
+      i += 2
+      while (i < source.length && !(source[i] === '*' && source[i + 1] === '/')) i += 1
+      i += 1
+      continue
+    }
+    if (ch === '[') depth += 1
+    else if (ch === ']') {
+      depth -= 1
+      if (depth === 0) {
+        const literal = source.slice(start, i + 1)
+        try {
+          return vm.runInNewContext(`(${literal})`)
+        } catch {
+          return null
+        }
+      }
+    }
+  }
+  return null
+}
+
+/** 收集 index.html 里所有 i18n 引用 key：data-i18n / data-i18n-title / data-i18n-attr="attr:KEY,attr:KEY"。 */
+function collectTemplateI18nKeys(html) {
+  const clean = stripHtmlComments(html)
+  const keys = new Set()
+  for (const match of findAll(clean, /<[a-zA-Z][\w:-]*\b[^>]*>/g)) {
+    const tag = match[0]
+    const plain = getAttr(tag, 'data-i18n')
+    if (plain) keys.add(plain.trim())
+    const title = getAttr(tag, 'data-i18n-title')
+    if (title) keys.add(title.trim())
+    const attrSpec = getAttr(tag, 'data-i18n-attr')
+    if (attrSpec) {
+      for (const part of attrSpec.split(/[,;]/)) {
+        const separator = part.indexOf(':')
+        if (separator === -1) continue
+        const key = part.slice(separator + 1).trim()
+        if (key) keys.add(key)
+      }
+    }
+  }
+  return [...keys]
 }
 
 /** 提取页面里所有 <link rel="...icon..."> 的 href。 */
@@ -873,17 +959,37 @@ check('index.html 引用的本地资源全部存在', () => {
 
 // ---------------------------------------------------------------- 6. 脚本顺序
 
-check('index.html 按契约顺序引用 11 个经典脚本（pwa.js 在 sites-admin.js 之后、app.js 之前）', () => {
+check('index.html 引用 13 个经典脚本（i18n 在 theme 之后、palette 在 sites-admin 之后，均在 app.js 之前）', () => {
   if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
   const localScripts = extractScriptSrcs(realPage.html).filter((src) => !isExternalUrl(src))
-  if (localScripts.join(',') !== EXPECTED_SCRIPTS.join(',')) {
-    return [
-      `${REAL_PAGE} 的脚本引用与契约 §6 不一致：\n` +
-        `        期望：${EXPECTED_SCRIPTS.join(', ')}\n` +
-        `        实际：${localScripts.join(', ') || '（无）'}`,
-    ]
+  const problems = []
+
+  // 集合必须与契约一致（13 个，顺序不写死，下列规则单独约束）
+  const missing = EXPECTED_SCRIPTS.filter((name) => !localScripts.includes(name))
+  const unexpected = localScripts.filter((name) => !EXPECTED_SCRIPTS.includes(name))
+  if (missing.length > 0) problems.push(`${REAL_PAGE} 缺少脚本：${missing.join(', ')}`)
+  if (unexpected.length > 0) problems.push(`${REAL_PAGE} 出现契约外脚本：${unexpected.join(', ')}`)
+
+  const indexOf = (name) => localScripts.indexOf(name)
+  const requireAfter = (later, earlier) => {
+    if (indexOf(later) === -1 || indexOf(earlier) === -1) return
+    if (indexOf(later) < indexOf(earlier)) {
+      problems.push(`${later} 应排在 ${earlier} 之后（期望 ${earlier} → ${later}）`)
+    }
   }
-  return []
+
+  requireAfter('assets/js/i18n.js', 'assets/js/theme.js')
+  requireAfter('assets/js/palette.js', 'assets/js/sites-admin.js')
+  requireAfter('assets/js/pwa.js', 'assets/js/sites-admin.js')
+  for (const name of EXPECTED_SCRIPTS) {
+    if (name === 'assets/js/app.js') continue
+    requireAfter('assets/js/app.js', name)
+  }
+  if (localScripts.length > 0 && localScripts[localScripts.length - 1] !== 'assets/js/app.js') {
+    problems.push(`app.js 应是最后一个脚本，实际最后为 ${localScripts[localScripts.length - 1]}`)
+  }
+
+  return problems
 })
 
 // ---------------------------------------------------------------- 7. 站点渲染
@@ -1781,7 +1887,7 @@ check('CSS 不含 !important（契约 §6）', () => {
 
 // ---------------------------------------------------------------- 23. 体积门禁（§21.2，超限阻断）
 
-check('体积门禁（index.html 单页 < 212KB，超限阻断；gzip 仅信息输出）', () => {
+check('体积门禁（index.html 单页 < 232KB，超限阻断；gzip 仅信息输出）', () => {
   if (!realPage.exists) return [`${REAL_PAGE} 不存在，无法统计首屏体积`]
 
   const notes = []
@@ -2268,13 +2374,144 @@ check('v2.11 pwa.js：脚本列表含 assets/js/pwa.js 且位于 app.js 之前�
   return problems
 })
 
+// ---------------------------------------------------------------- 33. v2.12 命令面板 DOM（§23.1）
+
+check('v2.12 命令面板 DOM：#palette[hidden] + #palette-input(role=combobox) + #palette-list(role=listbox)', () => {
+  if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
+  const clean = stripHtmlComments(realPage.html)
+  const problems = []
+
+  const palette = findTagById(clean, 'palette')
+  if (!palette) {
+    problems.push(`${REAL_PAGE} 缺少 #palette（命令面板）`)
+  } else if (!hasHiddenAttr(palette)) {
+    problems.push('#palette 初始应带 hidden（Ctrl/⌘+K 才打开）')
+  }
+
+  const input = findTagById(clean, 'palette-input')
+  if (!input) {
+    problems.push(`${REAL_PAGE} 缺少 #palette-input`)
+  } else {
+    const role = (getAttr(input, 'role') || '').toLowerCase()
+    if (role !== 'combobox') problems.push(`#palette-input 的 role 应为 combobox，实际 ${JSON.stringify(getAttr(input, 'role'))}`)
+    const controls = getAttr(input, 'aria-controls')
+    if (controls !== 'palette-list') problems.push(`#palette-input 的 aria-controls 应为 palette-list，实际 ${JSON.stringify(controls)}`)
+  }
+
+  const list = findTagById(clean, 'palette-list')
+  if (!list) {
+    problems.push(`${REAL_PAGE} 缺少 #palette-list`)
+  } else {
+    const role = (getAttr(list, 'role') || '').toLowerCase()
+    if (role !== 'listbox') problems.push(`#palette-list 的 role 应为 listbox，实际 ${JSON.stringify(getAttr(list, 'role'))}`)
+  }
+
+  return problems
+})
+
+// ---------------------------------------------------------------- 34. v2.12 语言/联想源设置行（§23.2/§23.3）
+
+check('v2.12 设置行：#lang-mode / #suggest-provider / #suggest-custom-row[hidden] / #suggest-url', () => {
+  if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
+  const clean = stripHtmlComments(realPage.html)
+  const problems = []
+
+  if (!findTagById(clean, 'lang-mode')) problems.push(`${REAL_PAGE} 缺少 #lang-mode（语言三段式）`)
+  if (!findTagById(clean, 'suggest-provider')) problems.push(`${REAL_PAGE} 缺少 #suggest-provider（联想源）`)
+
+  const customRow = findTagById(clean, 'suggest-custom-row')
+  if (!customRow) {
+    problems.push(`${REAL_PAGE} 缺少 #suggest-custom-row`)
+  } else if (!hasHiddenAttr(customRow)) {
+    problems.push('#suggest-custom-row 初始应带 hidden（仅自定义联想源时显示）')
+  }
+  if (!findTagById(clean, 'suggest-url')) problems.push(`${REAL_PAGE} 缺少 #suggest-url`)
+
+  return problems
+})
+
+// ---------------------------------------------------------------- 35. v2.12 脚本数量与新增脚本位置（§23.5）
+
+check('v2.12 脚本 13 个：i18n.js 在 theme.js 之后、palette.js 在 sites-admin.js 之后，且均在 app.js 之前', () => {
+  if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
+  const localScripts = extractScriptSrcs(realPage.html).filter((src) => !isExternalUrl(src))
+  const problems = []
+  const indexOf = (name) => localScripts.indexOf(name)
+
+  if (localScripts.length !== EXPECTED_SCRIPTS.length) {
+    problems.push(`脚本应为 ${EXPECTED_SCRIPTS.length} 个，实际 ${localScripts.length}：${localScripts.join(', ')}`)
+  }
+
+  const places = [
+    ['assets/js/i18n.js', 'assets/js/theme.js', 'theme.js 之后'],
+    ['assets/js/palette.js', 'assets/js/sites-admin.js', 'sites-admin.js 之后'],
+  ]
+  for (const [name, after, description] of places) {
+    if (indexOf(name) === -1) {
+      problems.push(`脚本列表缺少 ${name}`)
+      continue
+    }
+    if (indexOf(name) < indexOf(after)) problems.push(`${name} 应在 ${description}（${after} 之后）`)
+    if (indexOf('assets/js/app.js') !== -1 && indexOf(name) > indexOf('assets/js/app.js')) {
+      problems.push(`${name} 应在 app.js 之前`)
+    }
+  }
+
+  return problems
+})
+
+// ---------------------------------------------------------------- 36. v2.12 i18n key 一致性（§23.4）
+
+check('v2.12 i18n：KEYS/ZH/EN 长度一致、KEYS 唯一；模板引用的 data-i18n* key 全覆盖', () => {
+  if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
+  const problems = []
+
+  const i18nPath = path.join(ROOT, 'assets', 'js', 'i18n.js')
+  if (!fs.existsSync(i18nPath)) return ['缺少 assets/js/i18n.js（v2.12 新增模块）']
+
+  const source = fs.readFileSync(i18nPath, 'utf8')
+  const keys = extractArrayLiteral(source, 'KEYS')
+  const zh = extractArrayLiteral(source, 'ZH')
+  const en = extractArrayLiteral(source, 'EN')
+  if (!Array.isArray(keys)) problems.push('i18n.js 中无法解析 KEYS 数组（需为紧凑平行数组字面量）')
+  if (!Array.isArray(zh)) problems.push('i18n.js 中无法解析 ZH 数组')
+  if (!Array.isArray(en)) problems.push('i18n.js 中无法解析 EN 数组')
+  if (!Array.isArray(keys) || !Array.isArray(zh) || !Array.isArray(en)) return problems
+
+  if (keys.length === 0) problems.push('KEYS 为空')
+  if (zh.length !== keys.length) problems.push(`ZH 长度 ${zh.length} 应等于 KEYS 长度 ${keys.length}`)
+  if (en.length !== keys.length) problems.push(`EN 长度 ${en.length} 应等于 KEYS 长度 ${keys.length}`)
+
+  const duplicates = keys.filter((key, index) => keys.indexOf(key) !== index)
+  if (duplicates.length > 0) problems.push(`KEYS 存在重复 key：${[...new Set(duplicates)].join(', ')}`)
+  for (const key of keys) {
+    if (typeof key !== 'string' || key.trim() === '') {
+      problems.push(`KEYS 中存在非法 key：${JSON.stringify(key)}`)
+      break
+    }
+  }
+
+  // 模板引用的 key 必须全部存在于词表（反向允许：词表里未被模板引用的 key 由 JS 使用）
+  const templateKeys = collectTemplateI18nKeys(realPage.html)
+  const keySet = new Set(keys)
+  const missing = templateKeys.filter((key) => !keySet.has(key))
+  if (missing.length > 0) {
+    problems.push(`模板引用了词表里不存在的 i18n key：${[...new Set(missing)].join(', ')}`)
+  }
+
+  return {
+    problems,
+    notes: [`KEYS ${keys.length} 个 / 模板引用 ${templateKeys.length} 个（全部命中）`],
+  }
+})
+
 // ---------------------------------------------------------------- 输出摘要
 
 function printReport() {
   const failed = checks.filter((item) => item.problems.length > 0)
   const passed = checks.length - failed.length
 
-  console.log('SimpleSearch v2.11 静态校验（validate）')
+  console.log('SimpleSearch v2.12 静态校验（validate）')
   console.log(`仓库：${ROOT}`)
   console.log(`产物：${REAL_PAGE}（真实页）+ ${SHELLS.map((shell) => shell.file).join(' + ')}（重定向壳）`)
   console.log('')

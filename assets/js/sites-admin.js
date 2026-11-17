@@ -10,6 +10,23 @@
   // 导入配置大小上限 1 MB（契约 §22.4）；读到内存/JSON.parse 之前就拒绝
   const MAX_IMPORT_BYTES = 1024 * 1024
 
+  // i18n 文案：SS.i18n 缺失/缺 key 时回退中文；支持 {name} 占位
+  function t(key, fallback, vars) {
+    try {
+      if (SS.i18n && typeof SS.i18n.t === 'function') {
+        const value = SS.i18n.t(key, vars)
+        if (typeof value === 'string' && value !== '' && value !== key) return value
+      }
+    } catch (error) {
+      /* 回退中文 */
+    }
+    let text = fallback
+    if (vars) {
+      for (const name in vars) text = text.split('{' + name + '}').join(String(vars[name]))
+    }
+    return text
+  }
+
   let initialized = false
 
   function init() {
@@ -185,8 +202,8 @@
         row.setAttribute('data-site-id', site.id)
         row.appendChild(createElement('span', 'site-label', site.label))
         row.appendChild(createElement('span', 'site-group', groupLabel(site.group)))
-        row.appendChild(createRowAction('data-action', 'edit', 'row-action', '编辑 ' + site.label, '编辑'))
-        row.appendChild(createRowAction('data-action', 'delete', 'row-action', '删除 ' + site.label, '删除'))
+        row.appendChild(createRowAction('data-action', 'edit', 'row-action', t('sites.edit', '编辑') + ' ' + site.label, t('sites.edit', '编辑')))
+        row.appendChild(createRowAction('data-action', 'delete', 'row-action', t('sites.delete', '删除') + ' ' + site.label, t('sites.delete', '删除')))
         sitesList.appendChild(row)
       }
       if (sitesEmpty) sitesEmpty.hidden = customSites.length > 0
@@ -272,13 +289,13 @@
       hideForm()
       renderSitesList()
       refreshButtons()
-      setStatus('已保存：' + result.site.label)
+      setStatus(t('sites.status.saved', '已保存：{name}', { name: result.site.label }))
     }
 
     function deleteSite(site) {
       let confirmed = false
       try {
-        confirmed = Boolean(root.confirm('确定删除「' + site.label + '」吗？此操作不可撤销。'))
+        confirmed = Boolean(root.confirm(t('sites.confirmDelete', '确定删除「{name}」吗？此操作不可撤销。', { name: site.label })))
       } catch (error) {
         confirmed = false
       }
@@ -291,7 +308,7 @@
       if (editingId === site.id) hideForm()
       renderSitesList()
       refreshButtons()
-      setStatus('已删除：' + site.label)
+      setStatus(t('sites.status.deleted', '已删除：{name}', { name: site.label }))
     }
 
     // ------------------------------------------------------------ 导入 / 导出
@@ -397,7 +414,7 @@
       for (const site of current) merged.set(site.id, site)
       for (const site of data.customSites) merged.set(site.id, site)
       if (!store.saveCustom(safeStorage(), Array.from(merged.values()))) {
-        setStatus('导入失败：本地存储不可用')
+        setStatus(t('sites.status.importFail', '导入失败：{reason}', { reason: '本地存储不可用' }))
         return
       }
       store.saveOrder(safeStorage(), data.order)
@@ -405,7 +422,7 @@
       refreshButtons()
       renderSitesList()
       renderOrderList()
-      setStatus('已导入 ' + data.customSites.length + ' 个自定义站点')
+      setStatus(t('sites.status.imported', '已导入 {n} 个自定义站点', { n: data.customSites.length }))
     }
 
     function readFileText(file) {
@@ -423,7 +440,7 @@
       if (!file) return
       // 导入上限 1 MB（契约 §22.4）：超限直接拒绝，不读文件、不进 JSON.parse
       if (typeof file.size === 'number' && file.size > MAX_IMPORT_BYTES) {
-        setStatus('导入失败：文件过大（上限 1 MB）')
+        setStatus(t('sites.status.tooBig', '文件过大（上限 1 MB）', { size: '1 MB' }))
         try {
           importFile.value = ''
         } catch (error) {
@@ -435,13 +452,17 @@
         .then((text) => {
           const parsed = store.parseImport(text)
           if (!parsed.ok) {
-            setStatus('导入失败：' + (parsed.error || '配置文件不合法'))
+            setStatus(t('sites.status.importFail', '导入失败：{reason}', {
+              reason: parsed.error || '配置文件不合法',
+            }))
             return
           }
           applyImport(parsed)
         })
         .catch((error) => {
-          setStatus('导入失败：' + (error && error.message ? error.message : '无法读取文件'))
+          setStatus(t('sites.status.importFail', '导入失败：{reason}', {
+            reason: error && error.message ? error.message : '无法读取文件',
+          }))
         })
         .then(() => {
           if (importFile) {

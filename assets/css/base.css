@@ -150,6 +150,24 @@ kbd{display:inline-flex;align-items:center;justify-content:center;min-width:24px
 .form-error{margin:0;color:var(--danger);font-size:13px}
 .form-actions{display:flex;justify-content:flex-end;gap:8px}
 
+/* v2.12 */
+.visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.palette{width:min(560px,92vw);top:12vh;transform:translateX(-50%);max-height:70vh}
+.palette:not([hidden]){display:flex;flex-flow:column}
+.palette-input{flex:none;height:48px;padding:0 16px;border:0;border-bottom:1px solid var(--divider);background-color:transparent;color:var(--text);font:inherit}
+.palette-input:focus-visible{outline:none;box-shadow:inset 0 -2px 0 var(--primary-bg)}
+.palette-list{flex:1;margin:0;padding:4px 0;list-style:none;overflow:auto}
+.palette-item{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 16px;border-radius:2px;cursor:pointer}
+.palette-item:hover{background-color:var(--overlay-hover)}
+.palette-item[aria-selected='true']{background-color:var(--overlay-active);box-shadow:inset 2px 0 0 var(--primary-bg)}
+.palette-icon{display:inline-flex;flex:none;width:18px;height:18px}
+.palette-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.palette-kind{font-size:12px;color:var(--text-secondary)}
+#palette-hint{padding:0 16px 12px}
+.settings-select,#suggest-url{height:36px;padding:0 8px;border:1px solid var(--divider);border-radius:2px;background-color:var(--surface);color:var(--text);font:inherit}
+.settings-select{max-width:150px;margin-left:auto}
+.settings-row-stack{gap:6px;padding:8px 0}
+
 /* ------------------------------------------------------------ skip-link / 焦点 / 兜底 */
 .skip-link{position:fixed;top:var(--space-2);left:var(--space-2);z-index:var(--z-skip-link);padding:var(--space-2) var(--space-4);border-radius:var(--radius-sm);background-color:var(--primary-bg);color:var(--on-primary);font-size:var(--font-size-sm);font-weight:var(--font-weight-medium);text-decoration:none;box-shadow:var(--elevation-2);transform:translateY(calc(-100% - var(--space-4)));transition:transform var(--transition-base) var(--ease)}
 .skip-link:focus{transform:translateY(0)}
@@ -193,6 +211,8 @@ body.nav-open .site-nav{transform:none}
 .dialog-body{padding:8px 16px 16px}
 .shortcut-list{padding:8px 16px 16px}
 #engine-mode .segmented-item{padding:0 10px}
+.palette{width:calc(100vw - 24px);top:8vh;max-height:76vh}
+.palette-item{min-height:48px}
 }
 
 /* reduced motion：关闭涟漪与过渡 */

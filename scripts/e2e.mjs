@@ -267,7 +267,9 @@ function createPage(cdp) {
   }
 
   async function clearStorage() {
-    await evaluate('(() => { try { localStorage.clear() } catch (e) {} })()')
+    // v2.12 起界面语言跟随 navigator.language（headless Chrome 是 en-US）：
+    // 测试统一固定中文，语言相关的用例自己再切 English。
+    await evaluate('(() => { try { localStorage.clear(); localStorage.setItem("ss.lang", "zh") } catch (e) {} })()')
   }
 
   async function setStored(key, value) {
@@ -491,10 +493,10 @@ async function run() {
     const externalAssets = earlyRequests.filter((u) => !u.startsWith(ORIGIN) && !u.startsWith('data:'))
     check('C: 首屏无第三方请求', externalAssets.length === 0, externalAssets[0] || '')
     // SW 接管缓存后 transferSize 会归零，真正的体积预算由 scripts/validate.mjs 按磁盘产物校验；
-    // 这里只断言首屏请求数量合理（首页 + 3 CSS + 11 JS + favicon + PWA 图标）
+    // 这里只断言首屏请求数量合理（首页 + 3 CSS + 13 JS + favicon + PWA 图标）
     check(
-      'C: 首屏请求数合理（≤17）',
-      earlyRequests.length <= 17,
+      'C: 首屏请求数合理（≤19）',
+      earlyRequests.length <= 19,
       `${earlyRequests.length} 个请求 / transferSize ${(earlyBytes / 1024).toFixed(1)} KB（SW 命中时记 0）`
     )
 
@@ -1768,7 +1770,7 @@ async function run() {
       }))()`)
       check(
         'P: 导入 >1MB 文件被拒绝且不写入存储',
-        cap.status.includes('过大') && !cap.stored && cap.rows === 0,
+        /过大|1 MB|too big/i.test(cap.status) && !cap.stored && cap.rows === 0,
         JSON.stringify(cap)
       )
     } catch (error) {
@@ -1779,6 +1781,225 @@ async function run() {
 
     const pErrors = page.state.consoleErrors.length + page.state.exceptions.length
     check('P: 本段无控制台错误', pErrors === 0, page.state.consoleErrors.concat(page.state.exceptions).join(' | '))
+
+    // ================= Q. 命令面板 / 英文界面 / 可配置联想源（v2.12） =================
+    console.log('\n=== Q. 命令面板 / 英文界面 / 可配置联想源 ===')
+    await page.clearStorage()
+    await page.goto(PAGE, 350)
+    page.resetLogs()
+
+    // G1 Ctrl+K 打开命令面板（document keydown 监听，直接派发即可）
+    await page.evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }))`)
+    await sleep(300)
+    const paletteOpen = await page.evaluate(`(() => {
+      const p = document.getElementById('palette')
+      return {
+        hidden: p.hidden,
+        focused: document.activeElement && document.activeElement.id,
+        list: document.querySelectorAll('#palette-list .palette-item').length,
+        scrim: !document.getElementById('scrim').hidden,
+      }
+    })()`)
+    check(
+      'Q: Ctrl+K 打开命令面板并聚焦输入框',
+      paletteOpen.hidden === false && paletteOpen.focused === 'palette-input' && paletteOpen.list > 0 && paletteOpen.scrim,
+      JSON.stringify(paletteOpen)
+    )
+
+    // G2 输入 git → 结果含 GitHub
+    await page.evaluate(`(() => {
+      const input = document.getElementById('palette-input')
+      input.value = 'git'
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })()`)
+    await sleep(200)
+    const paletteFiltered = await page.evaluate(`(() => {
+      const items = [...document.querySelectorAll('#palette-list .palette-item')]
+      return {
+        count: items.length,
+        first: items[0] ? items[0].textContent.trim() : '',
+        labels: items.map((li) => li.textContent.trim()),
+        active: document.getElementById('palette-list').querySelector('[aria-selected="true"]') ? true : false,
+      }
+    })()`)
+    check(
+      'Q: 面板输入过滤后包含 GitHub',
+      paletteFiltered.labels.some((label) => label.includes('GitHub')) && paletteFiltered.active,
+      JSON.stringify({ count: paletteFiltered.count, first: paletteFiltered.first })
+    )
+
+    // G3 键盘：↓ 选中站点 + Enter 执行（把 resolveSite 换成 stub，避免真的跳外站）
+    await page.evaluate(`(() => {
+      window.__paletteOpened = null
+      const original = SimpleSearch.search.resolveSite
+      SimpleSearch.search.resolveSite = (id) => {
+        window.__paletteOpened = id
+        return { kind: 'home', url: '#stub-' + id }
+      }
+      window.__restoreResolveSite = () => { SimpleSearch.search.resolveSite = original }
+    })()`)
+    await page.pressKey('ArrowDown', { vk: 40, code: 'ArrowDown' })
+    await sleep(150)
+    await page.pressKey('Enter', { vk: 13, code: 'Enter' })
+    await sleep(350)
+    check(
+      'Q: ↓ + Enter 执行选中的站点（stub 拦截导航）',
+      (await page.evaluate('window.__paletteOpened')) === 'github',
+      await page.evaluate('String(window.__paletteOpened)')
+    )
+    await page.evaluate('window.__restoreResolveSite && window.__restoreResolveSite()')
+
+    // G4 重新打开 → Esc 关闭
+    await page.evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }))`)
+    await sleep(250)
+    await page.pressKey('Escape', { vk: 27, code: 'Escape' })
+    await sleep(250)
+    check('Q: Esc 关闭命令面板', await page.evaluate("document.getElementById('palette') ? document.getElementById('palette').hidden : 'page-changed'"))
+
+    // G5 命令项：输入「设置」→ 点击「打开设置」命令 → 设置面板打开
+    await page.evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }))`)
+    await sleep(250)
+    await page.evaluate(`(() => {
+      const input = document.getElementById('palette-input')
+      if (!input) return
+      input.value = '设置'
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })()`)
+    await sleep(250)
+    const commandClicked = await page.evaluate(`(() => {
+      const items = [...document.querySelectorAll('#palette-list .palette-item')]
+      const cmd = items.find((li) => li.textContent.includes('设置') && !li.textContent.includes('搜索'))
+      if (!cmd) return false
+      cmd.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      return true
+    })()`)
+    await sleep(350)
+    const commandResult = await page.evaluate(`(() => {
+      const palette = document.getElementById('palette')
+      const panel = document.getElementById('settings-panel')
+      return {
+        paletteHidden: palette ? palette.hidden : null,
+        panelHidden: panel ? panel.hidden : null,
+      }
+    })()`)
+    check(
+      'Q: 命令面板执行「打开设置」命令',
+      commandClicked === true && commandResult.paletteHidden === true && commandResult.panelHidden === false,
+      JSON.stringify({ commandClicked, ...commandResult })
+    )
+    await page.evaluate('SimpleSearch.app.closeSettings && SimpleSearch.app.closeSettings()')
+    await page.goto(PAGE, 350)
+
+    // G6 切 English：html lang / 导航 / 设置标题 / 卡片标题 / 持久化
+    await page.evaluate(`(() => {
+      const select = document.getElementById('lang-mode')
+      select.value = 'en'
+      select.dispatchEvent(new Event('change', { bubbles: true }))
+    })()`)
+    await sleep(300)
+    const english = await page.evaluate(`(() => {
+      const nav = document.querySelector('#group-chips [data-group="all"] .nav-label')
+      return {
+        htmlLang: document.documentElement.lang,
+        navAll: nav ? nav.textContent.trim() : '',
+        settingsTitle: (document.getElementById('settings-title') || {}).textContent,
+        cardTitle: (document.querySelector('.card-title') || {}).textContent,
+        submit: (document.getElementById('search-submit') || {}).textContent,
+        stored: (() => { try { return localStorage.getItem('ss.lang') } catch (e) { return null } })(),
+      }
+    })()`)
+    check(
+      'Q: 切到英文后界面文案与 html lang 更新',
+      english.htmlLang === 'en' &&
+        english.navAll !== '常用' &&
+        english.navAll.length > 0 &&
+        english.settingsTitle !== '设置' &&
+        english.cardTitle !== '常用网站' &&
+        english.stored === 'en',
+      JSON.stringify(english)
+    )
+    await page.evaluate("SimpleSearch.app.closeSettings()")
+    await page.goto(PAGE, 350)
+    check('Q: 刷新后仍是英文（ss.lang 持久化）', (await page.evaluate('document.documentElement.lang')) === 'en')
+
+    // G7 切回中文，重新 apply
+    await page.evaluate(`(() => {
+      const select = document.getElementById('lang-mode')
+      select.value = 'zh'
+      select.dispatchEvent(new Event('change', { bubbles: true }))
+    })()`)
+    await sleep(300)
+    const chinese = await page.evaluate(`(() => ({
+      htmlLang: document.documentElement.lang,
+      navAll: (document.querySelector('#group-chips [data-group="all"] .nav-label') || {}).textContent,
+      cardTitle: (document.querySelector('.card-title') || {}).textContent,
+      open: !document.getElementById('settings-panel').hidden,
+    }))()`)
+    check(
+      'Q: 切回中文后恢复中文文案',
+      chinese.htmlLang === 'zh-CN' && chinese.navAll.trim() === '常用' && chinese.cardTitle.trim() === '常用网站',
+      JSON.stringify(chinese)
+    )
+    await page.evaluate("SimpleSearch.app.closeSettings()")
+
+    // G8 自定义联想源：指向本地 fixture，输入关键词出现自定义建议
+    await page.evaluate(`SimpleSearch.app.openSettings()`)
+    await sleep(250)
+    await page.evaluate(`(() => {
+      const select = document.getElementById('suggest-provider')
+      select.value = 'custom'
+      select.dispatchEvent(new Event('change', { bubbles: true }))
+      const row = document.getElementById('suggest-custom-row')
+      const input = document.getElementById('suggest-url')
+      input.value = ${JSON.stringify(`${ORIGIN}/tests/fixtures/suggest.json?q={q}`)}
+      input.dispatchEvent(new Event('change', { bubbles: true }))
+      window.__providerRowVisible = !row.hidden
+    })()`)
+    await sleep(200)
+    check('Q: 选「自定义」后显示接口地址输入行', await page.evaluate('window.__providerRowVisible === true'))
+    await page.evaluate("SimpleSearch.app.closeSettings()")
+    await page.evaluate("document.getElementById('search-input').focus()")
+    await page.typeText('abc')
+    await sleep(700)
+    const customSuggest = await page.evaluate(`(() => {
+      const items = [...document.querySelectorAll('#suggest-list .suggest-item')]
+      return { labels: items.map((li) => li.textContent.trim()), hidden: document.getElementById('suggest-list').hidden }
+    })()`)
+    check(
+      'Q: 自定义联想源返回的建议出现在列表里',
+      customSuggest.hidden === false && customSuggest.labels.some((label) => label.includes('自定义建议一')),
+      JSON.stringify(customSuggest.labels.slice(0, 4))
+    )
+
+    // G9 联想源切 off：不再发远程请求
+    await page.evaluate("document.getElementById('search-input').value = ''")
+    page.resetLogs()
+    await page.evaluate(`(() => {
+      const select = document.getElementById('suggest-provider')
+      select.value = 'off'
+      select.dispatchEvent(new Event('change', { bubbles: true }))
+      const input = document.getElementById('search-input')
+      input.value = ''
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      input.focus()
+    })()`)
+    await page.typeText('xyz')
+    await sleep(700)
+    const offRequests = page.state.requests.filter((url) => url.includes('suggest.json'))
+    check('Q: 联想源设为「关闭」后不再请求远程', offRequests.length === 0, offRequests[0] || '')
+
+    // 清掉本段写入的配置，避免影响后续/下次运行
+    await page.evaluate(`(() => {
+      try {
+        localStorage.removeItem('ss.suggestProvider')
+        localStorage.removeItem('ss.suggestUrl')
+        localStorage.removeItem('ss.lang')
+      } catch (e) {}
+    })()`)
+    await page.clearStorage()
+
+    const gErrors = page.state.consoleErrors.length + page.state.exceptions.length
+    check('Q: 本段无控制台错误', gErrors === 0, page.state.consoleErrors.concat(page.state.exceptions).join(' | '))
 
   } finally {
     cleanup()

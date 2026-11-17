@@ -19,6 +19,23 @@
   const LOCAL_ITEM_CAP = 24
   const REMOTE_WORD_MAX_LENGTH = 100
 
+  // i18n 文案：SS.i18n 缺失/缺 key 时回退中文；支持 {name} 占位
+  function i18nText(key, fallback, vars) {
+    try {
+      if (SS.i18n && typeof SS.i18n.t === 'function') {
+        const value = SS.i18n.t(key, vars)
+        if (typeof value === 'string' && value !== '' && value !== key) return value
+      }
+    } catch (e) {
+      /* 回退中文 */
+    }
+    let text = fallback
+    if (vars) {
+      for (const name in vars) text = text.split('{' + name + '}').join(String(vars[name]))
+    }
+    return text
+  }
+
   function normalize(raw) {
     if (typeof raw !== 'string') return ''
     return raw.trim().replace(/\s+/g, ' ')
@@ -163,7 +180,7 @@
 
     function refreshHistoryCount() {
       const count = historyList().length
-      if (historyCount) historyCount.textContent = count + ' 条'
+      if (historyCount) historyCount.textContent = i18nText('hist.count', '{n} 条', { n: count })
       if (historyClear) historyClear.disabled = count === 0
       return count
     }

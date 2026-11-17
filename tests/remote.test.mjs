@@ -412,3 +412,95 @@ testRemote('fetch：失败/异常回包也 resolve([])，不 reject', async () =
   const result = await promise
   assertWords(result, [])
 })
+
+// ---------------------------------------------------------------- v2.12 §23.2 自定义联想源响应解析
+
+function customParserOf(env) {
+  const remote = env && env.remote
+  if (!remote) return null
+  if (typeof remote.parseCustomPayload === 'function') return remote.parseCustomPayload
+  if (remote.provider && typeof remote.provider.parseCustomPayload === 'function') {
+    return remote.provider.parseCustomPayload.bind(remote.provider)
+  }
+  return null
+}
+
+const customProbe = skipReason ? null : createRemoteEnv()
+const customParser = customProbe ? customParserOf(customProbe) : null
+
+function testCustom(name, fn) {
+  test(name, customParser ? {} : { skip: '等待 input-ux 交付 parseCustomPayload（自定义联想源）' }, fn)
+}
+
+function invokeCustom(input) {
+  const remote = customProbe.remote
+  if (typeof remote.parseCustomPayload === 'function') return remote.parseCustomPayload(input)
+  return remote.provider.parseCustomPayload(input)
+}
+
+// 实现可能接受「已解析的对象」或「JSON 文本」，先探测一次，再按同一模式跑全部用例
+function detectCustomMode() {
+  for (const mode of ['object', 'string']) {
+    const input = mode === 'object' ? ['a', 'b'] : '["a","b"]'
+    try {
+      const result = invokeCustom(input)
+      if (Array.isArray(result) && result.length > 0) return mode
+    } catch {
+      // 换下一种输入模式
+    }
+  }
+  return null
+}
+
+function asCustomInput(value, mode) {
+  return mode === 'string' && typeof value !== 'string' ? JSON.stringify(value) : value
+}
+
+testCustom('parseCustomPayload：数组形状 ["a","b","a"] → 去重后字符串数组', () => {
+  const mode = detectCustomMode()
+  assert.ok(mode, '无法调用 parseCustomPayload（对象/文本两种输入探测都失败）')
+  assertWords(invokeCustom(asCustomInput(['a', 'b', 'a'], mode)), ['a', 'b'])
+})
+
+testCustom('parseCustomPayload：{s:[...]} 形状', () => {
+  const mode = detectCustomMode()
+  assert.ok(mode)
+  assertWords(invokeCustom(asCustomInput({ s: ['x', 'y'] }, mode)), ['x', 'y'])
+})
+
+testCustom('parseCustomPayload：{data:[...]} 形状', () => {
+  const mode = detectCustomMode()
+  assert.ok(mode)
+  assertWords(invokeCustom(asCustomInput({ data: ['m', 'n'] }, mode)), ['m', 'n'])
+})
+
+testCustom('parseCustomPayload：结果去重且最多 8 条', () => {
+  const mode = detectCustomMode()
+  assert.ok(mode)
+  const words = Array.from({ length: 12 }, (_, index) => 'w' + index)
+  words.push('w0', 'w1')
+  const result = invokeCustom(asCustomInput(words, mode))
+  assert.ok(Array.isArray(result))
+  assert.ok(result.length <= 8, '最多 8 条，实际 ' + result.length)
+  assert.equal(new Set(result).size, result.length, '结果应去重')
+})
+
+testCustom('parseCustomPayload：非字符串项被过滤', () => {
+  const mode = detectCustomMode()
+  assert.ok(mode)
+  assertWords(invokeCustom(asCustomInput({ data: ['ok', 42, null, 'ok2'] }, mode)), ['ok', 'ok2'])
+})
+
+testCustom('parseCustomPayload：非法输入返回空数组且不抛异常', () => {
+  const mode = detectCustomMode()
+  assert.ok(mode)
+  const badInputs = ['not-json', '{"s":"nope"}', '{"data":{}}', '42', 'null', '']
+  for (const input of badInputs) {
+    let result
+    assert.doesNotThrow(() => {
+      result = invokeCustom(input)
+    }, '非法输入不应抛异常：' + input)
+    assert.ok(Array.isArray(result), '非法输入应返回数组：' + input)
+    assertWords(result, [], '非法输入应返回空数组：' + input)
+  }
+})
