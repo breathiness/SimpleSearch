@@ -29,7 +29,7 @@ jobs:
         # manifest.webmanifest / PWA 图标是手写静态文件，不参与 diff。
         run: |
           npm run build
-          git diff --exit-code -- index.html SimpleSearch.html SimpleSearch-Light.html SimpleSearch-Dark.html sw.js
+          git diff --exit-code -- index.html SimpleSearch.html SimpleSearch-Light.html SimpleSearch-Dark.html sw.js assets
 
       - name: 构建、单元测试、静态校验
         run: npm run check

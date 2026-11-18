@@ -3,6 +3,19 @@
 本项目的对用户可见变化都记录在这里。
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)：主版本号在页面结构/使用方式有明显变化时递增。
 
+## 2.13.0（未发布）
+
+构建期安全压缩：页面加载压缩后的 CSS/JS，源码保持可读；功能、交互、视觉零变化。
+
+### 工程
+
+- 新增 `scripts/minify.mjs`（零依赖，字符级状态机）：只删块注释、整行 `//` 注释、行首缩进、行尾空白、合并空行；**不重命名标识符、不合并行、不删行尾注释、不动字符串/模板字面量/正则内容**；HTML 删注释（保留条件注释）但保留每行换行。
+- `npm run build` 把页面引用的每个 `assets/css/*.css`、`assets/js/*.js` 压缩成**同目录**的 `*.min.css` / `*.min.js`，页面改为引用 `.min`；单文件便携版内联压缩版；**可读源码保留**、单测仍 import 原文件；每次 build 先清旧 min；`build --check` 与 CI 漂移检查覆盖 min 产物；`buildPrecacheList()` 改为从页面引用推导（只缓存 `.min` + manifest/favicon/PWA 图标）。
+- 体积：首屏 **230.3 → 190.7 KB raw / gzip 66.7 → 56.1 KB / brotli 54.9 → 48.3 KB**（brotli 仅信息），`BUDGET_KB` **232 → 196**（按压缩后 raw 硬门禁）；单文件 **230.7 → 184.6 KB（189,017 B）/ gzip 44.0 KB**（上限 260 KB 不变）；`index.html` 36.5 KB，新增 **16 个 `.min` 产物**（3 CSS + 13 JS）；脚本仍 13 个、首屏仍 19 个请求。
+- **为什么 raw 降 39.6 KB、gzip 只降 10.6 KB**：注释和缩进是「独特文本」，gzip 本来就压不动；删掉后 raw 明显变小，但 gzip/brotli 收益有限（brotli 只降 6.6 KB）。
+- 验证：e2e **195/195**、`npm run visual` **4/4、0 px 差异**；`npm run validate` **37/37 PASS**；`tests/minify.test.mjs` 覆盖边界/幂等/可解析/数据一致；`npm test` **302 例**全绿。
+- 明确不做：不改交互/功能、不延迟加载、不换托管、不引入 esbuild、不做标识符混淆——只做构建期字节压缩，源码保持可读。
+
 ## 2.12.1（未发布）
 
 ### 修复

@@ -1,4 +1,4 @@
-// SimpleSearch v2.12 静态校验与产物一致性门禁。
+// SimpleSearch v2.13 静态校验与产物一致性门禁。
 // 用法：node scripts/validate.mjs（npm run validate）
 //
 // 产物模型（docs/contract.md §7、§12-§17）：npm run build 生成 5 个产物
@@ -15,7 +15,7 @@
 //   3. index.html head：charset / lang / viewport / theme-color / favicon / data-theme / data-theme-default=auto
 //   4. index.html 硬约束：无 type="module"、无内联 on* 事件、无未替换 {{...}}、无重复 id、DOM 契约 id 齐全
 //   5. index.html 引用的所有本地 resources 真实存在
-//   6. index.html 引用 13 个经典脚本；i18n.js 在 theme.js 之后、palette.js 在 sites-admin.js 之后，均在 app.js 之前
+//   6. index.html 引用 13 个经典脚本（页面引用 .min.js，校验时归一化；顺序 sites → … → pwa → palette → app）
 //   7. index.html 的 data-site 与 SS.sites 一一对应（顺序/label/数量/data-group）
 //   8. 文档站骨架：.appbar（含 .appbar-logo→#i-logo）/.shell/#main-content/.card、
 //      设置面板（dialog/hidden/#theme-mode 三段式/唯一 .switch-row/.settings-row+空 #color-swatches）、
@@ -37,10 +37,10 @@
 //      壳不得包含真实页内容（#buttons-container / data-site / assets/js bundle），体积 < 1KB
 //  21. 唯一性：只有 index.html 是真实页
 //  22. CSS 不含 !important（契约 §6）
-//  23. 体积门禁（§21.2 + §9.9）：index.html 单页加载资源合计 > BUDGET_KB（232KB，gzip 前）→ 失败；
+//  23. 体积门禁（§21.2 + §9.9）：index.html 单页加载资源合计 > BUDGET_KB（196KB，gzip 前）→ 失败；
 //      gzip 数值仅作信息输出（真实成本口径），不单独卡；sw.js / manifest / PWA 图标不计入首屏
-//      预算 212→232 的理由（v2.12）：新增 i18n 中英词表、palette 命令面板、联想源与语言/联想源设置行，
-//      契约 §23 目标 ≤230KB / gzip ≤64KB（i18n 文案 gzip 压缩率高）。
+//      232→196 的原因（v2.13）：构建期安全压缩，页面只加载 assets/**/*.min.*，
+//      首屏 230.3→190.7 KB / gzip 66.7→56.1 KB（契约 §24.3 目标 ≤192 KB / gzip ≤57）。
 //  24. 单文件便携版 SimpleSearch.html：build 生成 + CSS/JS 全内联 + 零 assets/manifest/apple-touch-icon 引用
 //  25. 单文件体积门禁（§21.2）：SimpleSearch.html > 260KB → 失败；gzip 数值仅作信息输出
 //  26. v2.7 站点库规模：总站点数 ≥30、每分组 ≥3、DOM 含全部 data-site 按钮（可见性由 JS 控制）
@@ -57,6 +57,7 @@
 //  34. v2.12 设置行：#lang-mode / #suggest-provider / #suggest-custom-row[hidden] / #suggest-url
 //  35. v2.12 脚本 13 个：新增 i18n.js（theme.js 之后）与 palette.js（sites-admin.js 之后），均在 app.js 之前
 //  36. v2.12 i18n：KEYS/ZH/EN 长度一致、KEYS 唯一；模板引用的 data-i18n/data-i18n-attr/data-i18n-title key 全覆盖
+//  37. v2.13 min 产物：页面只引用 .min.js/.min.css、引用文件都存在、无孤儿 min 文件、被引用 min.js 无 eval/new Function
 // 任一失败 → 退出码 1，并打印失败详情。
 import fs from 'node:fs'
 import path from 'node:path'
@@ -87,8 +88,8 @@ const EXPECTED_SCRIPTS = [
   'assets/js/input.js',
   'assets/js/sites-store.js',
   'assets/js/sites-admin.js',
-  'assets/js/palette.js',
   'assets/js/pwa.js',
+  'assets/js/palette.js',
   'assets/js/app.js',
 ]
 
@@ -219,10 +220,9 @@ const BUILTIN_IDS = [
 const BUILD_MARKER = /<!--\s*由 scripts\/build\.mjs/
 // v2.6 PWA 唯一允许被引用的图片（apple-touch-icon / manifest icons / sw precache）
 const PWA_ICON_PATHS = ['assets/img/icon-192.png', 'assets/img/icon-512.png']
-// 体积预算口径（lead 2026-11-17 v2.12）：单页加载 < 232 KB（gzip 前；契约 §9.9 以 gzip 为真实成本口径）。
-// 212→232 显式上调原因：v2.12 新增 i18n 中英词表、palette 命令面板、联想源与语言/联想源两个设置行，
-// 按契约 §23 体积红线目标 ≤230KB / gzip ≤64KB（i18n 文案 gzip 压缩率很高）。
-const BUDGET_KB = 232
+// 体积预算口径（lead 2026-11-18 v2.13）：单页加载 < 196 KB（gzip 前；契约 §9.9 以 gzip 为真实成本口径）。
+// 232→196 的原因：v2.13 构建期安全压缩（页面只加载 assets/**/*.min.*），首屏 230.3→190.7 KB / gzip 66.7→56.1 KB。
+const BUDGET_KB = 196
 const SHELL_MAX_BYTES = 1024
 
 // ---------------------------------------------------------------- 通用工具
@@ -465,6 +465,12 @@ function extractScriptSrcs(html) {
     if (src) srcs.push(src.trim())
   }
   return srcs
+}
+
+/** v2.13：页面引用的是 assets/js/<name>.min.js / assets/css/<name>.min.css，校验时归一化回源码路径。 */
+function normalizeMinPath(src) {
+  if (typeof src !== 'string') return src
+  return src.replace(/\.min\.js$/i, '.js').replace(/\.min\.css$/i, '.css')
 }
 
 // ---------------------------------------------------------------- v2.2 §13 解析工具
@@ -959,16 +965,26 @@ check('index.html 引用的本地资源全部存在', () => {
 
 // ---------------------------------------------------------------- 6. 脚本顺序
 
-check('index.html 引用 13 个经典脚本（i18n 在 theme 之后、palette 在 sites-admin 之后，均在 app.js 之前）', () => {
+check('index.html 引用 13 个经典脚本（.min.js 归一化后：sites → … → pwa → palette → app）', () => {
   if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
-  const localScripts = extractScriptSrcs(realPage.html).filter((src) => !isExternalUrl(src))
+  const localScripts = extractScriptSrcs(realPage.html)
+    .filter((src) => !isExternalUrl(src))
+    .map(normalizeMinPath)
   const problems = []
 
-  // 集合必须与契约一致（13 个，顺序不写死，下列规则单独约束）
+  // 集合必须与契约一致（13 个，顺序单独校验）
   const missing = EXPECTED_SCRIPTS.filter((name) => !localScripts.includes(name))
   const unexpected = localScripts.filter((name) => !EXPECTED_SCRIPTS.includes(name))
   if (missing.length > 0) problems.push(`${REAL_PAGE} 缺少脚本：${missing.join(', ')}`)
   if (unexpected.length > 0) problems.push(`${REAL_PAGE} 出现契约外脚本：${unexpected.join(', ')}`)
+
+  if (missing.length === 0 && unexpected.length === 0 && localScripts.join(',') !== EXPECTED_SCRIPTS.join(',')) {
+    problems.push(
+      `脚本顺序/数量与契约 §24 不一致：\n` +
+        `        期望：${EXPECTED_SCRIPTS.join(' → ')}\n` +
+        `        实际：${localScripts.join(' → ')}`,
+    )
+  }
 
   const indexOf = (name) => localScripts.indexOf(name)
   const requireAfter = (later, earlier) => {
@@ -1887,7 +1903,7 @@ check('CSS 不含 !important（契约 §6）', () => {
 
 // ---------------------------------------------------------------- 23. 体积门禁（§21.2，超限阻断）
 
-check('体积门禁（index.html 单页 < 232KB，超限阻断；gzip 仅信息输出）', () => {
+check('体积门禁（index.html 单页 < 196KB，超限阻断；gzip 仅信息输出）', () => {
   if (!realPage.exists) return [`${REAL_PAGE} 不存在，无法统计首屏体积`]
 
   const notes = []
@@ -2215,7 +2231,9 @@ check('v2.9 data-icon 与脚本：内置按钮带 data-icon（非空时形如 #i
   }
 
   // 新脚本顺序：sites-store.js / sites-admin.js 必须在 app.js 之前
-  const localScripts = extractScriptSrcs(clean).filter((src) => !isExternalUrl(src))
+  const localScripts = extractScriptSrcs(clean)
+    .filter((src) => !isExternalUrl(src))
+    .map(normalizeMinPath)
   const indexOf = (name) => localScripts.indexOf(name)
   for (const name of ['assets/js/sites-store.js', 'assets/js/sites-admin.js']) {
     if (indexOf(name) === -1) {
@@ -2347,7 +2365,9 @@ check('v2.11 pwa.js：脚本列表含 assets/js/pwa.js 且位于 app.js 之前�
   const clean = stripHtmlComments(realPage.html)
   const problems = []
 
-  const localScripts = extractScriptSrcs(clean).filter((src) => !isExternalUrl(src))
+  const localScripts = extractScriptSrcs(clean)
+    .filter((src) => !isExternalUrl(src))
+    .map(normalizeMinPath)
   const pwaIndex = localScripts.indexOf('assets/js/pwa.js')
   const appIndex = localScripts.indexOf('assets/js/app.js')
   if (pwaIndex === -1) problems.push(`${REAL_PAGE} 脚本列表缺少 assets/js/pwa.js`)
@@ -2434,7 +2454,9 @@ check('v2.12 设置行：#lang-mode / #suggest-provider / #suggest-custom-row[hi
 
 check('v2.12 脚本 13 个：i18n.js 在 theme.js 之后、palette.js 在 sites-admin.js 之后，且均在 app.js 之前', () => {
   if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
-  const localScripts = extractScriptSrcs(realPage.html).filter((src) => !isExternalUrl(src))
+  const localScripts = extractScriptSrcs(realPage.html)
+    .filter((src) => !isExternalUrl(src))
+    .map(normalizeMinPath)
   const problems = []
   const indexOf = (name) => localScripts.indexOf(name)
 
@@ -2505,13 +2527,82 @@ check('v2.12 i18n：KEYS/ZH/EN 长度一致、KEYS 唯一；模板引用的 data
   }
 })
 
+// ---------------------------------------------------------------- 37. v2.13 min 产物（§24.2/§24.3）
+
+check('v2.13 min 产物：页面只引用 .min.js/.min.css、引用文件都存在、无孤儿 min、被引用 min.js 无 eval/new Function', () => {
+  if (!realPage.exists) return [`${REAL_PAGE} 不存在`]
+  const problems = []
+
+  const scriptRefs = extractScriptSrcs(realPage.html).filter((src) => !isExternalUrl(src))
+  const cssRefs = extractResourceRefs(realPage.html)
+    .map((ref) => (ref.url || '').split('?')[0].split('#')[0])
+    .filter((url) => url && !isExternalUrl(url) && !url.startsWith('#') && /\.css$/i.test(url))
+
+  if (scriptRefs.length === 0) problems.push(`${REAL_PAGE} 没有任何脚本引用`)
+
+  const nonMinScripts = scriptRefs.filter((src) => !/\.min\.js$/i.test(src.split('?')[0]))
+  if (nonMinScripts.length > 0) {
+    problems.push(`v2.13 页面应只引用 .min.js，仍引用源码：${nonMinScripts.join(', ')}`)
+  }
+  const nonMinCss = cssRefs.filter((url) => !/\.min\.css$/i.test(url))
+  if (nonMinCss.length > 0) {
+    problems.push(`v2.13 页面应只引用 .min.css，仍引用源码：${nonMinCss.join(', ')}`)
+  }
+
+  const referenced = new Set([...scriptRefs, ...cssRefs].map((url) => url.split('?')[0]))
+  for (const ref of referenced) {
+    const full = path.join(ROOT, ref)
+    if (!fs.existsSync(full)) {
+      problems.push(`页面引用的文件不存在：${ref}`)
+      continue
+    }
+    if (/\.min\.js$/i.test(ref)) {
+      const source = fs.readFileSync(full, 'utf8')
+      if (/\beval\s*\(/.test(source)) problems.push(`${ref} 含 eval(（禁止）`)
+      if (/\bnew\s+Function\s*\(/.test(source)) problems.push(`${ref} 含 new Function(（禁止）`)
+    }
+  }
+
+  // 孤儿 min 产物（页面没引用到的 *.min.js / *.min.css = 构建残留）
+  for (const dir of ['assets/js', 'assets/css']) {
+    const full = path.join(ROOT, dir)
+    if (!fs.existsSync(full)) continue
+    for (const file of fs.readdirSync(full)) {
+      if (!/\.min\.(js|css)$/i.test(file)) continue
+      const relative = `${dir}/${file}`
+      if (!referenced.has(relative)) {
+        problems.push(`孤儿 min 产物：${relative}（页面未引用，疑似构建残留；构建应先清理旧 *.min.*）`)
+      }
+    }
+  }
+
+  let minBytes = 0
+  let sourceBytes = 0
+  for (const ref of referenced) {
+    if (!/\.min\.(js|css)$/i.test(ref)) continue
+    const full = path.join(ROOT, ref)
+    if (!fs.existsSync(full)) continue
+    minBytes += fs.statSync(full).size
+    const sourceFull = path.join(ROOT, normalizeMinPath(ref))
+    if (fs.existsSync(sourceFull)) sourceBytes += fs.statSync(sourceFull).size
+  }
+
+  return {
+    problems,
+    notes: [
+      `页面引用 min 产物 ${referenced.size} 个（${minBytes ? `${(minBytes / 1024).toFixed(1)} KB` : '—'}）` +
+        (sourceBytes ? `，对应源码 ${(sourceBytes / 1024).toFixed(1)} KB（压缩率 ${(100 - (minBytes / sourceBytes) * 100).toFixed(1)}%）` : ''),
+    ],
+  }
+})
+
 // ---------------------------------------------------------------- 输出摘要
 
 function printReport() {
   const failed = checks.filter((item) => item.problems.length > 0)
   const passed = checks.length - failed.length
 
-  console.log('SimpleSearch v2.12 静态校验（validate）')
+  console.log('SimpleSearch v2.13 静态校验（validate）')
   console.log(`仓库：${ROOT}`)
   console.log(`产物：${REAL_PAGE}（真实页）+ ${SHELLS.map((shell) => shell.file).join(' + ')}（重定向壳）`)
   console.log('')

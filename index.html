@@ -2,27 +2,27 @@
 <!-- 由 scripts/build.mjs 从 templates/page.html 生成，请勿手改 -->
 <html lang="zh-CN" data-theme="light" data-theme-default="auto" data-color="indigo">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>简单搜索</title>
-  <meta name="description" content="一款超简单的聚合搜索网站：输入关键词，点击网站即可在该站内搜索；不输入则直接打开网站。自动跟随系统深浅色，也可一键切换。">
-  <meta name="theme-color" content="#f5f5f5">
-  <meta property="og:title" content="简单搜索">
-  <meta property="og:description" content="一款超简单的聚合搜索网站：输入关键词，点击网站即可在该站内搜索；不输入则直接打开网站。自动跟随系统深浅色，也可一键切换。">
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://breathiness.github.io/SimpleSearch/">
-  <meta property="og:image" content="https://breathiness.github.io/SimpleSearch/docs/images/screenshot-desktop.png">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="900">
-  <meta property="og:site_name" content="简单搜索">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="简单搜索">
-  <meta name="twitter:description" content="一款超简单的聚合搜索网站：输入关键词，点击网站即可在该站内搜索；不输入则直接打开网站。自动跟随系统深浅色，也可一键切换。">
-  <meta name="twitter:image" content="https://breathiness.github.io/SimpleSearch/docs/images/screenshot-desktop.png">
-  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="assets/img/icon-192.png">
-  <link rel="manifest" href="manifest.webmanifest">
-  <script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>简单搜索</title>
+<meta name="description" content="一款超简单的聚合搜索网站：输入关键词，点击网站即可在该站内搜索；不输入则直接打开网站。自动跟随系统深浅色，也可一键切换。">
+<meta name="theme-color" content="#f5f5f5">
+<meta property="og:title" content="简单搜索">
+<meta property="og:description" content="一款超简单的聚合搜索网站：输入关键词，点击网站即可在该站内搜索；不输入则直接打开网站。自动跟随系统深浅色，也可一键切换。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://breathiness.github.io/SimpleSearch/">
+<meta property="og:image" content="https://breathiness.github.io/SimpleSearch/docs/images/screenshot-desktop.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="900">
+<meta property="og:site_name" content="简单搜索">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="简单搜索">
+<meta name="twitter:description" content="一款超简单的聚合搜索网站：输入关键词，点击网站即可在该站内搜索；不输入则直接打开网站。自动跟随系统深浅色，也可一键切换。">
+<meta name="twitter:image" content="https://breathiness.github.io/SimpleSearch/docs/images/screenshot-desktop.png">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/img/icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<script>
     // 防闪烁：样式表生效前确定主题。优先级与 theme.js 一致：
     // ?theme= 参数 → localStorage ss.theme → 系统深色偏好 → 浅色
     (function () {
@@ -70,304 +70,304 @@
       el.setAttribute('lang', lang === 'zh' ? 'zh-CN' : 'en')
     })()
   </script>
-  <link rel="stylesheet" href="assets/css/tokens.css">
-  <link rel="stylesheet" href="assets/css/base.css">
-  <link rel="stylesheet" href="assets/css/input.css">
+<link rel="stylesheet" href="assets/css/tokens.min.css">
+<link rel="stylesheet" href="assets/css/base.min.css">
+<link rel="stylesheet" href="assets/css/input.min.css">
 </head>
 <body>
-  <svg class="icon-sprite" aria-hidden="true" focusable="false" width="0" height="0" xmlns="http://www.w3.org/2000/svg">
-    <symbol id="i-github" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 6.5 3.8 12l4.7 5.5"/><path d="M15.5 6.5l4.7 5.5-4.7 5.5"/><path d="M6 20h12"/></symbol>
-    <symbol id="i-unsplash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5h3.4L9 6.5h6l1.6 2H20v10H4z"/><circle cx="12" cy="13.5" r="3"/></symbol>
-    <symbol id="i-bilibili" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="7.5" width="17" height="11" rx="2.5"/><path d="M8.5 4.5 11 7.5M15.5 4.5 13 7.5"/><path d="M10.5 11v4l3.5-2z"/></symbol>
-    <symbol id="i-sspai" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13.6 3.5 6.4 14.1h4.6l-1 6.4 7.6-10.9h-4.6z"/></symbol>
-    <symbol id="i-moegirl" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7c-1.8-1.5-4.2-1.9-7.5-1.6V18c3.3-.3 5.7.1 7.5 1.6 1.8-1.5 4.2-1.9 7.5-1.6V5.4C16.2 5.1 13.8 5.5 12 7z"/><path d="M12 7v12.6"/></symbol>
-    <symbol id="i-zhihu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5h16v10.5H10L5.5 19v-3H4z"/><circle cx="9" cy="10.8" r="1" fill="currentColor" stroke="none"/><circle cx="12.5" cy="10.8" r="1" fill="currentColor" stroke="none"/><circle cx="16" cy="10.8" r="1" fill="currentColor" stroke="none"/></symbol>
-    <symbol id="i-tieba" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 5.5h11v7.5H9.2L6.4 15.6V13H3.5z"/><path d="M8.7 9.8h11.8v7.4h-2.3v2.6l-2.9-2.6H8.7z"/></symbol>
-    <symbol id="i-taobao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5.6 8h12.8l-1.2 11.5H6.8z"/><path d="M9 8V6.4a3 3 0 0 1 6 0V8"/></symbol>
-    <symbol id="i-jd" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 20 8v8l-8 4-8-4V8z"/><path d="M4 8l8 4.2L20 8"/><path d="M12 12.2V20"/></symbol>
-    <symbol id="i-steam" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="9" width="17" height="8.6" rx="4.3"/><path d="M8.4 11.8v3.2M6.8 13.4h3.2"/><circle cx="15.6" cy="13.4" r="1" fill="currentColor" stroke="none"/></symbol>
-    <symbol id="i-archwiki" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M7 9.5l3 2.8-3 2.8"/><path d="M12.5 16h4"/></symbol>
-    <symbol id="i-stackoverflow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 4 8l8 4 8-4z"/><path d="M4 12l8 4 8-4"/><path d="M4 16l8 4 8-4"/></symbol>
-    <symbol id="i-npm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7" width="16" height="10" rx="1"/><path d="M8.5 7v6M12 7v6M15.5 7v6"/></symbol>
-    <symbol id="i-douban" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="1"/><path d="M8 5v14M16 5v14M4 9.5h16M4 14.5h16"/></symbol>
-    <symbol id="i-weibo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M5.6 8.6a9 9 0 0 0 0 6.8M18.4 8.6a9 9 0 0 1 0 6.8"/></symbol>
-    <symbol id="i-reddit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16v9.5H9.2L4.5 19v-3.5H4z"/><path d="M12 13.2V9.6M10.1 11l1.9-1.9 1.9 1.9"/></symbol>
-    <symbol id="i-youtube" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="6" width="17" height="12" rx="3"/><path d="M10.2 9.6 14.8 12l-4.6 2.4z"/></symbol>
-    <symbol id="i-twitch" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h15v11l-4 4h-3l-3 2v-2H5z"/><path d="M11 8v4M15 8v4"/></symbol>
-    <symbol id="i-tmall" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 12.5 4H20v7.5L11.5 20z"/><circle cx="16.6" cy="7.4" r="1.2" fill="currentColor" stroke="none"/></symbol>
-    <symbol id="i-amazon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5.5h2.4l2.2 9h9.1l2.1-6.6H6"/><circle cx="9.4" cy="18" r="1.4"/><circle cx="16.4" cy="18" r="1.4"/></symbol>
-    <symbol id="i-pexels" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="1"/><circle cx="9" cy="10" r="1.5"/><path d="M5 17l4-4 3 3 3-3 4 4"/></symbol>
-    <symbol id="i-pixabay" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18.5 9 9l4.2 6H17l4 3.5z"/><circle cx="16.5" cy="7" r="1.6"/></symbol>
-    <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
-    <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h9M19 7h1M4 12h3M13 12h7M4 17h7M17 17h3"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="14" cy="17" r="2"/></symbol>
-    <symbol id="i-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></symbol>
-    <symbol id="i-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="10.6" cy="10.6" r="3.6"/><path d="M13.4 13.4 16.6 16.6"/></symbol>
-    <symbol id="i-cat-all" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="6.4" height="6.4" rx="1"/><rect x="13.6" y="4" width="6.4" height="6.4" rx="1"/><rect x="4" y="13.6" width="6.4" height="6.4" rx="1"/><rect x="13.6" y="13.6" width="6.4" height="6.4" rx="1"/></symbol>
-    <symbol id="i-cat-tech" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M7 9.5l3 2.8-3 2.8"/><path d="M12.5 16h4"/></symbol>
-    <symbol id="i-cat-community" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 5.5h11v7.5H9.2L6.4 15.6V13H3.5z"/><path d="M8.7 9.8h11.8v7.4h-2.3v2.6l-2.9-2.6H8.7z"/></symbol>
-    <symbol id="i-cat-media" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="7.5" width="17" height="11" rx="2.5"/><path d="M8.5 4.5 11 7.5M15.5 4.5 13 7.5"/><path d="M10.5 11v4l3.5-2z"/></symbol>
-    <symbol id="i-cat-shopping" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5.6 8h12.8l-1.2 11.5H6.8z"/><path d="M9 8V6.4a3 3 0 0 1 6 0V8"/></symbol>
-    <symbol id="i-cat-content" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5h3.4L9 6.5h6l1.6 2H20v10H4z"/><circle cx="12" cy="13.5" r="3"/></symbol>
-  </svg>
-  <a class="skip-link" href="#search-input" data-i18n="app.skip">跳到搜索框</a>
+<svg class="icon-sprite" aria-hidden="true" focusable="false" width="0" height="0" xmlns="http://www.w3.org/2000/svg">
+<symbol id="i-github" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 6.5 3.8 12l4.7 5.5"/><path d="M15.5 6.5l4.7 5.5-4.7 5.5"/><path d="M6 20h12"/></symbol>
+<symbol id="i-unsplash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5h3.4L9 6.5h6l1.6 2H20v10H4z"/><circle cx="12" cy="13.5" r="3"/></symbol>
+<symbol id="i-bilibili" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="7.5" width="17" height="11" rx="2.5"/><path d="M8.5 4.5 11 7.5M15.5 4.5 13 7.5"/><path d="M10.5 11v4l3.5-2z"/></symbol>
+<symbol id="i-sspai" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13.6 3.5 6.4 14.1h4.6l-1 6.4 7.6-10.9h-4.6z"/></symbol>
+<symbol id="i-moegirl" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7c-1.8-1.5-4.2-1.9-7.5-1.6V18c3.3-.3 5.7.1 7.5 1.6 1.8-1.5 4.2-1.9 7.5-1.6V5.4C16.2 5.1 13.8 5.5 12 7z"/><path d="M12 7v12.6"/></symbol>
+<symbol id="i-zhihu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5h16v10.5H10L5.5 19v-3H4z"/><circle cx="9" cy="10.8" r="1" fill="currentColor" stroke="none"/><circle cx="12.5" cy="10.8" r="1" fill="currentColor" stroke="none"/><circle cx="16" cy="10.8" r="1" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-tieba" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 5.5h11v7.5H9.2L6.4 15.6V13H3.5z"/><path d="M8.7 9.8h11.8v7.4h-2.3v2.6l-2.9-2.6H8.7z"/></symbol>
+<symbol id="i-taobao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5.6 8h12.8l-1.2 11.5H6.8z"/><path d="M9 8V6.4a3 3 0 0 1 6 0V8"/></symbol>
+<symbol id="i-jd" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 20 8v8l-8 4-8-4V8z"/><path d="M4 8l8 4.2L20 8"/><path d="M12 12.2V20"/></symbol>
+<symbol id="i-steam" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="9" width="17" height="8.6" rx="4.3"/><path d="M8.4 11.8v3.2M6.8 13.4h3.2"/><circle cx="15.6" cy="13.4" r="1" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-archwiki" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M7 9.5l3 2.8-3 2.8"/><path d="M12.5 16h4"/></symbol>
+<symbol id="i-stackoverflow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 4 8l8 4 8-4z"/><path d="M4 12l8 4 8-4"/><path d="M4 16l8 4 8-4"/></symbol>
+<symbol id="i-npm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7" width="16" height="10" rx="1"/><path d="M8.5 7v6M12 7v6M15.5 7v6"/></symbol>
+<symbol id="i-douban" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="1"/><path d="M8 5v14M16 5v14M4 9.5h16M4 14.5h16"/></symbol>
+<symbol id="i-weibo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M5.6 8.6a9 9 0 0 0 0 6.8M18.4 8.6a9 9 0 0 1 0 6.8"/></symbol>
+<symbol id="i-reddit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16v9.5H9.2L4.5 19v-3.5H4z"/><path d="M12 13.2V9.6M10.1 11l1.9-1.9 1.9 1.9"/></symbol>
+<symbol id="i-youtube" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="6" width="17" height="12" rx="3"/><path d="M10.2 9.6 14.8 12l-4.6 2.4z"/></symbol>
+<symbol id="i-twitch" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h15v11l-4 4h-3l-3 2v-2H5z"/><path d="M11 8v4M15 8v4"/></symbol>
+<symbol id="i-tmall" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 12.5 4H20v7.5L11.5 20z"/><circle cx="16.6" cy="7.4" r="1.2" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-amazon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5.5h2.4l2.2 9h9.1l2.1-6.6H6"/><circle cx="9.4" cy="18" r="1.4"/><circle cx="16.4" cy="18" r="1.4"/></symbol>
+<symbol id="i-pexels" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="1"/><circle cx="9" cy="10" r="1.5"/><path d="M5 17l4-4 3 3 3-3 4 4"/></symbol>
+<symbol id="i-pixabay" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18.5 9 9l4.2 6H17l4 3.5z"/><circle cx="16.5" cy="7" r="1.6"/></symbol>
+<symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+<symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h9M19 7h1M4 12h3M13 12h7M4 17h7M17 17h3"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="14" cy="17" r="2"/></symbol>
+<symbol id="i-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+<symbol id="i-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="10.6" cy="10.6" r="3.6"/><path d="M13.4 13.4 16.6 16.6"/></symbol>
+<symbol id="i-cat-all" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="6.4" height="6.4" rx="1"/><rect x="13.6" y="4" width="6.4" height="6.4" rx="1"/><rect x="4" y="13.6" width="6.4" height="6.4" rx="1"/><rect x="13.6" y="13.6" width="6.4" height="6.4" rx="1"/></symbol>
+<symbol id="i-cat-tech" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M7 9.5l3 2.8-3 2.8"/><path d="M12.5 16h4"/></symbol>
+<symbol id="i-cat-community" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 5.5h11v7.5H9.2L6.4 15.6V13H3.5z"/><path d="M8.7 9.8h11.8v7.4h-2.3v2.6l-2.9-2.6H8.7z"/></symbol>
+<symbol id="i-cat-media" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="7.5" width="17" height="11" rx="2.5"/><path d="M8.5 4.5 11 7.5M15.5 4.5 13 7.5"/><path d="M10.5 11v4l3.5-2z"/></symbol>
+<symbol id="i-cat-shopping" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5.6 8h12.8l-1.2 11.5H6.8z"/><path d="M9 8V6.4a3 3 0 0 1 6 0V8"/></symbol>
+<symbol id="i-cat-content" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5h3.4L9 6.5h6l1.6 2H20v10H4z"/><circle cx="12" cy="13.5" r="3"/></symbol>
+</svg>
+<a class="skip-link" href="#search-input" data-i18n="app.skip">跳到搜索框</a>
 
-  <header class="appbar">
-    <button id="nav-toggle" class="appbar-icon" type="button" data-i18n-attr="aria-label:nav.group"
-            aria-label="打开站点分类" aria-expanded="false" aria-controls="site-nav">
-      <svg class="appbar-icon-svg" aria-hidden="true" focusable="false"><use href="#i-menu"></use></svg>
-    </button>
-    <span class="appbar-logo" aria-hidden="true"><svg class="appbar-logo-svg" focusable="false"><use href="#i-logo"></use></svg></span>
-    <span class="appbar-title" data-i18n="app.title">简单搜索</span>
-    <button id="settings-toggle" class="appbar-icon" type="button" data-i18n-attr="aria-label:set.title"
-            aria-label="设置" aria-expanded="false" aria-controls="settings-panel">
-      <svg class="appbar-icon-svg" aria-hidden="true" focusable="false"><use href="#i-settings"></use></svg>
-    </button>
-  </header>
+<header class="appbar">
+<button id="nav-toggle" class="appbar-icon" type="button" data-i18n-attr="aria-label:nav.group"
+aria-label="打开站点分类" aria-expanded="false" aria-controls="site-nav">
+<svg class="appbar-icon-svg" aria-hidden="true" focusable="false"><use href="#i-menu"></use></svg>
+</button>
+<span class="appbar-logo" aria-hidden="true"><svg class="appbar-logo-svg" focusable="false"><use href="#i-logo"></use></svg></span>
+<span class="appbar-title" data-i18n="app.title">简单搜索</span>
+<button id="settings-toggle" class="appbar-icon" type="button" data-i18n-attr="aria-label:set.title"
+aria-label="设置" aria-expanded="false" aria-controls="settings-panel">
+<svg class="appbar-icon-svg" aria-hidden="true" focusable="false"><use href="#i-settings"></use></svg>
+</button>
+</header>
 
-  <div class="shell">
-    <aside id="site-nav" class="site-nav" data-i18n-attr="aria-label:nav.group" aria-label="站点分类">
-      <p class="nav-group-title" data-i18n="nav.group">站点分类</p>
-      <nav id="group-chips" class="nav-list" data-i18n-attr="aria-label:nav.filter" aria-label="按分类筛选站点">
-        <button class="nav-item" type="button" data-group="all" aria-current="true"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-all"></use></svg><span class="nav-label" data-i18n="nav.all">常用</span></button>
-        <button class="nav-item" type="button" data-group="tech" aria-current="false"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-tech"></use></svg><span class="nav-label" data-i18n="nav.tech">技术开发</span></button>
-        <button class="nav-item" type="button" data-group="community" aria-current="false"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-community"></use></svg><span class="nav-label" data-i18n="nav.community">社区问答</span></button>
-        <button class="nav-item" type="button" data-group="media" aria-current="false"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-media"></use></svg><span class="nav-label" data-i18n="nav.media">影音游戏</span></button>
-        <button class="nav-item" type="button" data-group="shopping" aria-current="false"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-shopping"></use></svg><span class="nav-label" data-i18n="nav.shopping">购物</span></button>
-        <button class="nav-item" type="button" data-group="content" aria-current="false"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-content"></use></svg><span class="nav-label" data-i18n="nav.content">素材资讯</span></button>
-      </nav>
-    </aside>
+<div class="shell">
+<aside id="site-nav" class="site-nav" data-i18n-attr="aria-label:nav.group" aria-label="站点分类">
+<p class="nav-group-title" data-i18n="nav.group">站点分类</p>
+<nav id="group-chips" class="nav-list" data-i18n-attr="aria-label:nav.filter" aria-label="按分类筛选站点">
+<button class="nav-item" type="button" data-group="all" aria-current="true"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-all"></use></svg><span class="nav-label" data-i18n="nav.all">常用</span></button>
+<button class="nav-item" type="button" data-group="tech" aria-current="false"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-tech"></use></svg><span class="nav-label" data-i18n="nav.tech">技术开发</span></button>
+<button class="nav-item" type="button" data-group="community" aria-current="false"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-community"></use></svg><span class="nav-label" data-i18n="nav.community">社区问答</span></button>
+<button class="nav-item" type="button" data-group="media" aria-current="false"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-media"></use></svg><span class="nav-label" data-i18n="nav.media">影音游戏</span></button>
+<button class="nav-item" type="button" data-group="shopping" aria-current="false"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-shopping"></use></svg><span class="nav-label" data-i18n="nav.shopping">购物</span></button>
+<button class="nav-item" type="button" data-group="content" aria-current="false"><svg class="nav-icon" aria-hidden="true" focusable="false"><use href="#i-cat-content"></use></svg><span class="nav-label" data-i18n="nav.content">素材资讯</span></button>
+</nav>
+</aside>
 
-    <main id="main-content">
-      <section class="card card-search" data-i18n-attr="aria-label:search.submit" aria-label="搜索">
-        <form id="search-form" role="search" action="https://www.bing.com/search" method="get" autocomplete="off">
-          <div class="search-field">
-            <input id="search-input" name="q" type="text" placeholder="搜索…"
-                   data-i18n-attr="placeholder:search.placeholder,aria-label:search.aria" aria-label="搜索关键词"
-                   aria-autocomplete="list" aria-controls="suggest-list" aria-expanded="false"
-                   enterkeyhint="search" autocomplete="off" spellcheck="false" maxlength="512">
-            <button id="clear-button" class="icon-button" type="button" data-i18n-attr="aria-label:search.clear" aria-label="清除输入内容" hidden>✕</button>
-            <ul id="suggest-list" class="suggest-list" role="listbox" data-i18n-attr="aria-label:search.suggest" aria-label="搜索建议" hidden></ul>
-          </div>
-          <button id="search-submit" class="submit-button" type="submit" data-i18n="search.submit">搜索</button>
-        </form>
-        <noscript>
-          <p class="noscript-hint" data-i18n="search.noscript">JavaScript 未启用：直接在输入框回车仍可用 Bing 搜索。</p>
-        </noscript>
-      </section>
+<main id="main-content">
+<section class="card card-search" data-i18n-attr="aria-label:search.submit" aria-label="搜索">
+<form id="search-form" role="search" action="https://www.bing.com/search" method="get" autocomplete="off">
+<div class="search-field">
+<input id="search-input" name="q" type="text" placeholder="搜索…"
+data-i18n-attr="placeholder:search.placeholder,aria-label:search.aria" aria-label="搜索关键词"
+aria-autocomplete="list" aria-controls="suggest-list" aria-expanded="false"
+enterkeyhint="search" autocomplete="off" spellcheck="false" maxlength="512">
+<button id="clear-button" class="icon-button" type="button" data-i18n-attr="aria-label:search.clear" aria-label="清除输入内容" hidden>✕</button>
+<ul id="suggest-list" class="suggest-list" role="listbox" data-i18n-attr="aria-label:search.suggest" aria-label="搜索建议" hidden></ul>
+</div>
+<button id="search-submit" class="submit-button" type="submit" data-i18n="search.submit">搜索</button>
+</form>
+<noscript>
+<p class="noscript-hint" data-i18n="search.noscript">JavaScript 未启用：直接在输入框回车仍可用 Bing 搜索。</p>
+</noscript>
+</section>
 
-      <section class="card card-sites" data-i18n-attr="aria-label:card.common" aria-label="常用网站">
-        <h2 class="card-title" data-i18n="card.common">常用网站</h2>
-        <nav id="buttons-container" data-i18n-attr="aria-label:card.buttons" aria-label="站点快捷按钮">
-      <button class="button" type="button" data-site="github" data-icon="#i-github" data-group="tech" data-keywords="gh git 代码 开源" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-github"></use></svg><span class="button-label">GitHub</span></button>
-      <button class="button" type="button" data-site="unsplash" data-icon="#i-unsplash" data-group="content" data-keywords="图片 壁纸 摄影 photo wallpaper" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-unsplash"></use></svg><span class="button-label">Unsplash</span></button>
-      <button class="button" type="button" data-site="bilibili" data-icon="#i-bilibili" data-group="media" data-keywords="b站 哔哩 视频 弹幕 bilibili" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-bilibili"></use></svg><span class="button-label">哔哩哔哩</span></button>
-      <button class="button" type="button" data-site="sspai" data-icon="#i-sspai" data-group="content" data-keywords="少数派 效率 数码 sspai" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-sspai"></use></svg><span class="button-label">少数派</span></button>
-      <button class="button" type="button" data-site="moegirl" data-icon="#i-moegirl" data-group="media" data-keywords="萌娘 百科 二次元 moe acg" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-moegirl"></use></svg><span class="button-label">萌娘百科</span></button>
-      <button class="button" type="button" data-site="zhihu" data-icon="#i-zhihu" data-group="community" data-keywords="知乎 问答 zhihu qa" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-zhihu"></use></svg><span class="button-label">知乎</span></button>
-      <button class="button" type="button" data-site="tieba" data-icon="#i-tieba" data-group="community" data-keywords="贴吧 百度 tieba forum" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-tieba"></use></svg><span class="button-label">百度贴吧</span></button>
-      <button class="button" type="button" data-site="taobao" data-icon="#i-taobao" data-group="shopping" data-keywords="淘宝 购物 taobao shop" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-taobao"></use></svg><span class="button-label">淘宝</span></button>
-      <button class="button" type="button" data-site="jd" data-icon="#i-jd" data-group="shopping" data-keywords="京东 购物 jd jd.com" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-jd"></use></svg><span class="button-label">京东</span></button>
-      <button class="button" type="button" data-site="steam" data-icon="#i-steam" data-group="media" data-keywords="steam 蒸汽 游戏 game" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-steam"></use></svg><span class="button-label">Steam</span></button>
-      <button class="button" type="button" data-site="archwiki" data-icon="#i-archwiki" data-group="tech" data-keywords="arch linux wiki 文档" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-archwiki"></use></svg><span class="button-label">ArchWiki</span></button>
-      <button class="button" type="button" data-site="stackoverflow" data-icon="#i-stackoverflow" data-group="tech" data-keywords="so stack 问答" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-stackoverflow"></use></svg><span class="button-label">StackOverflow</span></button>
-      <button class="button" type="button" data-site="mdn" data-icon="#i-cat-tech" data-group="tech" data-keywords="mdn 文档 web 前端" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-tech"></use></svg><span class="button-label">MDN</span></button>
-      <button class="button" type="button" data-site="gitee" data-icon="#i-cat-tech" data-group="tech" data-keywords="码云 gitee 国内git" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-tech"></use></svg><span class="button-label">Gitee</span></button>
-      <button class="button" type="button" data-site="npm" data-icon="#i-npm" data-group="tech" data-keywords="npm 包 node" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-npm"></use></svg><span class="button-label">npm</span></button>
-      <button class="button" type="button" data-site="juejin" data-icon="#i-cat-tech" data-group="tech" data-keywords="掘金 juejin 前端" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-tech"></use></svg><span class="button-label">掘金</span></button>
-      <button class="button" type="button" data-site="douban" data-icon="#i-douban" data-group="community" data-keywords="豆瓣 电影 书评" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-douban"></use></svg><span class="button-label">豆瓣</span></button>
-      <button class="button" type="button" data-site="weibo" data-icon="#i-weibo" data-group="community" data-keywords="微博 热搜 weibo" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-weibo"></use></svg><span class="button-label">微博</span></button>
-      <button class="button" type="button" data-site="v2ex" data-icon="#i-cat-community" data-group="community" data-keywords="v2ex 社区 程序员" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-community"></use></svg><span class="button-label">V2EX</span></button>
-      <button class="button" type="button" data-site="reddit" data-icon="#i-reddit" data-group="community" data-keywords="reddit forum" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-reddit"></use></svg><span class="button-label">Reddit</span></button>
-      <button class="button" type="button" data-site="youtube" data-icon="#i-youtube" data-group="media" data-keywords="油管 youtube 视频" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-youtube"></use></svg><span class="button-label">YouTube</span></button>
-      <button class="button" type="button" data-site="douyin" data-icon="#i-cat-media" data-group="media" data-keywords="抖音 短视频 tiktok" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-media"></use></svg><span class="button-label">抖音</span></button>
-      <button class="button" type="button" data-site="iqiyi" data-icon="#i-cat-media" data-group="media" data-keywords="爱奇艺 剧集 iqiyi" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-media"></use></svg><span class="button-label">爱奇艺</span></button>
-      <button class="button" type="button" data-site="vqq" data-icon="#i-cat-media" data-group="media" data-keywords="腾讯视频 剧 vqq" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-media"></use></svg><span class="button-label">腾讯视频</span></button>
-      <button class="button" type="button" data-site="twitch" data-icon="#i-twitch" data-group="media" data-keywords="twitch 直播 游戏" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-twitch"></use></svg><span class="button-label">Twitch</span></button>
-      <button class="button" type="button" data-site="tmall" data-icon="#i-tmall" data-group="shopping" data-keywords="天猫 tmall 购物" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-tmall"></use></svg><span class="button-label">天猫</span></button>
-      <button class="button" type="button" data-site="pinduoduo" data-icon="#i-cat-shopping" data-group="shopping" data-keywords="拼多多 pdd 百亿补贴" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-shopping"></use></svg><span class="button-label">拼多多</span></button>
-      <button class="button" type="button" data-site="goofish" data-icon="#i-cat-shopping" data-group="shopping" data-keywords="闲鱼 二手 goofish" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-shopping"></use></svg><span class="button-label">闲鱼</span></button>
-      <button class="button" type="button" data-site="amazon" data-icon="#i-amazon" data-group="shopping" data-keywords="亚马逊 amazon 海淘" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-amazon"></use></svg><span class="button-label">亚马逊</span></button>
-      <button class="button" type="button" data-site="pexels" data-icon="#i-pexels" data-group="content" data-keywords="pexels 图片 素材" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-pexels"></use></svg><span class="button-label">Pexels</span></button>
-      <button class="button" type="button" data-site="pixabay" data-icon="#i-pixabay" data-group="content" data-keywords="pixabay 图库 素材" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-pixabay"></use></svg><span class="button-label">Pixabay</span></button>
-      <button class="button" type="button" data-site="36kr" data-icon="#i-cat-content" data-group="content" data-keywords="36氪 科技 融资" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-content"></use></svg><span class="button-label">36氪</span></button>
-      <button class="button" type="button" data-site="zcool" data-icon="#i-cat-content" data-group="content" data-keywords="站酷 设计 zcool" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-content"></use></svg><span class="button-label">站酷</span></button>
-        </nav>
-      </section>
-    </main>
-  </div>
+<section class="card card-sites" data-i18n-attr="aria-label:card.common" aria-label="常用网站">
+<h2 class="card-title" data-i18n="card.common">常用网站</h2>
+<nav id="buttons-container" data-i18n-attr="aria-label:card.buttons" aria-label="站点快捷按钮">
+<button class="button" type="button" data-site="github" data-icon="#i-github" data-group="tech" data-keywords="gh git 代码 开源" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-github"></use></svg><span class="button-label">GitHub</span></button>
+<button class="button" type="button" data-site="unsplash" data-icon="#i-unsplash" data-group="content" data-keywords="图片 壁纸 摄影 photo wallpaper" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-unsplash"></use></svg><span class="button-label">Unsplash</span></button>
+<button class="button" type="button" data-site="bilibili" data-icon="#i-bilibili" data-group="media" data-keywords="b站 哔哩 视频 弹幕 bilibili" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-bilibili"></use></svg><span class="button-label">哔哩哔哩</span></button>
+<button class="button" type="button" data-site="sspai" data-icon="#i-sspai" data-group="content" data-keywords="少数派 效率 数码 sspai" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-sspai"></use></svg><span class="button-label">少数派</span></button>
+<button class="button" type="button" data-site="moegirl" data-icon="#i-moegirl" data-group="media" data-keywords="萌娘 百科 二次元 moe acg" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-moegirl"></use></svg><span class="button-label">萌娘百科</span></button>
+<button class="button" type="button" data-site="zhihu" data-icon="#i-zhihu" data-group="community" data-keywords="知乎 问答 zhihu qa" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-zhihu"></use></svg><span class="button-label">知乎</span></button>
+<button class="button" type="button" data-site="tieba" data-icon="#i-tieba" data-group="community" data-keywords="贴吧 百度 tieba forum" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-tieba"></use></svg><span class="button-label">百度贴吧</span></button>
+<button class="button" type="button" data-site="taobao" data-icon="#i-taobao" data-group="shopping" data-keywords="淘宝 购物 taobao shop" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-taobao"></use></svg><span class="button-label">淘宝</span></button>
+<button class="button" type="button" data-site="jd" data-icon="#i-jd" data-group="shopping" data-keywords="京东 购物 jd jd.com" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-jd"></use></svg><span class="button-label">京东</span></button>
+<button class="button" type="button" data-site="steam" data-icon="#i-steam" data-group="media" data-keywords="steam 蒸汽 游戏 game" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-steam"></use></svg><span class="button-label">Steam</span></button>
+<button class="button" type="button" data-site="archwiki" data-icon="#i-archwiki" data-group="tech" data-keywords="arch linux wiki 文档" data-featured="true"><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-archwiki"></use></svg><span class="button-label">ArchWiki</span></button>
+<button class="button" type="button" data-site="stackoverflow" data-icon="#i-stackoverflow" data-group="tech" data-keywords="so stack 问答" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-stackoverflow"></use></svg><span class="button-label">StackOverflow</span></button>
+<button class="button" type="button" data-site="mdn" data-icon="#i-cat-tech" data-group="tech" data-keywords="mdn 文档 web 前端" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-tech"></use></svg><span class="button-label">MDN</span></button>
+<button class="button" type="button" data-site="gitee" data-icon="#i-cat-tech" data-group="tech" data-keywords="码云 gitee 国内git" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-tech"></use></svg><span class="button-label">Gitee</span></button>
+<button class="button" type="button" data-site="npm" data-icon="#i-npm" data-group="tech" data-keywords="npm 包 node" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-npm"></use></svg><span class="button-label">npm</span></button>
+<button class="button" type="button" data-site="juejin" data-icon="#i-cat-tech" data-group="tech" data-keywords="掘金 juejin 前端" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-tech"></use></svg><span class="button-label">掘金</span></button>
+<button class="button" type="button" data-site="douban" data-icon="#i-douban" data-group="community" data-keywords="豆瓣 电影 书评" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-douban"></use></svg><span class="button-label">豆瓣</span></button>
+<button class="button" type="button" data-site="weibo" data-icon="#i-weibo" data-group="community" data-keywords="微博 热搜 weibo" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-weibo"></use></svg><span class="button-label">微博</span></button>
+<button class="button" type="button" data-site="v2ex" data-icon="#i-cat-community" data-group="community" data-keywords="v2ex 社区 程序员" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-community"></use></svg><span class="button-label">V2EX</span></button>
+<button class="button" type="button" data-site="reddit" data-icon="#i-reddit" data-group="community" data-keywords="reddit forum" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-reddit"></use></svg><span class="button-label">Reddit</span></button>
+<button class="button" type="button" data-site="youtube" data-icon="#i-youtube" data-group="media" data-keywords="油管 youtube 视频" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-youtube"></use></svg><span class="button-label">YouTube</span></button>
+<button class="button" type="button" data-site="douyin" data-icon="#i-cat-media" data-group="media" data-keywords="抖音 短视频 tiktok" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-media"></use></svg><span class="button-label">抖音</span></button>
+<button class="button" type="button" data-site="iqiyi" data-icon="#i-cat-media" data-group="media" data-keywords="爱奇艺 剧集 iqiyi" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-media"></use></svg><span class="button-label">爱奇艺</span></button>
+<button class="button" type="button" data-site="vqq" data-icon="#i-cat-media" data-group="media" data-keywords="腾讯视频 剧 vqq" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-media"></use></svg><span class="button-label">腾讯视频</span></button>
+<button class="button" type="button" data-site="twitch" data-icon="#i-twitch" data-group="media" data-keywords="twitch 直播 游戏" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-twitch"></use></svg><span class="button-label">Twitch</span></button>
+<button class="button" type="button" data-site="tmall" data-icon="#i-tmall" data-group="shopping" data-keywords="天猫 tmall 购物" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-tmall"></use></svg><span class="button-label">天猫</span></button>
+<button class="button" type="button" data-site="pinduoduo" data-icon="#i-cat-shopping" data-group="shopping" data-keywords="拼多多 pdd 百亿补贴" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-shopping"></use></svg><span class="button-label">拼多多</span></button>
+<button class="button" type="button" data-site="goofish" data-icon="#i-cat-shopping" data-group="shopping" data-keywords="闲鱼 二手 goofish" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-shopping"></use></svg><span class="button-label">闲鱼</span></button>
+<button class="button" type="button" data-site="amazon" data-icon="#i-amazon" data-group="shopping" data-keywords="亚马逊 amazon 海淘" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-amazon"></use></svg><span class="button-label">亚马逊</span></button>
+<button class="button" type="button" data-site="pexels" data-icon="#i-pexels" data-group="content" data-keywords="pexels 图片 素材" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-pexels"></use></svg><span class="button-label">Pexels</span></button>
+<button class="button" type="button" data-site="pixabay" data-icon="#i-pixabay" data-group="content" data-keywords="pixabay 图库 素材" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-pixabay"></use></svg><span class="button-label">Pixabay</span></button>
+<button class="button" type="button" data-site="36kr" data-icon="#i-cat-content" data-group="content" data-keywords="36氪 科技 融资" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-content"></use></svg><span class="button-label">36氪</span></button>
+<button class="button" type="button" data-site="zcool" data-icon="#i-cat-content" data-group="content" data-keywords="站酷 设计 zcool" hidden><svg class="button-icon" aria-hidden="true" focusable="false"><use href="#i-cat-content"></use></svg><span class="button-label">站酷</span></button>
+</nav>
+</section>
+</main>
+</div>
 
-  <div id="scrim" class="scrim" hidden></div>
+<div id="scrim" class="scrim" hidden></div>
 
-  <aside id="settings-panel" class="settings-panel" role="dialog" aria-modal="true"
-         aria-labelledby="settings-title" hidden>
-    <div class="panel-header">
-      <h2 id="settings-title" class="panel-title" data-i18n="set.title">设置</h2>
-      <button id="settings-close" class="icon-button panel-close" type="button" data-i18n-attr="aria-label:set.close" aria-label="关闭设置">
-        <svg class="panel-close-svg" aria-hidden="true" focusable="false"><use href="#i-close"></use></svg>
-      </button>
-    </div>
-    <div class="panel-body">
-      <div class="settings-row">
-        <span class="settings-label" data-i18n="set.theme">主题模式</span>
-        <div id="theme-mode" class="segmented" role="group" data-i18n-attr="aria-label:set.theme" aria-label="主题模式">
-          <button class="segmented-item" type="button" data-mode="auto" aria-pressed="true" data-i18n="mode.auto">跟随系统</button>
-          <button class="segmented-item" type="button" data-mode="light" aria-pressed="false" data-i18n="mode.light">浅色</button>
-          <button class="segmented-item" type="button" data-mode="dark" aria-pressed="false" data-i18n="mode.dark">深色</button>
-        </div>
-      </div>
-      <div class="settings-row">
-        <span class="settings-label" data-i18n="set.colors">主题色</span>
-        <div id="color-swatches" class="swatches" role="group" data-i18n-attr="aria-label:set.colors" aria-label="主题色"></div>
-      </div>
-      <div class="settings-row">
-        <span class="settings-label" data-i18n="set.engine">搜索引擎</span>
-        <div id="engine-mode" class="segmented" role="group" data-i18n-attr="aria-label:set.engine" aria-label="搜索引擎">
-          <button class="segmented-item" type="button" data-engine="bing" aria-pressed="true">Bing</button>
-          <button class="segmented-item" type="button" data-engine="google" aria-pressed="false">Google</button>
-          <button class="segmented-item" type="button" data-engine="ddg" aria-pressed="false">DDG</button>
-          <button class="segmented-item" type="button" data-engine="baidu" aria-pressed="false" data-i18n="engine.baidu">百度</button>
-        </div>
-      </div>
-      <button id="suggest-source-toggle" class="switch-row" type="button" aria-pressed="true" data-i18n="set.remote">联网联想</button>
-      <div class="settings-row settings-row-inline">
-        <span class="settings-label" data-i18n="set.suggest">联想源</span>
-        <select id="suggest-provider" class="settings-select" aria-label="联想源">
-          <option value="baidu" data-i18n="prov.baidu">百度</option>
-          <option value="custom" data-i18n="prov.custom">自定义</option>
-          <option value="off" data-i18n="prov.off">关闭</option>
-        </select>
-      </div>
-      <div id="suggest-custom-row" class="settings-row settings-row-stack" hidden>
-        <label class="field"><span data-i18n="set.suggestUrl">联想接口地址（{q} 表示关键词）</span>
-          <input id="suggest-url" type="text" placeholder="https://example.com/suggest?q={q}">
-        </label>
-      </div>
-      <div class="settings-row settings-row-inline">
-        <span class="settings-label" data-i18n="set.lang">语言</span>
-        <select id="lang-mode" class="settings-select" aria-label="语言">
-          <option value="auto" data-i18n="lang.auto">跟随系统</option>
-          <option value="zh" data-i18n="lang.zh">中文</option>
-          <option value="en" data-i18n="lang.en">English</option>
-        </select>
-      </div>
-      <div class="settings-row settings-row-inline">
-        <span class="settings-label"><span data-i18n="set.history">搜索历史</span> <span id="history-count" class="settings-value">0 条</span></span>
-        <button id="history-clear" class="text-button" type="button" disabled data-i18n="set.clear">清空</button>
-      </div>
-      <a class="panel-link" href="https://github.com/breathiness/SimpleSearch" data-i18n="set.about">GitHub 仓库 · 关于</a>
-      <div class="settings-row settings-row-inline">
-        <span class="settings-label" data-i18n="set.shortcuts">键盘快捷键</span>
-        <button id="shortcuts-open" class="text-button" type="button" data-i18n="set.view">查看</button>
-      </div>
-      <div class="settings-row settings-row-inline">
-        <span class="settings-label" data-i18n="set.sites">我的站点</span>
-        <button id="custom-sites-open" class="text-button" type="button" data-i18n="set.manage">管理</button>
-      </div>
-      <div class="settings-row settings-row-inline">
-        <span class="settings-label" data-i18n="set.order">常用排序</span>
-        <button id="order-open" class="text-button" type="button" data-i18n="set.adjust">调整</button>
-      </div>
-      <div id="install-row" class="settings-row settings-row-inline" hidden>
-        <span class="settings-label" data-i18n="set.install">安装到桌面</span>
-        <button id="install-app" class="text-button" type="button" data-i18n="set.installBtn">安装</button>
-      </div>
-      <p class="panel-version">简单搜索 v2.12.1</p>
-    </div>
-  </aside>
+<aside id="settings-panel" class="settings-panel" role="dialog" aria-modal="true"
+aria-labelledby="settings-title" hidden>
+<div class="panel-header">
+<h2 id="settings-title" class="panel-title" data-i18n="set.title">设置</h2>
+<button id="settings-close" class="icon-button panel-close" type="button" data-i18n-attr="aria-label:set.close" aria-label="关闭设置">
+<svg class="panel-close-svg" aria-hidden="true" focusable="false"><use href="#i-close"></use></svg>
+</button>
+</div>
+<div class="panel-body">
+<div class="settings-row">
+<span class="settings-label" data-i18n="set.theme">主题模式</span>
+<div id="theme-mode" class="segmented" role="group" data-i18n-attr="aria-label:set.theme" aria-label="主题模式">
+<button class="segmented-item" type="button" data-mode="auto" aria-pressed="true" data-i18n="mode.auto">跟随系统</button>
+<button class="segmented-item" type="button" data-mode="light" aria-pressed="false" data-i18n="mode.light">浅色</button>
+<button class="segmented-item" type="button" data-mode="dark" aria-pressed="false" data-i18n="mode.dark">深色</button>
+</div>
+</div>
+<div class="settings-row">
+<span class="settings-label" data-i18n="set.colors">主题色</span>
+<div id="color-swatches" class="swatches" role="group" data-i18n-attr="aria-label:set.colors" aria-label="主题色"></div>
+</div>
+<div class="settings-row">
+<span class="settings-label" data-i18n="set.engine">搜索引擎</span>
+<div id="engine-mode" class="segmented" role="group" data-i18n-attr="aria-label:set.engine" aria-label="搜索引擎">
+<button class="segmented-item" type="button" data-engine="bing" aria-pressed="true">Bing</button>
+<button class="segmented-item" type="button" data-engine="google" aria-pressed="false">Google</button>
+<button class="segmented-item" type="button" data-engine="ddg" aria-pressed="false">DDG</button>
+<button class="segmented-item" type="button" data-engine="baidu" aria-pressed="false" data-i18n="engine.baidu">百度</button>
+</div>
+</div>
+<button id="suggest-source-toggle" class="switch-row" type="button" aria-pressed="true" data-i18n="set.remote">联网联想</button>
+<div class="settings-row settings-row-inline">
+<span class="settings-label" data-i18n="set.suggest">联想源</span>
+<select id="suggest-provider" class="settings-select" aria-label="联想源">
+<option value="baidu" data-i18n="prov.baidu">百度</option>
+<option value="custom" data-i18n="prov.custom">自定义</option>
+<option value="off" data-i18n="prov.off">关闭</option>
+</select>
+</div>
+<div id="suggest-custom-row" class="settings-row settings-row-stack" hidden>
+<label class="field"><span data-i18n="set.suggestUrl">联想接口地址（{q} 表示关键词）</span>
+<input id="suggest-url" type="text" placeholder="https://example.com/suggest?q={q}">
+</label>
+</div>
+<div class="settings-row settings-row-inline">
+<span class="settings-label" data-i18n="set.lang">语言</span>
+<select id="lang-mode" class="settings-select" aria-label="语言">
+<option value="auto" data-i18n="lang.auto">跟随系统</option>
+<option value="zh" data-i18n="lang.zh">中文</option>
+<option value="en" data-i18n="lang.en">English</option>
+</select>
+</div>
+<div class="settings-row settings-row-inline">
+<span class="settings-label"><span data-i18n="set.history">搜索历史</span> <span id="history-count" class="settings-value">0 条</span></span>
+<button id="history-clear" class="text-button" type="button" disabled data-i18n="set.clear">清空</button>
+</div>
+<a class="panel-link" href="https://github.com/breathiness/SimpleSearch" data-i18n="set.about">GitHub 仓库 · 关于</a>
+<div class="settings-row settings-row-inline">
+<span class="settings-label" data-i18n="set.shortcuts">键盘快捷键</span>
+<button id="shortcuts-open" class="text-button" type="button" data-i18n="set.view">查看</button>
+</div>
+<div class="settings-row settings-row-inline">
+<span class="settings-label" data-i18n="set.sites">我的站点</span>
+<button id="custom-sites-open" class="text-button" type="button" data-i18n="set.manage">管理</button>
+</div>
+<div class="settings-row settings-row-inline">
+<span class="settings-label" data-i18n="set.order">常用排序</span>
+<button id="order-open" class="text-button" type="button" data-i18n="set.adjust">调整</button>
+</div>
+<div id="install-row" class="settings-row settings-row-inline" hidden>
+<span class="settings-label" data-i18n="set.install">安装到桌面</span>
+<button id="install-app" class="text-button" type="button" data-i18n="set.installBtn">安装</button>
+</div>
+<p class="panel-version">简单搜索 v2.13.0</p>
+</div>
+</aside>
 
-  <section id="palette" class="dialog palette" role="dialog" aria-modal="true"
-           aria-labelledby="palette-title" hidden>
-    <h2 id="palette-title" class="visually-hidden" data-i18n="dlg.palette">命令面板</h2>
-    <input id="palette-input" class="palette-input" type="text" role="combobox" aria-expanded="false"
-           aria-controls="palette-list" aria-autocomplete="list" data-i18n-attr="placeholder:palette.placeholder"
-           placeholder="搜索站点或命令…" autocomplete="off" spellcheck="false">
-    <ul id="palette-list" class="palette-list" role="listbox" aria-labelledby="palette-title"></ul>
-    <p id="palette-hint" class="dialog-hint" data-i18n="palette.hint">↑↓ 选择 · Enter 执行 · Esc 关闭</p>
-  </section>
+<section id="palette" class="dialog palette" role="dialog" aria-modal="true"
+aria-labelledby="palette-title" hidden>
+<h2 id="palette-title" class="visually-hidden" data-i18n="dlg.palette">命令面板</h2>
+<input id="palette-input" class="palette-input" type="text" role="combobox" aria-expanded="false"
+aria-controls="palette-list" aria-autocomplete="list" data-i18n-attr="placeholder:palette.placeholder"
+placeholder="搜索站点或命令…" autocomplete="off" spellcheck="false">
+<ul id="palette-list" class="palette-list" role="listbox" aria-labelledby="palette-title"></ul>
+<p id="palette-hint" class="dialog-hint" data-i18n="palette.hint">↑↓ 选择 · Enter 执行 · Esc 关闭</p>
+</section>
 
-  <section id="shortcuts-dialog" class="dialog" role="dialog" aria-modal="true"
-           aria-labelledby="shortcuts-title" hidden>
-    <div class="dialog-header">
-      <h2 id="shortcuts-title" class="dialog-title" data-i18n="dlg.shortcuts">键盘快捷键</h2>
-      <button id="shortcuts-close" class="icon-button dialog-close" type="button" data-i18n-attr="aria-label:set.close" aria-label="关闭">✕</button>
-    </div>
-    <dl class="shortcut-list">
-      <div><dt><kbd>/</kbd></dt><dd data-i18n="shortcut.focus">聚焦搜索框</dd></div>
-      <div><dt><kbd>↑</kbd><kbd>↓</kbd></dt><dd data-i18n="shortcut.move">在联想列表里移动</dd></div>
-      <div><dt><kbd>Enter</kbd></dt><dd data-i18n="shortcut.enter">采用高亮项或提交搜索</dd></div>
-      <div><dt><kbd>Esc</kbd></dt><dd data-i18n="shortcut.esc">关闭联想、抽屉或对话框</dd></div>
-      <div><dt><kbd>Tab</kbd></dt><dd data-i18n="shortcut.tab">移出搜索框（自动收起联想）</dd></div>
-      <div><dt><kbd>Delete</kbd></dt><dd data-i18n="shortcut.del">删除高亮的历史项</dd></div>
-      <div><dt><kbd>?</kbd></dt><dd data-i18n="shortcut.help">打开这个快捷键说明</dd></div>
-      <div><dt><kbd>!</kbd></dt><dd data-i18n="shortcut.bang">站点快捷搜索，例如 !gh rust</dd></div>
-      <div><dt><kbd>Ctrl</kbd><kbd>⌘</kbd><kbd>K</kbd></dt><dd data-i18n="shortcut.palette">打开命令面板</dd></div>
-      <div><dt><kbd>Ctrl</kbd><kbd>⌘</kbd></dt><dd data-i18n="shortcut.newtab">按住再点击站点按钮：新标签页打开</dd></div>
-    </dl>
-  </section>
+<section id="shortcuts-dialog" class="dialog" role="dialog" aria-modal="true"
+aria-labelledby="shortcuts-title" hidden>
+<div class="dialog-header">
+<h2 id="shortcuts-title" class="dialog-title" data-i18n="dlg.shortcuts">键盘快捷键</h2>
+<button id="shortcuts-close" class="icon-button dialog-close" type="button" data-i18n-attr="aria-label:set.close" aria-label="关闭">✕</button>
+</div>
+<dl class="shortcut-list">
+<div><dt><kbd>/</kbd></dt><dd data-i18n="shortcut.focus">聚焦搜索框</dd></div>
+<div><dt><kbd>↑</kbd><kbd>↓</kbd></dt><dd data-i18n="shortcut.move">在联想列表里移动</dd></div>
+<div><dt><kbd>Enter</kbd></dt><dd data-i18n="shortcut.enter">采用高亮项或提交搜索</dd></div>
+<div><dt><kbd>Esc</kbd></dt><dd data-i18n="shortcut.esc">关闭联想、抽屉或对话框</dd></div>
+<div><dt><kbd>Tab</kbd></dt><dd data-i18n="shortcut.tab">移出搜索框（自动收起联想）</dd></div>
+<div><dt><kbd>Delete</kbd></dt><dd data-i18n="shortcut.del">删除高亮的历史项</dd></div>
+<div><dt><kbd>?</kbd></dt><dd data-i18n="shortcut.help">打开这个快捷键说明</dd></div>
+<div><dt><kbd>!</kbd></dt><dd data-i18n="shortcut.bang">站点快捷搜索，例如 !gh rust</dd></div>
+<div><dt><kbd>Ctrl</kbd><kbd>⌘</kbd><kbd>K</kbd></dt><dd data-i18n="shortcut.palette">打开命令面板</dd></div>
+<div><dt><kbd>Ctrl</kbd><kbd>⌘</kbd></dt><dd data-i18n="shortcut.newtab">按住再点击站点按钮：新标签页打开</dd></div>
+</dl>
+</section>
 
-  <section id="sites-dialog" class="dialog dialog-wide" role="dialog" aria-modal="true"
-           aria-labelledby="sites-title" hidden>
-    <div class="dialog-header">
-      <h2 id="sites-title" class="dialog-title" data-i18n="dlg.sites">我的站点</h2>
-      <button id="sites-close" class="icon-button dialog-close" type="button" data-i18n-attr="aria-label:set.close" aria-label="关闭">✕</button>
-    </div>
-    <div class="dialog-body">
-      <p id="sites-empty" class="dialog-hint" data-i18n="sites.empty">还没有自定义站点。它们只保存在你的浏览器里。</p>
-      <ul id="sites-list" class="sites-list" data-i18n-attr="aria-label:dlg.sites" aria-label="自定义站点列表"></ul>
-      <div class="sites-actions">
-        <button id="site-add" class="text-button" type="button" data-i18n="sites.add">新增站点</button>
-        <button id="config-export" class="text-button" type="button" data-i18n="sites.export">导出配置</button>
-        <button id="config-import-open" class="text-button" type="button" data-i18n="sites.import">导入配置</button>
-        <input id="config-import-file" type="file" accept=".json,application/json" hidden>
-      </div>
-      <p id="sites-status" class="dialog-hint" role="status" aria-live="polite"></p>
-      <form id="site-form" class="site-form" hidden>
-        <h3 id="site-form-title" class="site-form-title" data-i18n="sites.new">新增站点</h3>
-        <label class="field"><span data-i18n="sites.name">名称</span><input id="site-label" name="label" type="text" required maxlength="24"></label>
-        <label class="field"><span data-i18n="sites.home">首页网址</span><input id="site-home" name="home" type="url" required placeholder="https://example.com"></label>
-        <label class="field"><span data-i18n="sites.search">搜索模板（用 {q} 表示关键词）</span><input id="site-search" name="search" type="text" required placeholder="https://example.com/search?q={q}"></label>
-        <label class="field"><span data-i18n="sites.group">分类</span><select id="site-group" name="group"></select></label>
-        <label class="field"><span data-i18n="sites.keywords">关键词（空格分隔，可选）</span><input id="site-keywords" name="keywords" type="text" placeholder="别名 关键词"></label>
-        <label class="field-inline"><input id="site-featured" name="featured" type="checkbox"><span data-i18n="sites.featured">放进「常用」</span></label>
-        <p id="site-form-error" class="form-error" role="alert" hidden></p>
-        <div class="form-actions">
-          <button id="site-save" class="text-button" type="submit" data-i18n="sites.save">保存</button>
-          <button id="site-cancel" class="text-button" type="button" data-i18n="sites.cancel">取消</button>
-        </div>
-      </form>
-    </div>
-  </section>
+<section id="sites-dialog" class="dialog dialog-wide" role="dialog" aria-modal="true"
+aria-labelledby="sites-title" hidden>
+<div class="dialog-header">
+<h2 id="sites-title" class="dialog-title" data-i18n="dlg.sites">我的站点</h2>
+<button id="sites-close" class="icon-button dialog-close" type="button" data-i18n-attr="aria-label:set.close" aria-label="关闭">✕</button>
+</div>
+<div class="dialog-body">
+<p id="sites-empty" class="dialog-hint" data-i18n="sites.empty">还没有自定义站点。它们只保存在你的浏览器里。</p>
+<ul id="sites-list" class="sites-list" data-i18n-attr="aria-label:dlg.sites" aria-label="自定义站点列表"></ul>
+<div class="sites-actions">
+<button id="site-add" class="text-button" type="button" data-i18n="sites.add">新增站点</button>
+<button id="config-export" class="text-button" type="button" data-i18n="sites.export">导出配置</button>
+<button id="config-import-open" class="text-button" type="button" data-i18n="sites.import">导入配置</button>
+<input id="config-import-file" type="file" accept=".json,application/json" hidden>
+</div>
+<p id="sites-status" class="dialog-hint" role="status" aria-live="polite"></p>
+<form id="site-form" class="site-form" hidden>
+<h3 id="site-form-title" class="site-form-title" data-i18n="sites.new">新增站点</h3>
+<label class="field"><span data-i18n="sites.name">名称</span><input id="site-label" name="label" type="text" required maxlength="24"></label>
+<label class="field"><span data-i18n="sites.home">首页网址</span><input id="site-home" name="home" type="url" required placeholder="https://example.com"></label>
+<label class="field"><span data-i18n="sites.search">搜索模板（用 {q} 表示关键词）</span><input id="site-search" name="search" type="text" required placeholder="https://example.com/search?q={q}"></label>
+<label class="field"><span data-i18n="sites.group">分类</span><select id="site-group" name="group"></select></label>
+<label class="field"><span data-i18n="sites.keywords">关键词（空格分隔，可选）</span><input id="site-keywords" name="keywords" type="text" placeholder="别名 关键词"></label>
+<label class="field-inline"><input id="site-featured" name="featured" type="checkbox"><span data-i18n="sites.featured">放进「常用」</span></label>
+<p id="site-form-error" class="form-error" role="alert" hidden></p>
+<div class="form-actions">
+<button id="site-save" class="text-button" type="submit" data-i18n="sites.save">保存</button>
+<button id="site-cancel" class="text-button" type="button" data-i18n="sites.cancel">取消</button>
+</div>
+</form>
+</div>
+</section>
 
-  <section id="order-dialog" class="dialog" role="dialog" aria-modal="true"
-           aria-labelledby="order-title" hidden>
-    <div class="dialog-header">
-      <h2 id="order-title" class="dialog-title" data-i18n="dlg.order">常用排序</h2>
-      <button id="order-close" class="icon-button dialog-close" type="button" data-i18n-attr="aria-label:set.close" aria-label="关闭">✕</button>
-    </div>
-    <div class="dialog-body">
-      <p class="dialog-hint" data-i18n="order.hint">调整「常用」视图里的按钮顺序，越靠上越靠前。</p>
-      <ul id="order-list" class="order-list" data-i18n-attr="aria-label:dlg.order" aria-label="常用站点顺序"></ul>
-    </div>
-  </section>
+<section id="order-dialog" class="dialog" role="dialog" aria-modal="true"
+aria-labelledby="order-title" hidden>
+<div class="dialog-header">
+<h2 id="order-title" class="dialog-title" data-i18n="dlg.order">常用排序</h2>
+<button id="order-close" class="icon-button dialog-close" type="button" data-i18n-attr="aria-label:set.close" aria-label="关闭">✕</button>
+</div>
+<div class="dialog-body">
+<p class="dialog-hint" data-i18n="order.hint">调整「常用」视图里的按钮顺序，越靠上越靠前。</p>
+<ul id="order-list" class="order-list" data-i18n-attr="aria-label:dlg.order" aria-label="常用站点顺序"></ul>
+</div>
+</section>
 
-  <div id="update-toast" class="snackbar" role="status" aria-live="polite" hidden>
-    <span class="snackbar-text" data-i18n="toast.update">新版本已就绪</span>
-    <button id="update-reload" class="snackbar-action" type="button" data-i18n="toast.reload">刷新</button>
-    <button id="update-dismiss" class="snackbar-action" type="button" data-i18n="toast.later">稍后</button>
-  </div>
+<div id="update-toast" class="snackbar" role="status" aria-live="polite" hidden>
+<span class="snackbar-text" data-i18n="toast.update">新版本已就绪</span>
+<button id="update-reload" class="snackbar-action" type="button" data-i18n="toast.reload">刷新</button>
+<button id="update-dismiss" class="snackbar-action" type="button" data-i18n="toast.later">稍后</button>
+</div>
 
-  <script defer src="assets/js/sites.js"></script>
-  <script defer src="assets/js/search.js"></script>
-  <script defer src="assets/js/suggest.js"></script>
-  <script defer src="assets/js/history.js"></script>
-  <script defer src="assets/js/theme.js"></script>
-  <script defer src="assets/js/i18n.js"></script>
-  <script defer src="assets/js/remote.js"></script>
-  <script defer src="assets/js/input.js"></script>
-  <script defer src="assets/js/sites-store.js"></script>
-  <script defer src="assets/js/sites-admin.js"></script>
-  <script defer src="assets/js/pwa.js"></script>
-  <script defer src="assets/js/palette.js"></script>
-  <script defer src="assets/js/app.js"></script>
+<script defer src="assets/js/sites.min.js"></script>
+<script defer src="assets/js/search.min.js"></script>
+<script defer src="assets/js/suggest.min.js"></script>
+<script defer src="assets/js/history.min.js"></script>
+<script defer src="assets/js/theme.min.js"></script>
+<script defer src="assets/js/i18n.min.js"></script>
+<script defer src="assets/js/remote.min.js"></script>
+<script defer src="assets/js/input.min.js"></script>
+<script defer src="assets/js/sites-store.min.js"></script>
+<script defer src="assets/js/sites-admin.min.js"></script>
+<script defer src="assets/js/pwa.min.js"></script>
+<script defer src="assets/js/palette.min.js"></script>
+<script defer src="assets/js/app.min.js"></script>
 </body>
 </html>

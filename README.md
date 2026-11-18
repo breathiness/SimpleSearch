@@ -34,7 +34,7 @@
 
 **SimpleSearch（简单搜索）** 是一个纯静态的聚合搜索页：输入关键词，点哪个站点就在哪个站点里搜；不输入关键词直接点，就打开那个网站。
 
-页面没有框架、没有运行时构建、没有第三方资源，核心功能全部在本地完成——唯一的例外是**默认开启、可一键关闭**的联网联想。可以部署到 GitHub Pages，也可以下载单文件版双击直接用。
+页面没有框架、没有运行时构建、没有第三方资源，核心功能全部在本地完成——唯一的例外是**默认开启、可一键关闭**的联网联想。可以部署到 GitHub Pages，也可以下载单文件版双击直接用。CSS / JS 在**构建时**做保守压缩（只删注释和缩进，源码保持可读，运行时行为不变）。
 
 <img src="docs/images/screenshot-desktop.png" alt="界面截图：常用视图（浅色）" width="100%">
 
@@ -57,7 +57,7 @@
 | 方式 | 说明 |
 | :--- | :--- |
 | **在线使用** | <https://breathiness.github.io/SimpleSearch/>（自动跟随系统深浅色） |
-| **单文件便携版** | 下载 [`SimpleSearch.html`](raw/main/SimpleSearch.html)（约 231 KB，双击即用、零外部请求） |
+| **单文件便携版** | 下载 [`SimpleSearch.html`](raw/main/SimpleSearch.html)（约 185 KB，双击即用、零外部请求） |
 | **装到桌面（PWA）** | Chrome / Edge 打开在线版 → 地址栏右侧「安装」，装完是独立窗口、可离线；设置里也会出现「安装到桌面」入口 |
 | **本地运行** | `git clone` 后直接双击 `index.html`，不需要服务器、不需要 `npm install` |
 

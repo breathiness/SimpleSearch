@@ -8,6 +8,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { SITE_ICONS, UI_ICONS } from './icons.mjs'
+import { minifyCss, minifyHtml, minifyJs } from './minify.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(HERE, '..')
@@ -206,20 +207,45 @@ function readTemplate(relative) {
   return fs.readFileSync(file, 'utf8')
 }
 
-// Service Worker 预缓存列表：首页 + 全部本地 CSS/JS/图标 + manifest（sw.js 自身不缓存）
-function buildPrecacheList() {
+// Service Worker 预缓存列表：从最终页面推导（只缓存真正被引用的 .min 产物 + manifest + 图标），
+// 不再把目录下所有 js/css 都塞进来（v2.13 起目录里同时存在可读源码与 .min 产物）。
+function buildPrecacheList(pageHtml) {
   const files = ['index.html', 'manifest.webmanifest']
-  for (const dir of ['assets/css', 'assets/js']) {
-    const abs = path.join(ROOT, dir)
-    if (!fs.existsSync(abs)) continue
-    for (const name of fs.readdirSync(abs).sort()) {
-      if (/\.(css|js)$/.test(name)) files.push(`${dir}/${name}`)
-    }
+  const seen = new Set(files)
+  const push = (rel) => {
+    if (!rel || seen.has(rel)) return
+    seen.add(rel)
+    files.push(rel)
   }
-  for (const name of ['favicon.svg', 'icon-192.png', 'icon-512.png']) {
-    if (fs.existsSync(path.join(ROOT, 'assets/img', name))) files.push(`assets/img/${name}`)
+  for (const match of pageHtml.matchAll(/<link[^>]+href="(assets\/[^"]+)"/g)) push(match[1])
+  for (const match of pageHtml.matchAll(/<script[^>]+src="(assets\/[^"]+)"/g)) push(match[1])
+  push('assets/img/favicon.svg')
+  push('assets/img/icon-192.png')
+  push('assets/img/icon-512.png')
+  return files.filter((rel) => rel === 'manifest.webmanifest' || fs.existsSync(path.join(ROOT, rel)))
+}
+
+// 构建期安全压缩：为页面引用的每个 CSS/JS 生成同目录 .min 产物，并把页面引用改成 .min 版本。
+// 返回 { html: 压缩后的页面, assets: [{ file, html }] }。
+function minifyAssets(pageHtml) {
+  const assets = []
+  let html = pageHtml
+
+  const cssRefs = [...pageHtml.matchAll(/<link rel="stylesheet" href="(assets\/css\/[^"]+\.css)">/g)].map((m) => m[1])
+  for (const rel of cssRefs) {
+    const minRel = rel.replace(/\.css$/, '.min.css')
+    assets.push({ file: minRel, html: minifyCss(fs.readFileSync(path.join(ROOT, rel), 'utf8')) })
+    html = html.split(`href="${rel}"`).join(`href="${minRel}"`)
   }
-  return files
+
+  const jsRefs = [...pageHtml.matchAll(/<script defer src="(assets\/js\/[^"]+\.js)"><\/script>/g)].map((m) => m[1])
+  for (const rel of jsRefs) {
+    const minRel = rel.replace(/\.js$/, '.min.js')
+    assets.push({ file: minRel, html: minifyJs(fs.readFileSync(path.join(ROOT, rel), 'utf8')) })
+    html = html.split(`src="${rel}"`).join(`src="${minRel}"`)
+  }
+
+  return { html: minifyHtml(html), assets }
 }
 
 function readAppVersion() {
@@ -234,12 +260,12 @@ function readAppVersion() {
 
 // 把多文件页面折叠成单文件便携版：CSS/JS/图标全部内联，零外部请求。
 // 注意：单文件版没有 sw.js / manifest，因此不注册 Service Worker（PWA 用多文件版）。
-function renderSingleFile(html) {
+function renderSingleFile(html, assetMap = new Map()) {
   let out = html
 
   // 1) 样式表 → <style>
   out = out.replace(/<link rel="stylesheet" href="(assets\/css\/[^"]+)">/g, (match, href) => {
-    const css = fs.readFileSync(path.join(ROOT, href), 'utf8')
+    const css = assetMap.get(href) ?? fs.readFileSync(path.join(ROOT, href), 'utf8')
     return `<style>\n/* ${href} */\n${css}\n</style>`
   })
 
@@ -252,13 +278,12 @@ function renderSingleFile(html) {
   out = out.replace(/\s*<link rel="apple-touch-icon" href="assets\/img\/icon-192\.png">/, '')
   out = out.replace(/\s*<link rel="manifest" href="manifest\.webmanifest">/, '')
 
-  // 3) 脚本 → 内联 <script>（保持原顺序与位置）；先插单文件标记
-  out = out.replace(
-    '<script defer src="assets/js/sites.js"></script>',
-    '<script>window.__SS_SINGLE_FILE = true;</script>\n  <script defer src="assets/js/sites.js"></script>'
-  )
+  // 3) 脚本 → 内联 <script>（保持原顺序与位置）；先插单文件标记（不依赖具体文件名，兼容 .min 版本）
+  out = out.replace(/(^[ \t]*)<script defer src="(assets\/js\/[^"]+)"><\/script>/m, (match, indent, src) => {
+    return `${indent}<script>window.__SS_SINGLE_FILE = true;</script>\n${indent}<script defer src="${src}"></script>`
+  })
   out = out.replace(/<script defer src="(assets\/js\/[^"]+)"><\/script>/g, (match, src) => {
-    const js = fs.readFileSync(path.join(ROOT, src), 'utf8')
+    const js = assetMap.get(src) ?? fs.readFileSync(path.join(ROOT, src), 'utf8')
     return `<script>\n/* ${src} */\n${js}\n</script>`
   })
 
@@ -274,7 +299,6 @@ async function main() {
   const redirectTemplate = readTemplate('templates/redirect.html')
   const swTemplate = readTemplate('templates/sw.js')
   const appVersion = readAppVersion()
-  const precacheList = buildPrecacheList()
 
   const SS = await loadRegistry()
   validateSites(SS.sites)
@@ -283,27 +307,26 @@ async function main() {
     console.warn('[build] 警告：SS.engines 缺少默认引擎，页面仍可生成（无 JS 时表单回退 Bing）')
   }
 
+  // 1) 可读页面 → 2) 生成 .min 资源并改写引用 → 3) 压缩页面 HTML
+  const readablePage = renderTemplate(
+    pageTemplate,
+    {
+      ...PAGE.values,
+      '{{ICON_SPRITE}}': renderIconSprite(SS.sites, SITE_ICONS),
+      '{{GROUP_NAV}}': renderGroupNav(groups),
+      '{{APP_VERSION}}': escapeHtml(appVersion),
+      '{{SITE_BUTTONS}}': renderSiteButtons(SS.sites, SITE_ICONS),
+    },
+    PAGE.output
+  )
+  const { html: pageHtml, assets: minAssets } = minifyAssets(readablePage)
+  const precacheList = buildPrecacheList(pageHtml)
+
   const outputs = []
-  outputs.push({
-    file: PAGE.output,
-    html: renderTemplate(
-      pageTemplate,
-      {
-        ...PAGE.values,
-        '{{ICON_SPRITE}}': renderIconSprite(SS.sites, SITE_ICONS),
-        '{{GROUP_NAV}}': renderGroupNav(groups),
-        '{{APP_VERSION}}': escapeHtml(appVersion),
-        '{{SITE_BUTTONS}}': renderSiteButtons(SS.sites, SITE_ICONS),
-      },
-      PAGE.output
-    ),
-  })
-
-  outputs.push({
-    file: 'SimpleSearch.html',
-    html: renderSingleFile(outputs[0].html),
-  })
-
+  outputs.push({ file: PAGE.output, html: pageHtml })
+  for (const asset of minAssets) outputs.push(asset)
+  const assetMap = new Map(minAssets.map((asset) => [asset.file, asset.html]))
+  outputs.push({ file: 'SimpleSearch.html', html: renderSingleFile(pageHtml, assetMap) })
   outputs.push({
     file: 'sw.js',
     html: renderTemplate(
@@ -330,15 +353,27 @@ async function main() {
     })
   }
 
-  let drift = 0
-  for (const { file, html } of outputs) {
-    const target = path.join(ROOT, file)
-    const current = fs.existsSync(target) ? fs.readFileSync(target, 'utf8') : null
+  // 孤儿 .min 产物：源码删掉/改名后不能留下旧文件（也会让 SW precache 与漂移检查失真）
+  const expected = new Set(minAssets.map((asset) => asset.file))
+  const orphans = []
+  for (const dir of ['assets/css', 'assets/js']) {
+    const abs = path.join(ROOT, dir)
+    if (!fs.existsSync(abs)) continue
+    for (const name of fs.readdirSync(abs).sort()) {
+      if (!/\.min\.(js|css)$/.test(name)) continue
+      const rel = `${dir}/${name}`
+      if (!expected.has(rel)) orphans.push(rel)
+    }
+  }
 
-    if (CHECK_ONLY) {
+  let drift = 0
+  if (CHECK_ONLY) {
+    for (const { file, html } of outputs) {
+      const target = path.join(ROOT, file)
+      const current = fs.existsSync(target) ? fs.readFileSync(target, 'utf8') : null
       if (current !== html) {
         console.error(`[build] ${file} 与模板/注册表不一致，请运行 npm run build`)
-        if (process.env.BUILD_DEBUG) {
+        if (process.env.BUILD_DEBUG && typeof current === 'string') {
           let i = 0
           while (i < current.length && i < html.length && current[i] === html[i]) i += 1
           console.error(`  first diff @${i} len=${current.length}/${html.length}`)
@@ -347,19 +382,25 @@ async function main() {
         }
         drift += 1
       }
-      continue
     }
-
-    fs.writeFileSync(target, html, 'utf8')
-    console.log(`[build] 写入 ${file}（${Buffer.byteLength(html, 'utf8')} 字节）`)
-  }
-
-  if (CHECK_ONLY) {
+    for (const rel of orphans) {
+      console.error(`[build] 孤儿产物 ${rel}（源码已删除或改名）`)
+      drift += 1
+    }
     if (drift > 0) process.exit(1)
     console.log('[build] 生成产物已是最新')
-  } else {
-    console.log(`[build] 完成：1 个页面 + ${REDIRECTS.length} 个重定向壳，${SS.sites.length} 个站点`)
+    return
   }
+
+  for (const { file, html } of outputs) {
+    fs.writeFileSync(path.join(ROOT, file), html, 'utf8')
+    console.log(`[build] 写入 ${file}（${Buffer.byteLength(html, 'utf8')} 字节）`)
+  }
+  for (const rel of orphans) {
+    fs.rmSync(path.join(ROOT, rel))
+    console.log(`[build] 清理孤儿产物 ${rel}`)
+  }
+  console.log(`[build] 完成：1 个页面 + ${minAssets.length} 个压缩资源 + ${REDIRECTS.length} 个重定向壳，${SS.sites.length} 个站点`)
 }
 
 main().catch((err) => {
