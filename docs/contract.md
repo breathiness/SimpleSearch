@@ -824,3 +824,35 @@ README 增加「书签小工具」小节：一段可复制的 `javascript:` 书�
 - 单测：`SS.i18n`（语言解析优先级、t 占位/回退、apply 文本与属性、zh/en key 一致）；`SS.palette.matchSites/matchCommands`（子序列、前缀优先、无匹配、中文）；`SS.remote` 自定义源解析三种响应形状（可对纯函数注入 fetch mock）。
 - validate：`#palette`/`#palette-input`/`#palette-list` 存在且 `#palette` 初始 hidden；`#lang-mode`/`#suggest-provider`/`#suggest-custom-row`(hidden)/`#suggest-url` 存在；i18n.js/palette.js 在脚本列表（13 个）且顺序在 app.js 之前；zh/en 词表 key 一致且 `data-i18n` 引用的 key 都存在；体积门禁 **232 KB**。
 - e2e（G 段）：`Ctrl+K` 打开面板 → 输入 `git` → 结果含 GitHub → `Enter` 打开站点（拦截导航断言 URL）；`Esc` 关闭；设置里切 English → 导航/设置/卡片标题变英文、`<html lang="en">`、刷新后仍英文；切回中文；联想源切 `custom` 填一个本地 mock URL（e2e 静态服务器可提供 `/suggest.json?q=xx` 假数据）→ 联想出现自定义词；`off` 时不发远程请求。
+
+## 24. v2.13：构建期安全压缩（只做压缩，不改功能/交互）
+
+目标：首屏 230.3 KB / gzip 66.7 / brotli 54.9 → **≈183 KB / gzip ≈49.6 / brotli ≈41.9**，且**视觉与行为零变化**。
+
+### 24.1 压缩器 `scripts/minify.mjs`（零依赖，保守策略）
+
+- `minifyJs(text)`：用**字符级状态机**（normal / 'single' / "double" / `template`（含 `${}` 嵌套）/ line-comment / block-comment / regex 启发式）只删除：
+  1) `/* ... */` 块注释；2) **整行 `//` 注释**（行首缩进后就是 `//`）；3) 行首缩进与行尾空白；4) 连续空行合并为一行。
+  **不重命名标识符、不合并行、不删行尾注释、不改变字符串/模板字面量/正则内容**。
+- `minifyCss(text)`：删 `/* */` 注释、去缩进/行尾空白、合并空行（不重排、不合并选择器）。
+- `minifyHtml(text)`：删 HTML 注释（保留 `<!--[if` 条件注释）、去行首缩进/行尾空白、合并空行；**保留每行一个换行**（避免把行内元素间的空白节点吃掉）。
+- 三者都是纯函数，便于单测；对含 `/*` 的字符串、模板字面量里以 `//` 开头的行等边界必须有测试。
+
+### 24.2 构建集成（保留可读源码，产物压缩）
+
+- `build` 在生成可读 `index.html` 后：
+  1. 读取页面里引用的每个 `assets/css/*.css`、`assets/js/*.js`，压缩后写入同目录的 `*.min.css` / `*.min.js`；
+  2. 把页面里的引用改成 `.min` 版本；
+  3. 对页面 HTML 做 `minifyHtml` 后写入 `index.html`；
+  4. 单文件版 `SimpleSearch.html` 由**压缩后的页面**生成（内联的是 min 版本）。
+- 每次构建先清掉目录里旧的 `*.min.*`，再写入当前集合（源文件删除后不会留孤儿产物；`build --check` 与 CI 漂移检查会覆盖 min 文件）。
+- `buildPrecacheList()` 改为**从最终页面引用推导**（`<link href>` / `<script src>` + manifest + PWA 图标 + favicon），不再把目录里所有 `.js/.css` 都塞进 precache。
+- 可读源码不删、不移动；单元测试继续 `import` 原文件；页面运行时只加载 `.min` 版本。
+
+### 24.3 体积与门禁
+
+- 实测目标：首屏 **≤192 KB raw / gzip ≤57 KB**（实际 190.7 / 56.1 / brotli 48.3）；`BUDGET_KB` **232 → 196**（按 raw 硬门禁，gzip 仍仅信息输出）。
+- 单文件版预计 ≈183 KB（上限 260 不变）；脚本数量不变（13 个，只是都换成 `.min.js`）。
+- validate：脚本顺序/数量断言要兼容 `.min`（名字归一化）；新增 min 产物存在性、min 文件无 `eval(`/`new Function(`、`build --check` 覆盖 min 文件。
+- 新增 `tests/minify.test.mjs`：边界（字符串含 `/*`、模板字面量、URL `https://`、行尾注释保留）、幂等（再压缩不变）、对每个 `assets/js/*.js` 压缩后用 `vm.Script` 可解析、`sites.js` 压缩后数据与原始一致。
+- e2e 全部 195 项必须通过（页面现在加载 `.min` 脚本）；`visual` 4/4 **0 px 差异**（压缩必须视觉等价）。

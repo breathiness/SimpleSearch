@@ -1,28 +1,28 @@
 // 由 scripts/build.mjs 从 templates/sw.js 生成，请勿手改。
 // Service Worker：预缓存首页静态资源，断网也能打开；跨域请求（百度联想等）不拦截。
-const VERSION = '2.12.1'
+const VERSION = '2.13.0'
 const CACHE = 'simplesearch-' + VERSION
 const PRECACHE = [
   "index.html",
   "manifest.webmanifest",
-  "assets/css/base.css",
-  "assets/css/input.css",
-  "assets/css/tokens.css",
-  "assets/js/app.js",
-  "assets/js/history.js",
-  "assets/js/i18n.js",
-  "assets/js/input.js",
-  "assets/js/palette.js",
-  "assets/js/pwa.js",
-  "assets/js/remote.js",
-  "assets/js/search.js",
-  "assets/js/sites-admin.js",
-  "assets/js/sites-store.js",
-  "assets/js/sites.js",
-  "assets/js/suggest.js",
-  "assets/js/theme.js",
   "assets/img/favicon.svg",
   "assets/img/icon-192.png",
+  "assets/css/tokens.min.css",
+  "assets/css/base.min.css",
+  "assets/css/input.min.css",
+  "assets/js/sites.min.js",
+  "assets/js/search.min.js",
+  "assets/js/suggest.min.js",
+  "assets/js/history.min.js",
+  "assets/js/theme.min.js",
+  "assets/js/i18n.min.js",
+  "assets/js/remote.min.js",
+  "assets/js/input.min.js",
+  "assets/js/sites-store.min.js",
+  "assets/js/sites-admin.min.js",
+  "assets/js/pwa.min.js",
+  "assets/js/palette.min.js",
+  "assets/js/app.min.js",
   "assets/img/icon-512.png"
 ]
 
