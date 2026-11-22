@@ -42,7 +42,7 @@ SimpleSearch/
 ├─ scripts/           # build.mjs / minify.mjs / icons.mjs（dev-time 图标数据）/ serve.mjs / validate.mjs / e2e.mjs / check-sites.mjs / site-health-report.mjs / visual.mjs
 ├─ templates/         # page.html（真实页：顶栏 / 导航 / 卡片 / 设置抽屉 / 快捷键对话框）/ redirect.html（重定向壳）/ sw.js（Service Worker 模板）
 ├─ tests/             # node:test 单元测试（import 的是可读源码，不是 min）
-├─ .github/workflows/ # ci.yml（push / PR 门禁）+ site-health.yml（每周站点巡检）
+├─ .github/workflows/ # ci.yml（main push + PR 门禁）+ site-health.yml（每周站点巡检）
 ├─ manifest.webmanifest # PWA manifest（手写）
 ├─ sw.js              # Service Worker，由 build 生成，勿手改
 ├─ index.html         # 唯一真实页面（多文件 + PWA），由 build 生成，勿手改
@@ -330,7 +330,7 @@ SS.remote.provider = {
 - 当前测试基线：`npm test` **302 例**、`npm run validate` **37 项**、`npm run e2e` **195 项**全绿；覆盖率基线约 96% 行 / 81% 分支 / 88% 函数（阈值 90 / 75 / 80）。
 - `npm run coverage` 可选、不进 CI 必跑；`npm run check:sites` 同样可选、需要网络。
 - `npm run e2e` 真实浏览器检查：单页主题解析、主题三态与主题色切换与持久化、深链 `?cat=` / `?q=` / `?site=`、`!bang` 直达、搜索引擎切换（表单 action/name/存储）、快捷键对话框（`?` 打开、Esc 关闭归还焦点）、PWA 注册 / 断网刷新 / 安装引导 / 新版本 snackbar、导入配置 1MB 上限、社交分享 meta、iPhone 安全区、两个旧链接的 0 秒跳转与地址栏清理、联网联想开关 / 超时降级 / 真实百度联调、分类导航筛选与左侧抽屉开合、设置面板、搜索历史计数 / 清空 / 单条删除、版本号、图标 sprite（无额外图片请求）、960px 断点与 390px 移动端布局、`file://` 打开。
-- **CI 两个 job**（`.github/workflows/ci.yml`，都在 `push` / `pull_request` 触发、并行）：
+- **CI 两个 job**（`.github/workflows/ci.yml`，都在 **main 的 `push` 与 `pull_request`** 触发、并行；分支 push 与 tag push 不触发，避免同一 commit 重复跑）：
   - `check`：ubuntu-latest + Node 22 → `npm run build` + 产物漂移 `git diff --exit-code` → `npm run check`；
   - `e2e`：ubuntu-latest + Node 22 → `node scripts/e2e.mjs`（零依赖、不跑 `npm install`）。runner 预装 `/usr/bin/google-chrome`，`findBrowser()` 会找到它。
 - **E2E 在 Ubuntu Chrome 下的注意事项**：headless 无 GPU 不影响行为断言；跨平台字体/渲染差异只影响像素，e2e 只做 DOM / 交互 / 网络断言，**不要加截图或视觉断言**（视觉回归留在本地 `npm run visual`）；不要写「没装浏览器就跳过」这种只适用于开发机的分支，CI runner 一定有 Chrome。
