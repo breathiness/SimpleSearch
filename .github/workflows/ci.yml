@@ -1,7 +1,10 @@
 name: CI
 
+# 只在 main 的 push 与 PR 上跑：分支 push 不再各跑一遍（同一 commit 只跑一次），
+# 也顺带减少 Actions 通知；tag push 不触发（tag 指向的 commit 已在 main 上验证过）。
 on:
   push:
+    branches: [main]
   pull_request:
 
 permissions:
